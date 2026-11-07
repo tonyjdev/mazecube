@@ -4,6 +4,10 @@ extends Node3D
 ## El nivel que se juega lo indica GameState.current_level (se elige en el
 ## selector de niveles del menú).
 ##
+## Sonidos (ver Sfx): vuelcos, rebotes, giros descartados, llaves, puertas,
+## muros, botones y barrotes, power ups, media vuelta, muerte, meta y botones
+## de la interfaz.
+##
 ## Vibración (si está activada en Opciones): al destruir un muro, al pulsar
 ## un botón, al morir el cubo y, muy suave, al descartarse un giro. La flecha sobre el cubo se puede ocultar
 ## en Opciones.
@@ -71,21 +75,35 @@ func _ready() -> void:
 	cube.reached_goal.connect(_on_reached_goal)
 	level.cube = cube
 	cube.died.connect(func(_cell: Vector2i) -> void:
+		Sfx.play("explode")
 		level.notify_cube_died()
 		camera.shake()
 		GameState.vibrate(GameState.VIBRATION_DEATH))
 	cube.show_arrow = GameState.show_arrow
 	cube.turn_rejected.connect(func(_dir: Vector2i) -> void:
+		Sfx.play("reject")
 		GameState.vibrate(GameState.VIBRATION_TURN_REJECTED))
 	cube.breakable_hit.connect(func(_cell: Vector2i, hits_left: int) -> void:
+		Sfx.play("crack" if hits_left > 0 else "break", 0.08)
 		if hits_left == 0:
 			GameState.vibrate(GameState.VIBRATION_WALL_BROKEN))
 	cube.reversed.connect(func(_cell: Vector2i) -> void:
+		Sfx.play("reverse")
 		camera.shake()
 		GameState.vibrate(GameState.VIBRATION_REVERSE))
 	cube.button_pressed.connect(func(_cell: Vector2i) -> void:
+		Sfx.play("button")
+		Sfx.play("bars", 0.05)
 		camera.notify_button_pressed()
 		GameState.vibrate(GameState.VIBRATION_BUTTON))
+	cube.rolled.connect(func(_cell: Vector2i) -> void: Sfx.play("roll", 0.12))
+	cube.bounced.connect(func(_cell: Vector2i) -> void: Sfx.play("bounce", 0.1))
+	cube.key_picked.connect(func(_color: String) -> void: Sfx.play("key"))
+	cube.door_opened.connect(func(_color: String) -> void: Sfx.play("door"))
+	cube.power_up_picked.connect(func(_power_up: PowerUp, _stacks: int) -> void:
+		Sfx.play("powerup"))
+	for button in find_children("*", "BaseButton", true, false):
+		(button as BaseButton).pressed.connect(func() -> void: Sfx.play("click"))
 	pause_button.pressed.connect(_set_paused.bind(true))
 	%ContinueButton.pressed.connect(_set_paused.bind(false))
 	%RestartButton.pressed.connect(func() -> void:
@@ -238,6 +256,7 @@ func _next_level() -> void:
 
 
 func _on_reached_goal() -> void:
+	Sfx.play("goal")
 	GameState.mark_completed(current_level)
 	pause_button.visible = false
 	var last := current_level >= Levels.count() - 1

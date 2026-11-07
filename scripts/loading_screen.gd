@@ -79,6 +79,7 @@ func _ready() -> void:
 	_continue_button.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_continue_button.visible = false
 	_continue_button.pressed.connect(_on_continue)
+	_continue_button.pressed.connect(func() -> void: Sfx.play("click"))
 	slot.add_child(_continue_button)
 
 	var tip_title := _make_label("LOADING_TIP", 26, DIM_TEXT)

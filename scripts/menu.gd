@@ -45,7 +45,11 @@ func _ready() -> void:
 	%OptionsButton.pressed.connect(_show.bind("options"))
 	%CreditsButton.pressed.connect(_show.bind("credits"))
 	%QuitButton.pressed.connect(get_tree().quit)
-	%LevelMap.level_chosen.connect(GameState.play_level)
+	%LevelMap.level_chosen.connect(func(index: int) -> void:
+		Sfx.play("click")
+		GameState.play_level(index))
+	for button in find_children("*", "BaseButton", true, false):
+		(button as BaseButton).pressed.connect(func() -> void: Sfx.play("click"))
 	for back in [%LevelsBack, %OptionsBack, %CreditsBack]:
 		back.pressed.connect(_show.bind("main"))
 	_setup_options()

@@ -190,6 +190,8 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 
 ## 5. Presentación visual
 
+- **Efectos de sonido:** vuelco del cubo (golpe sordo, con el tono un poco al azar), rebote, giro descartado, llave cogida (campanitas), puerta abierta, golpe y derrumbe de muros destructibles, botón y barrotes, power up, media vuelta (soplido), explosión del cubo, meta (fanfarria), alarma cuando un perseguidor ve al cubo y clic en los botones de la interfaz. Son sonidos sintetizados (no hay grabaciones externas) con `tools/make_sfx.py` y suenan por el canal «SFX».
+
 - **Icono de la aplicación:** un cubo isométrico con los colores de las caras del cubo del juego (amarillo, azul y rojo) y la flecha de rumbo, sobre el fondo marrón del menú con trozos de muro de laberinto. En Android se usa también como icono adaptativo (primer plano, fondo y versión monocromática). Se genera con `tools/make_icon.py`.
 - Juego en **3D**, con cubo y laberinto visibles desde arriba.
 - **Cámara — Decidido:** vista **cenital ligeramente inclinada**, en perspectiva (unos 65° sobre el tablero). Se descartó la isométrica, que en vertical mostraba el tablero bastante más pequeño. La cámara es fija: no hay opción para cambiarla.
@@ -207,7 +209,7 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 
 ### 6.1. Progresión
 
-- El juego tiene **16 niveles** de **dificultad creciente**.
+- El juego tiene **30 niveles** de **dificultad creciente**.
 - Los niveles se eligen en el **selector de niveles** (apartado 7.2). Solo se puede entrar en los **completados** y en los **desbloqueados**: el nivel 1 está siempre desbloqueado y completar un nivel desbloquea el siguiente.
 - Al llegar a la meta, el nivel queda **completado** y se muestra «¡Nivel completado!» con **Siguiente nivel**, **Repetir** y **Niveles** (vuelve al selector). Tras el último nivel se indica que se han completado todos.
 - El jugador puede **reiniciar** el nivel en cualquier momento desde el menú de pausa.
@@ -233,6 +235,8 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 - **Los niveles actuales son de prueba de mecánicas**; los niveles definitivos los proporcionará el diseñador.
 - Los niveles de prueba van de **1 a 27 giros** y crecen de forma progresiva, de **9×5 a 23×17 casillas** (en torno a un 15-20% más de casillas cada uno), alternando mapas apaisados y verticales. Los niveles pequeños caben enteros en pantalla; en los grandes la cámara sigue al cubo.
 - Desde el nivel 3 incluyen parejas llave/puerta, y cada puerta es imprescindible (convertida en muro, el nivel no tendría solución). Los niveles 4 y 7 tienen un power up de velocidad y el 9 tres seguidos, para probar la acumulación. Hay muros destructibles en los niveles 2, 5, 7 y 10 (hay que romperlos para pasar) y en el 8 (un atajo: sin romperlo harían falta 26 giros en vez de 14). Los niveles 11 a 13 introducen los botones y barrotes; cada botón es imprescindible (sin él, el nivel no tendría solución). Los niveles 14 a 16 presentan los enemigos, uno por nivel, en laberintos con bucles para poder esquivarlos; por eso sus giros mínimos no siguen la progresión.
+- Los niveles **17 a 30** son **mapas grandes** (de 27×19 a 64×34 casillas) que combinan todos los mecanismos y enemigos, con dificultad creciente de **27 a 64 giros**. Se alternan dos tipos de mapa: **salas y pasillos** (salas rectangulares, algunas con pilares, unidas por pasillos de una casilla, rectos o en zigzag) y **laberintos** con pocos bucles. Las puertas, los barrotes cerrados y los muros destructibles están siempre en pasillos de paso obligado (son imprescindibles), cada llave está entre su puerta y la anterior (a ser posible en un rincón apartado) y cada **botón está a 6 casillas o menos de sus barrotes**, para que se vean juntos. Los patrulleros rodean salas o recorren pasillos rectos lejos de la salida y los perseguidores empiezan a 12 casillas o más de ella.
+- Estos niveles los crea el **generador de niveles** `tools/build_levels.py` (determinista: con las mismas semillas sale siempre lo mismo), que los valida con el resolvedor y elige, para cada nivel, el candidato cuyo mínimo de giros se acerca más al objetivo.
 
 | Nivel | Nombre | Tamaño | Forma | Parejas llave/puerta | Muros destructibles | Power ups | Botones y barrotes | Giros mínimos |
 |---|---|---|---|---|---|---|---|---|
@@ -252,13 +256,27 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 | 14 | La patrulla | 17×13 | apaisado | — | — | — | — | 12 (3 patrulleros: línea recta, ida y vuelta y circular) |
 | 15 | Perseguidos | 15×19 | vertical | — | — | — | — | 14 (2 perseguidores) |
 | 16 | El guardián | 15×6 | apaisado | — | — | — | 1 botón, 2 barrotes abiertos para encerrar al obstáculo | 5 (1 obstáculo) |
+| 17 | Pasillos | 42×16 | salas y pasillos | amarilla | — | — | — | 27 (1 patrullero) |
+| 18 | Laberinto de piedra | 27×19 | laberinto | amarilla, naranja | 1 (3 golpes) | — | — | 30 (1 patrullero) |
+| 19 | La celda | 31×28 | salas y pasillos | amarilla | — | — | 1 botón, 1 barrote cerrado | 33 (1 perseguidor, 1 patrullero) |
+| 20 | Velocidad punta | 29×21 | laberinto | amarilla, naranja | 1 (3 golpes) | 2 velocidad | — | 35 (2 patrulleros) |
+| 21 | Los aposentos | 42×25 | salas y pasillos | amarilla, naranja | — | — | 1 botón, 1 barrote cerrado | 38 (1 patrullero, 1 obstáculo) |
+| 22 | Rejas | 33×23 | laberinto | amarilla | 1 (4 golpes) | — | 2 botones, 2 barrotes cerrados | 38 (1 perseguidor, 1 patrullero) |
+| 23 | La cacería | 42×28 | salas y pasillos | amarilla, naranja | — | 1 velocidad | 1 botón, 1 barrote cerrado | 43 (2 perseguidores, 1 patrullero) |
+| 24 | Las catacumbas | 31×23 | laberinto | amarilla, naranja, azul | 1 (2 golpes) | 1 velocidad | — | 45 (2 patrulleros, 1 obstáculo) |
+| 25 | El vigilante | 42×34 | salas y pasillos | amarilla, naranja | — | — | 2 botones, 2 barrotes cerrados | 47 (2 patrulleros, 1 obstáculo) |
+| 26 | Persecución | 35×25 | laberinto | amarilla, naranja, azul | — | 1 velocidad | 1 botón, 1 barrote cerrado | 50 (2 perseguidores, 1 patrullero) |
+| 27 | La ronda | 53×28 | salas y pasillos | amarilla, naranja | 1 (4 golpes) | 1 velocidad | 1 botón, 1 barrote cerrado | 53 (1 perseguidor, 3 patrulleros) |
+| 28 | El bastión | 37×27 | laberinto | amarilla, naranja, azul | 1 (2 golpes) | 1 velocidad | 1 botón, 1 barrote cerrado | 59 (1 perseguidor, 2 patrulleros, 1 obstáculo) |
+| 29 | El palacio | 53×34 | salas y pasillos | amarilla, naranja, azul | — | 1 velocidad | 2 botones, 2 barrotes cerrados | 59 (1 perseguidor, 3 patrulleros, 1 obstáculo) |
+| 30 | El gran laberinto | 64×34 | salas y pasillos | amarilla, naranja, azul | 1 (3 golpes) | 2 velocidad | 2 botones, 2 barrotes cerrados | 64 (2 perseguidores, 3 patrulleros, 1 obstáculo) |
 
 ## 7. Menús y controles — Confirmada
 
 ### 7.1. Menú principal
 
 - **Jugar:** abre el selector de niveles.
-- **Opciones:** volumen de **efectos de sonido** y de **música** (0-100%; todavía no hay sonidos ni música, pero ya existen los canales de audio «SFX» y «Music»), **antialiasing** (activado/desactivado), **vibración** (activada/desactivada; al activarla vibra brevemente como prueba), **flecha de dirección** sobre el cubo (mostrar/ocultar) e **idioma** (español o inglés). Los cambios se aplican al momento y se guardan en el dispositivo. Por defecto se usa el idioma del sistema si es español o inglés, y si no, inglés.
+- **Opciones:** volumen de **efectos de sonido** y de **música** (0-100%; canales de audio «SFX» y «Music»; todavía no hay música), **antialiasing** (activado/desactivado), **vibración** (activada/desactivada; al activarla vibra brevemente como prueba), **flecha de dirección** sobre el cubo (mostrar/ocultar) e **idioma** (español o inglés). Los cambios se aplican al momento y se guardan en el dispositivo. Por defecto se usa el idioma del sistema si es español o inglés, y si no, inglés.
 - **Créditos:** equipo de desarrollo, gráficos, sonido, tipografía, herramientas y licencia del motor, en una lista que se puede desplazar.
 - **Salir:** cierra el juego (igual que pulsar Atrás en la pantalla principal).
 

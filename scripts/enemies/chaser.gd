@@ -63,6 +63,8 @@ func _update_awareness() -> void:
 
 
 func _set_chasing(chasing: bool) -> void:
+	if chasing and not is_chasing:
+		Sfx.play("alert")
 	is_chasing = chasing
 	step_time = CHASE_STEP_TIME if chasing else WANDER_STEP_TIME
 	if _body_mat:

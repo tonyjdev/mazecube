@@ -129,6 +129,10 @@ func build() -> void:
 	var wall_mat := _make_material(Color(0.32, 0.36, 0.45))
 	var start_mat := _make_material(Color(0.35, 0.60, 0.95))
 	var goal_mat := _make_material(Color(0.30, 0.80, 0.45))
+	# Muros y baldosas normales se dibujan con MultiMesh (una llamada de dibujo
+	# por tipo): los mapas grandes tienen miles de casillas.
+	var wall_cells: Array[Vector2i] = []
+	var floor_cells := [[], []]
 
 	for z in layout.size():
 		var row: String = layout[z]
@@ -136,20 +140,20 @@ func build() -> void:
 			var cell := Vector2i(x, z)
 			var symbol := row[x]
 			if symbol == "#" or BUTTON_CHARS.contains(symbol):
-				_add_box(cell, Vector3(CELL_SIZE, WALL_HEIGHT, CELL_SIZE), WALL_HEIGHT * 0.5, wall_mat)
+				wall_cells.append(cell)
 				if symbol != "#":
 					_add_button(cell, symbol)
 				continue
 			_walkable[cell] = true
-			var mat := floor_a if (x + z) % 2 == 0 else floor_b
+			var tile := Vector3(CELL_SIZE * 0.96, FLOOR_THICKNESS, CELL_SIZE * 0.96)
 			if symbol == "A":
 				start_cell = cell
-				mat = start_mat
+				_add_box(cell, tile, -FLOOR_THICKNESS * 0.5, start_mat)
 			elif symbol == "B":
 				goal_cell = cell
-				mat = goal_mat
-			var tile := Vector3(CELL_SIZE * 0.96, FLOOR_THICKNESS, CELL_SIZE * 0.96)
-			_add_box(cell, tile, -FLOOR_THICKNESS * 0.5, mat)
+				_add_box(cell, tile, -FLOOR_THICKNESS * 0.5, goal_mat)
+			else:
+				floor_cells[(x + z) % 2].append(cell)
 			if KEY_CHARS.contains(symbol):
 				_add_key(cell, symbol)
 			elif KEY_CHARS.to_upper().contains(symbol):
@@ -162,6 +166,10 @@ func build() -> void:
 				_add_bars(cell, symbol)
 			elif symbol == CHASER_CHAR or symbol == BLOCKER_CHAR or PATROL_CHARS.contains(symbol):
 				enemy_cells[cell] = symbol
+	_add_multimesh(wall_cells, Vector3(CELL_SIZE, WALL_HEIGHT, CELL_SIZE), WALL_HEIGHT * 0.5, wall_mat)
+	var tile_size := Vector3(CELL_SIZE * 0.96, FLOOR_THICKNESS, CELL_SIZE * 0.96)
+	_add_multimesh(floor_cells[0], tile_size, -FLOOR_THICKNESS * 0.5, floor_a)
+	_add_multimesh(floor_cells[1], tile_size, -FLOOR_THICKNESS * 0.5, floor_b)
 	for cell: Vector2i in enemy_cells:
 		_add_enemy(cell, enemy_cells[cell])
 	for button in _buttons.values():
@@ -352,6 +360,26 @@ func get_grid_size() -> Vector2i:
 	for row in layout:
 		width = maxi(width, row.length())
 	return Vector2i(width, layout.size())
+
+
+## Un mismo bloque repetido en varias casillas, en un solo MultiMesh.
+func _add_multimesh(cells: Array, size: Vector3, y: float, mat: Material) -> void:
+	if cells.is_empty():
+		return
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	mesh.material = mat
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.mesh = mesh
+	multimesh.instance_count = cells.size()
+	for i in cells.size():
+		var cell: Vector2i = cells[i]
+		multimesh.set_instance_transform(i,
+			Transform3D(Basis.IDENTITY, Vector3(cell.x * CELL_SIZE, y, cell.y * CELL_SIZE)))
+	var instance := MultiMeshInstance3D.new()
+	instance.multimesh = multimesh
+	add_child(instance)
 
 
 func _add_box(cell: Vector2i, size: Vector3, y: float, mat: Material) -> MeshInstance3D:
