@@ -10,6 +10,11 @@ extends RefCounted
 ## Muros destructibles: '1'..'5' = golpes que aguantan (5 pocas grietas, 1
 ## muchas). En los niveles 2, 5, 7 y 10 hay que romperlos para pasar; en el 8
 ## es un atajo (sin romperlo harían falta 26 giros en vez de 14).
+## Botones y barrotes (niveles 11-13): barrotes 'c' 'd' 'e' 'f' 'h' (grupo;
+## minúscula = empiezan abiertos, mayúscula = cerrados) y botones 'p' 'q' 't'
+## 'v' 'w' (muros con botón en la cara que da a su única casilla libre). El
+## campo "buttons" indica qué grupos cambia cada botón: {"p": "cd"}. Cada
+## botón es imprescindible (sin él, el nivel no tendría solución).
 ##
 ## Los niveles crecen de forma progresiva (en torno a un 15-20% más de
 ## casillas cada uno) y alternan forma apaisada y vertical. Los pequeños
@@ -214,6 +219,85 @@ const LIST: Array[Dictionary] = [
 			"#.........O.#.#",
 			"###############",
 		],
+	},
+	{
+		"name": "El botón",
+		"turns": 21,
+		"start_heading": Vector2i(1, 0),
+		"layout": [
+			"#################p#",
+			"#...#y#.......A.#.#",
+			"#.#.#.#.#######.#.#",
+			"#.#.#.#.#.......#.#",
+			"#.#.#.#.#.###.###.#",
+			"#.#.#.......#.#...#",
+			"###.#####.#.#s#Y###",
+			"#...#.....#.#.#...#",
+			"#.###C#####.#.#.#.#",
+			"#.....#.#...#.#.#.#",
+			"#.#.###.#.###.#.#.#",
+			"#.#.....#...#...#.#",
+			"#.#.###.###.#.###.#",
+			"#..B......#.......#",
+			"###################",
+		],
+		"buttons": {"p": "c"},
+	},
+	{
+		"name": "Barrotes",
+		"turns": 22,
+		"start_heading": Vector2i(1, 0),
+		"layout": [
+			"###############",
+			"p.......#A....#",
+			"#####.#.#.###.#",
+			"#.......#...#.#",
+			"#.#####.#.#.#.#",
+			"#.#...#.....#.#",
+			"#.###.###.#.#.#",
+			"#...#..d....#.#",
+			"###.#.#####.#.#",
+			"#...#.#.....#.#",
+			"#.###.#.#####.#",
+			"#.#...#.....#.#",
+			"#.#.###.#.#.#d#",
+			"#.....#...#.#.#",
+			"#.###.###.#.#.#",
+			"#D#.......#...#",
+			"#.#############",
+			"#.#.....#.....#",
+			"#.#.###.#####.#",
+			"#...#.#...#...#",
+			"#C###.#.###.###",
+			"#..B..#..2....q",
+			"###############",
+		],
+		"buttons": {"p": "d", "q": "cd"},
+	},
+	{
+		"name": "La fortaleza",
+		"turns": 27,
+		"start_heading": Vector2i(0, 1),
+		"layout": [
+			"#######################",
+			"p....A#.E.....D...#...#",
+			"#####.#Y###.#.#.#.#.#.#",
+			"#.....#.#.#...#.#.#...#",
+			"#.#.#.#.#.#####.#.#.#.#",
+			"#.#...#...#y#.......#.#",
+			"#.#######.#.#.#########",
+			"#.......#.#.#.C.#.....#",
+			"#.###.###.#.###.#.#####",
+			"#.....#...#.#...#.#...#",
+			"#.#.#.#.###d#.#.#.###.#",
+			"#.#.#...#...#.#.#...#.#",
+			"#.#.#.#.#.#.#.#.#.#.#.#",
+			"#.#.#...#.#.#.#...#...#",
+			"#.#.###.#.#.#.#######.#",
+			"#.#..3.s..#.#......B..#",
+			"###########q###########",
+		],
+		"buttons": {"p": "e", "q": "cd"},
 	},
 ]
 

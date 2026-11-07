@@ -21,6 +21,12 @@ Simula las reglas de scripts/rolling_cube.gd:
   pared (rebote y giros descartados). Cada choque de frente les quita un
   golpe y el cubo rebota; el choque que los rompe también rebota, pero desde
   entonces la casilla es libre.
+- Botones y barrotes: los barrotes (c, d, e, f, h; minúscula = empiezan
+  abiertos, mayúscula = empiezan cerrados) cierran un pasillo como una
+  puerta. Los botones (p, q, t, v, w) son paredes con un botón en la cara que
+  da a su única casilla libre. Al chocar de frente con un botón el cubo
+  rebota y cambian de estado todos los barrotes de los grupos asociados
+  (campo "buttons" del nivel: {"p": "cd"}). Barrotes cerrados = pared.
 - Power ups (s = velocidad): no cambian qué decisiones hay que tomar, solo
   el ritmo del cubo, así que para el resolvedor son casillas libres.
 - Al llegar a la meta B termina el nivel.
@@ -33,7 +39,7 @@ Uso (desde la raíz del repositorio):
       Resuelve todos los niveles de scripts/levels.gd y comprueba que el campo
       "turns" coincide con el mínimo real de giros.
 
-  python3 tools/level_solver.py solve 0,1 "#####" "#A..#" "###B#" "#####"
+  python3 tools/level_solver.py solve 0,1 "#####" "#A..#" "###B#" "#####" [--buttons p=cd,q=e]
       Resuelve un nivel. El primer argumento es el rumbo inicial x,z
       (1,0 derecha; -1,0 izquierda; 0,1 abajo; 0,-1 arriba) y el resto las filas.
 
@@ -58,7 +64,10 @@ KEY_CHARS = "yorug"
 DOOR_CHARS = KEY_CHARS.upper()
 POWERUP_CHARS = "s"
 BREAKABLE_CHARS = "12345"
-LEVEL_CHARS = "#.AB" + KEY_CHARS + DOOR_CHARS + POWERUP_CHARS + BREAKABLE_CHARS
+BAR_CHARS = "cdefh"
+BUTTON_CHARS = "pqtvw"
+LEVEL_CHARS = ("#.AB" + KEY_CHARS + DOOR_CHARS + POWERUP_CHARS + BREAKABLE_CHARS
+               + BAR_CHARS + BAR_CHARS.upper() + BUTTON_CHARS)
 
 
 def turn_left(h):
@@ -78,7 +87,7 @@ def parse(layout):
     free, start, goal = set(), None, None
     for z, row in enumerate(layout):
         for x, c in enumerate(row):
-            if c != "#":
+            if c != "#" and c not in BUTTON_CHARS:
                 free.add((x, z))
             if c == "A":
                 start = (x, z)
@@ -102,8 +111,25 @@ def parse_items(layout):
 class Board:
     """Mapa preparado para simular: casillas libres, llaves y puertas."""
 
-    def __init__(self, layout):
+    def __init__(self, layout, buttons=None):
         self.free, self.start, self.goal = parse(layout)
+        buttons = buttons or {}
+        groups = sorted({c.lower() for row in layout for c in row if c.lower() in BAR_CHARS})
+        group_bit = {g: i for i, g in enumerate(groups)}
+        # casilla -> (bit del grupo, empieza cerrado)
+        self.bar_at = {(x, z): (group_bit[c.lower()], c.isupper())
+                       for z, row in enumerate(layout) for x, c in enumerate(row)
+                       if c.lower() in BAR_CHARS}
+        # casilla del botón -> máscara de grupos de barrotes que conmuta
+        self.button_at = {}
+        for z, row in enumerate(layout):
+            for x, c in enumerate(row):
+                if c in BUTTON_CHARS:
+                    mask = 0
+                    for g in buttons.get(c, ""):
+                        if g in group_bit:
+                            mask |= 1 << group_bit[g]
+                    self.button_at[(x, z)] = mask
         keys, doors = parse_items(layout)
         self.key_at = {cell: (i, color) for i, (cell, color) in enumerate(keys)}
         self.door_at = {cell: (i, color) for i, (cell, color) in enumerate(doors)}
@@ -112,10 +138,14 @@ class Board:
         self.breakable_at = {cell: i for i, (cell, _) in enumerate(breakables)}
         self.initial_hits = tuple(hits for _, hits in breakables)
         self.unbreakable = False
+        self.no_buttons = False
 
-    def passable(self, cell, opened, hits):
-        """Casilla libre, sin puerta cerrada y sin muro destructible en pie."""
+    def passable(self, cell, opened, hits, flipped=0):
+        """Casilla libre, sin puerta ni barrotes cerrados y sin muro en pie."""
         if cell not in self.free:
+            return False
+        bar = self.bar_at.get(cell)
+        if bar is not None and bar[1] != bool(flipped >> bar[0] & 1):
             return False
         wall = self.breakable_at.get(cell)
         if wall is not None and hits[wall] > 0:
@@ -128,51 +158,58 @@ def step(board, state, turn):
     """Aplica una decisión (0, -1 izquierda, 1 derecha) y avanza una casilla.
 
     state = (casilla, rumbo, llave_llevada o None, puertas_abiertas, llaves_cogidas,
-             golpes_restantes)
-    (puertas_abiertas y llaves_cogidas son máscaras de bits; golpes_restantes
-    es una tupla con los golpes que le quedan a cada muro destructible).
+             golpes_restantes, barrotes_conmutados)
+    (puertas_abiertas, llaves_cogidas y barrotes_conmutados son máscaras de
+    bits; golpes_restantes es una tupla con los golpes que le quedan a cada
+    muro destructible).
     """
-    cell, heading, held, opened, taken, hits = state
+    cell, heading, held, opened, taken, hits, flipped = state
     if turn:
         candidate = turn_left(heading) if turn < 0 else turn_right(heading)
-        if board.passable((cell[0] + candidate[0], cell[1] + candidate[1]), opened, hits):
+        if board.passable((cell[0] + candidate[0], cell[1] + candidate[1]), opened, hits, flipped):
             heading = candidate
     nxt = (cell[0] + heading[0], cell[1] + heading[1])
-    if not board.passable(nxt, opened, hits):
+    if not board.passable(nxt, opened, hits, flipped):
         door = board.door_at.get(nxt)
         wall = board.breakable_at.get(nxt)
+        button = board.button_at.get(nxt)
         if door is not None and held == door[1]:
             opened |= 1 << door[0]
             held = None
         elif wall is not None and hits[wall] > 0 and not board.unbreakable:
             hits = hits[:wall] + (hits[wall] - 1,) + hits[wall + 1:]
+        elif button is not None and not board.no_buttons:
+            flipped ^= button
         heading = (-heading[0], -heading[1])
         nxt = (cell[0] + heading[0], cell[1] + heading[1])
-        if not board.passable(nxt, opened, hits):
-            return cell, heading, held, opened, taken, hits
+        if not board.passable(nxt, opened, hits, flipped):
+            return cell, heading, held, opened, taken, hits, flipped
     key = board.key_at.get(nxt)
     if key is not None and held is None and not taken >> key[0] & 1:
         held = key[1]
         taken |= 1 << key[0]
-    return nxt, heading, held, opened, taken, hits
+    return nxt, heading, held, opened, taken, hits, flipped
 
 
-def solve(layout, start_heading, doors_as_walls=False, breakables_as_walls=False):
+def solve(layout, start_heading, doors_as_walls=False, breakables_as_walls=False,
+          buttons=None, no_buttons=False):
     """Devuelve (giros_minimos, pasos, decisiones) o None si no tiene solución.
 
     decisiones es una lista de (casilla, giro) del recorrido óptimo.
     Con doors_as_walls=True las puertas no se pueden abrir (sirve para
     comprobar que una puerta es imprescindible) y con breakables_as_walls=True
-    los muros destructibles no se pueden romper.
+    los muros destructibles no se pueden romper. buttons es el campo "buttons"
+    del nivel y con no_buttons=True los botones no hacen nada.
     """
-    board = Board(layout)
+    board = Board(layout, buttons)
+    board.no_buttons = no_buttons
     if board.start is None or board.goal is None:
         raise ValueError("El nivel necesita una casilla A y una casilla B")
     if doors_as_walls:
         board.key_at = {}
     if breakables_as_walls:
         board.unbreakable = True
-    start = (board.start, start_heading, None, 0, 0, board.initial_hits)
+    start = (board.start, start_heading, None, 0, 0, board.initial_hits, 0)
     best = {start: (0, 0)}
     prev = {}
     queue = deque([(0, 0, start)])
@@ -271,14 +308,58 @@ def read_levels(path=LEVELS_GD):
     source = path.read_text(encoding="utf-8")
     pattern = re.compile(
         r'"name":\s*"([^"]+)",\s*"turns":\s*(\d+),\s*'
-        r'"start_heading":\s*Vector2i\((-?\d+),\s*(-?\d+)\),\s*"layout":\s*\[(.*?)\]',
+        r'"start_heading":\s*Vector2i\((-?\d+),\s*(-?\d+)\),\s*"layout":\s*\[(.*?)\],'
+        r'(.*?)\n\t\}',
         re.S)
     levels = []
-    for name, turns, hx, hz, body in pattern.findall(source):
+    for name, turns, hx, hz, body, extra in pattern.findall(source):
         rows = re.findall(r'"([' + re.escape(LEVEL_CHARS) + r']+)"', body)
+        buttons = {}
+        block = re.search(r'"buttons":\s*\{(.*?)\}', extra, re.S)
+        if block:
+            buttons = dict(re.findall(r'"(\w)":\s*"(\w*)"', block.group(1)))
         levels.append({"name": name, "turns": int(turns),
-                       "heading": (int(hx), int(hz)), "layout": rows})
+                       "heading": (int(hx), int(hz)), "layout": rows, "buttons": buttons})
     return levels
+
+
+def check_buttons(rows, buttons):
+    """Problemas de colocación de botones y barrotes (lista de textos)."""
+    problems = []
+    free, _, _ = parse(rows)
+    used = {c for row in rows for c in row}
+    groups = {c.lower() for c in used if c.lower() in BAR_CHARS}
+
+    def wall(x, z):
+        if z < 0 or z >= len(rows) or x < 0 or x >= len(rows[z]):
+            return True
+        return rows[z][x] == "#" or rows[z][x] in BUTTON_CHARS or rows[z][x] in BREAKABLE_CHARS
+
+    fronts = set()
+    for z, row in enumerate(rows):
+        for x, c in enumerate(row):
+            if c in BUTTON_CHARS:
+                sides = [(x + dx, z + dz) for dx, dz in DIRS if (x + dx, z + dz) in free]
+                if len(sides) != 1:
+                    problems.append(f"el botón {c} en {(x, z)} debe tener exactamente una casilla libre al lado")
+                fronts.update(sides)
+                if not buttons.get(c):
+                    problems.append(f"el botón {c} no tiene barrotes asignados")
+            elif c.lower() in BAR_CHARS:
+                across_x = wall(x - 1, z) and wall(x + 1, z)
+                across_z = wall(x, z - 1) and wall(x, z + 1)
+                if across_x == across_z:
+                    problems.append(f"los barrotes {c} en {(x, z)} deben tener pared justo a ambos lados del pasillo")
+    for cell in fronts:
+        if cell in {(x, z) for z, row in enumerate(rows) for x, c in enumerate(row) if c.lower() in BAR_CHARS}:
+            problems.append(f"hay barrotes delante de un botón en {cell}")
+    for b, linked in buttons.items():
+        if b not in used:
+            problems.append(f"el botón {b} de \"buttons\" no está en el mapa")
+        for g in linked:
+            if g not in groups:
+                problems.append(f"el botón {b} acciona los barrotes {g}, que no están en el mapa")
+    return problems
 
 
 def cmd_validate(_args):
@@ -292,7 +373,8 @@ def cmd_validate(_args):
         problems = []
         if len({len(r) for r in rows}) != 1:
             problems.append("filas de distinta longitud")
-        result = None if problems else solve(rows, lvl["heading"])
+        problems += check_buttons(rows, lvl["buttons"])
+        result = None if problems else solve(rows, lvl["heading"], buttons=lvl["buttons"])
         if not problems and result is None:
             problems.append("sin solución")
         elif result and result[0] != lvl["turns"]:
@@ -308,7 +390,10 @@ def cmd_validate(_args):
 
 def cmd_solve(args):
     hx, hz = (int(v) for v in args.heading.split(","))
-    result = solve(args.rows, (hx, hz))
+    buttons = dict(pair.split("=") for pair in args.buttons.split(",")) if args.buttons else {}
+    for problem in check_buttons(args.rows, buttons):
+        print("Aviso:", problem)
+    result = solve(args.rows, (hx, hz), buttons=buttons)
     if result is None:
         print("Sin solución")
         return 1
@@ -346,6 +431,7 @@ def main():
     p_solve = sub.add_parser("solve", help="resuelve un nivel dado por sus filas")
     p_solve.add_argument("heading", help="rumbo inicial x,z (p. ej. 1,0)")
     p_solve.add_argument("rows", nargs="+", help="filas del mapa")
+    p_solve.add_argument("--buttons", default="", help='botones y sus barrotes, p. ej. "p=cd,q=e"')
     p_gen = sub.add_parser("generate", help="busca un laberinto con un número de giros dado")
     p_gen.add_argument("width", type=int)
     p_gen.add_argument("height", type=int)

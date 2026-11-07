@@ -6,10 +6,16 @@ extends Control
 ## los que se generan aquí se rehacen al cambiar de idioma.
 ## Atrás (Esc o el botón Atrás de Android) vuelve a la pantalla principal y,
 ## desde ella, cierra el juego.
+##
+## Truco (solo en builds de depuración): tocar 5 veces seguidas el título del
+## selector de niveles desbloquea todos los niveles.
 
 const LANGUAGE_NAMES := {"es": "Español", "en": "English"}
 const LEVEL_BUTTON_SIZE := Vector2(210, 128)
 const DONE_COLOR := Color(0.62, 0.92, 0.55)
+## Truco de desbloqueo: toques necesarios y tiempo máximo entre dos toques.
+const UNLOCK_TAPS := 5
+const UNLOCK_TAP_WINDOW := 0.6
 
 ## Créditos: (clave del encabezado, texto o clave). Los textos que no son
 ## claves (nombres propios) se muestran tal cual.
@@ -26,6 +32,8 @@ const CREDITS := [
 
 var _screens: Dictionary
 var _current := "main"
+var _unlock_taps := 0
+var _last_unlock_tap := 0.0
 
 
 func _ready() -> void:
@@ -41,6 +49,10 @@ func _ready() -> void:
 	for back in [%LevelsBack, %OptionsBack, %CreditsBack]:
 		back.pressed.connect(_show.bind("main"))
 	_setup_options()
+	if OS.is_debug_build():
+		var title: Label = %LevelsScreen.get_node("VBox/Title")
+		title.mouse_filter = Control.MOUSE_FILTER_STOP
+		title.gui_input.connect(_on_levels_title_input)
 	_show(GameState.menu_screen)
 	GameState.menu_screen = "main"
 
@@ -119,6 +131,22 @@ func _build_level_grid() -> void:
 			button.tooltip_text = tr("LEVEL_DONE")
 		button.pressed.connect(GameState.play_level.bind(i))
 		grid.add_child(button)
+
+
+func _on_levels_title_input(event: InputEvent) -> void:
+	# En el móvil los toques llegan también como clic (emulate_mouse_from_touch),
+	# así que solo se cuentan los clics para no contar cada toque dos veces.
+	var mouse := event as InputEventMouseButton
+	if mouse == null or not mouse.pressed or mouse.button_index != MOUSE_BUTTON_LEFT:
+		return
+	var now := Time.get_ticks_msec() / 1000.0
+	_unlock_taps = _unlock_taps + 1 if now - _last_unlock_tap <= UNLOCK_TAP_WINDOW else 1
+	_last_unlock_tap = now
+	if _unlock_taps >= UNLOCK_TAPS:
+		_unlock_taps = 0
+		GameState.unlock_all_levels()
+		GameState.vibrate(GameState.VIBRATION_PREVIEW)
+		_build_level_grid()
 
 
 # --- Opciones ---------------------------------------------------------------

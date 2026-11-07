@@ -19,6 +19,7 @@ const LOCALES := ["es", "en"]
 ## Vibraciones: (duración en ms, intensidad de 0 a 1).
 const VIBRATION_WALL_BROKEN := Vector2(90, 0.8)
 const VIBRATION_TURN_REJECTED := Vector2(18, 0.25)
+const VIBRATION_BUTTON := Vector2(40, 0.5)
 ## Al activar la vibración en Opciones, para notar que funciona.
 const VIBRATION_PREVIEW := Vector2(60, 0.6)
 
@@ -37,6 +38,8 @@ var vibration := true
 var show_arrow := true
 
 var _completed: Array[int] = []
+## Truco para pruebas: todos los niveles desbloqueados (ver unlock_all_levels).
+var _all_unlocked := false
 
 
 func _ready() -> void:
@@ -53,7 +56,14 @@ func is_completed(index: int) -> bool:
 
 
 func is_unlocked(index: int) -> bool:
-	return index == 0 or is_completed(index) or is_completed(index - 1)
+	return _all_unlocked or index == 0 or is_completed(index) or is_completed(index - 1)
+
+
+## Truco para pruebas: desbloquea todos los niveles (sin marcarlos como
+## completados) y lo guarda. Se activa desde el selector de niveles.
+func unlock_all_levels() -> void:
+	_all_unlocked = true
+	_save_progress()
 
 
 func mark_completed(index: int) -> void:
@@ -67,6 +77,7 @@ func _load_progress() -> void:
 	var cfg := ConfigFile.new()
 	if cfg.load(PROGRESS_PATH) != OK:
 		return
+	_all_unlocked = cfg.get_value("progress", "all_unlocked", false)
 	if cfg.has_section_key("progress", "completed"):
 		for value in cfg.get_value("progress", "completed", []):
 			_completed.append(int(value))
@@ -81,6 +92,8 @@ func _load_progress() -> void:
 func _save_progress() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("progress", "completed", _completed)
+	if _all_unlocked:
+		cfg.set_value("progress", "all_unlocked", true)
 	cfg.save(PROGRESS_PATH)
 
 

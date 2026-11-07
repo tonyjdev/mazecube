@@ -16,6 +16,10 @@ extends Node3D
 ## quita un golpe y el cubo rebota; el golpe que los rompe también rebota,
 ## pero desde ese momento la casilla ya se puede atravesar.
 ##
+## Botones y barrotes: unos barrotes cerrados son un obstáculo como una
+## puerta. Un botón es una pared: al chocar con él de frente el cubo rebota y
+## los barrotes asociados cambian de estado (ver Level.press_button).
+##
 ## Power ups: al llegar a su casilla el cubo lo coge y se activa su efecto.
 ## Las reglas de cada tipo (acumulación, duración, fin al rebotar...) las
 ## define su clase (ver PowerUp); aquí se gestionan de forma genérica.
@@ -26,6 +30,7 @@ signal rolled(cell: Vector2i)
 signal key_picked(color: String)
 signal door_opened(color: String)
 signal breakable_hit(cell: Vector2i, hits_left: int)
+signal button_pressed(cell: Vector2i)
 ## Se ha pedido un giro hacia una casilla bloqueada y se ha descartado.
 signal turn_rejected(direction: Vector2i)
 signal power_up_picked(power_up: PowerUp, stacks: int)
@@ -143,16 +148,22 @@ func _try_advance() -> void:
 	# se invierte al instante y el cubo sigue rodando en sentido contrario.
 	# Al chocar con una puerta llevando su llave, la puerta se abre (y la llave
 	# se gasta), pero el cubo rebota igualmente.
+	# Al chocar con un botón, se pulsa y el cubo rebota.
 	var ahead := cell + heading
 	if not level.is_walkable(ahead):
 		var door := level.door_color(ahead)
+		# Para los power ups, los barrotes cuentan como una puerta.
+		var door_like := door != "" or level.bars_closed(ahead)
 		if door != "" and door == held_key:
 			level.open_door(ahead)
 			_drop_held_key()
 			door_opened.emit(door)
 		elif level.breakable_hits(ahead) > 0:
 			breakable_hit.emit(ahead, level.hit_breakable(ahead, heading))
-		_end_power_ups_on_bounce(door != "")
+		elif level.is_button(ahead):
+			level.press_button(ahead)
+			button_pressed.emit(ahead)
+		_end_power_ups_on_bounce(door_like)
 		heading = -heading
 		bounced.emit(cell)
 		_update_arrow(Vector3.ZERO)

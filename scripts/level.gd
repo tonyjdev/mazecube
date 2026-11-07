@@ -9,6 +9,11 @@ extends Node3D
 ##   Power ups: ver PowerUpCatalog (s = velocidad).
 ##   Muros destructibles: '1'..'5' = golpes que aguanta (5 pocas grietas,
 ##   1 muchas grietas). Ver BreakableWall.
+##   Barrotes: c d e f h = grupo de barrotes; en minúscula empiezan abiertos y
+##   en mayúscula cerrados. Ver Bars.
+##   Botones: p q t v w = muro con un botón en la cara que da a su única
+##   casilla libre. `button_links` indica qué grupos de barrotes cambia cada
+##   botón ({"p": "cd"}). Ver WallButton.
 ## Las filas crecen hacia +Z (hacia abajo en pantalla) y las columnas hacia +X.
 
 const CELL_SIZE := 1.0
@@ -16,6 +21,8 @@ const WALL_HEIGHT := 0.5
 const FLOOR_THICKNESS := 0.1
 const KEY_CHARS := "yorug"
 const BREAKABLE_CHARS := "12345"
+const BAR_CHARS := "cdefh"
+const BUTTON_CHARS := "pqtvw"
 const ITEM_COLORS := {
 	"y": Color(0.98, 0.80, 0.12),
 	"o": Color(1.00, 0.50, 0.08),
@@ -33,6 +40,10 @@ const KEY_FLOAT_HEIGHT := 0.5
 const KEY_SCALE := 1.6
 const KEY_SPIN_SPEED := 1.2
 const POWER_UP_FLOAT_HEIGHT := 0.5
+## Casillas de recorrido (contando la de delante del botón) en las que el cubo
+## se considera cerca de un botón. Ver button_near().
+const BUTTON_APPROACH_CELLS := 4
+const NO_CELL := Vector2i(-9999, -9999)
 
 @export var layout: PackedStringArray = PackedStringArray([
 	"#######",
@@ -47,6 +58,10 @@ const POWER_UP_FLOAT_HEIGHT := 0.5
 ])
 ## Rumbo inicial del cubo en coordenadas de casilla (x, z). (0, 1) = abajo.
 @export var start_heading := Vector2i(0, 1)
+## Grupos de barrotes que cambia cada botón: {"p": "cd"} (campo "buttons" del
+## nivel). Pulsar un botón abre los barrotes cerrados de esos grupos y cierra
+## los abiertos.
+@export var button_links := {}
 
 var start_cell := Vector2i.ZERO
 var goal_cell := Vector2i.ZERO
@@ -58,6 +73,11 @@ var _doors := {}
 var _power_ups := {}
 ## casilla -> BreakableWall (solo los que siguen en pie)
 var _breakables := {}
+## casilla -> { "group": String, "node": Bars }
+var _bars := {}
+## casilla -> { "symbol": String, "node": WallButton, "front": Vector2i,
+##             "near": { casilla: casillas de recorrido hasta el botón } }
+var _buttons := {}
 
 
 func _ready() -> void:
@@ -68,6 +88,7 @@ func _ready() -> void:
 func load_level(data: Dictionary) -> void:
 	layout = PackedStringArray(data["layout"])
 	start_heading = data["start_heading"]
+	button_links = data.get("buttons", {})
 	build()
 
 
@@ -79,6 +100,8 @@ func build() -> void:
 	_doors.clear()
 	_power_ups.clear()
 	_breakables.clear()
+	_bars.clear()
+	_buttons.clear()
 
 	var floor_a := _make_material(Color(0.86, 0.84, 0.80))
 	var floor_b := _make_material(Color(0.78, 0.76, 0.72))
@@ -91,8 +114,10 @@ func build() -> void:
 		for x in row.length():
 			var cell := Vector2i(x, z)
 			var symbol := row[x]
-			if symbol == "#":
+			if symbol == "#" or BUTTON_CHARS.contains(symbol):
 				_add_box(cell, Vector3(CELL_SIZE, WALL_HEIGHT, CELL_SIZE), WALL_HEIGHT * 0.5, wall_mat)
+				if symbol != "#":
+					_add_button(cell, symbol)
 				continue
 			_walkable[cell] = true
 			var mat := floor_a if (x + z) % 2 == 0 else floor_b
@@ -112,6 +137,10 @@ func build() -> void:
 				_add_power_up(cell, symbol)
 			elif BREAKABLE_CHARS.contains(symbol):
 				_add_breakable(cell, int(symbol))
+			elif BAR_CHARS.contains(symbol.to_lower()):
+				_add_bars(cell, symbol)
+	for button in _buttons.values():
+		button["near"] = _cells_within(button["front"], BUTTON_APPROACH_CELLS)
 
 
 func _process(delta: float) -> void:
@@ -122,10 +151,65 @@ func _process(delta: float) -> void:
 		item["node"].rotate(power_up.pickup_spin_axis, power_up.pickup_spin_speed * delta)
 
 
-## Casilla por la que se puede pasar: libre, sin puerta cerrada y sin muro
-## destructible en pie.
+## Casilla por la que se puede pasar: libre, sin puerta ni barrotes cerrados
+## y sin muro destructible en pie.
 func is_walkable(cell: Vector2i) -> bool:
-	return _walkable.has(cell) and not _doors.has(cell) and not _breakables.has(cell)
+	return _walkable.has(cell) and not _doors.has(cell) and not _breakables.has(cell) \
+		and not bars_closed(cell)
+
+
+## Hay barrotes cerrados en la casilla.
+func bars_closed(cell: Vector2i) -> bool:
+	return _bars.has(cell) and not _bars[cell]["node"].is_open
+
+
+## Hay un muro con botón en la casilla.
+func is_button(cell: Vector2i) -> bool:
+	return _buttons.has(cell)
+
+
+## Botón cerca de la casilla (a BUTTON_APPROACH_CELLS casillas de recorrido o
+## menos de la casilla de delante del botón), o NO_CELL si no hay ninguno. Si
+## hay varios, el más cercano.
+func button_near(cell: Vector2i) -> Vector2i:
+	var best := NO_CELL
+	var best_steps := BUTTON_APPROACH_CELLS + 1
+	for button_cell in _buttons:
+		var near: Dictionary = _buttons[button_cell]["near"]
+		if near.has(cell) and near[cell] < best_steps:
+			best = button_cell
+			best_steps = near[cell]
+	return best
+
+
+## Casilla libre de delante del botón.
+func button_front(button_cell: Vector2i) -> Vector2i:
+	return _buttons[button_cell]["front"] if _buttons.has(button_cell) else NO_CELL
+
+
+## Casillas de todos los barrotes que cambia el botón.
+func button_bars(button_cell: Vector2i) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	if not _buttons.has(button_cell):
+		return cells
+	var groups: String = button_links.get(_buttons[button_cell]["symbol"], "")
+	for bar_cell in _bars:
+		if groups.contains(_bars[bar_cell]["group"]):
+			cells.append(bar_cell)
+	return cells
+
+
+## Pulsa el botón de la casilla: todos los barrotes de sus grupos cambian de
+## estado al instante (los abiertos se cierran y los cerrados se abren).
+func press_button(cell: Vector2i) -> void:
+	if not _buttons.has(cell):
+		return
+	_buttons[cell]["node"].press()
+	var groups: String = button_links.get(_buttons[cell]["symbol"], "")
+	for item in _bars.values():
+		if groups.contains(item["group"]):
+			var bars: Bars = item["node"]
+			bars.set_open(not bars.is_open)
 
 
 ## Golpes que le quedan al muro destructible de la casilla (0 si no hay).
@@ -234,6 +318,53 @@ func _add_power_up(cell: Vector2i, symbol: String) -> void:
 	_power_ups[cell] = {"power_up": power_up, "node": node}
 
 
+## Los barrotes se orientan como las puertas: las lanzas van de muro a muro
+## y, al abrirse, se esconden dentro de ellos.
+func _add_bars(cell: Vector2i, symbol: String) -> void:
+	var bars := Bars.new(symbol == symbol.to_lower())
+	bars.position = Vector3(cell.x * CELL_SIZE, 0.0, cell.y * CELL_SIZE)
+	if not (_is_wall(cell + Vector2i.LEFT) and _is_wall(cell + Vector2i.RIGHT)):
+		bars.rotation.y = PI * 0.5
+	add_child(bars)
+	_bars[cell] = {"group": symbol.to_lower(), "node": bars}
+
+
+## El botón se pega a la cara del muro que da a la casilla libre de al lado.
+func _add_button(cell: Vector2i, symbol: String) -> void:
+	var facing := Vector2i.ZERO
+	for dir: Vector2i in [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
+		var n := cell + dir
+		if n.y >= 0 and n.y < layout.size() and n.x >= 0 and n.x < layout[n.y].length() \
+				and layout[n.y][n.x] != "#" and not BUTTON_CHARS.contains(layout[n.y][n.x]):
+			facing = dir
+			break
+	if facing == Vector2i.ZERO:
+		push_warning("Botón '%s' en %s sin casilla libre al lado" % [symbol, cell])
+		return
+	var button := WallButton.new()
+	button.position = Vector3((cell.x + facing.x * 0.5) * CELL_SIZE, 0.0, (cell.y + facing.y * 0.5) * CELL_SIZE)
+	button.rotation.y = atan2(facing.x, facing.y)
+	add_child(button)
+	_buttons[cell] = {"symbol": symbol, "node": button, "front": cell + facing, "near": {}}
+
+
+## Casillas libres a `max_steps` pasos o menos de `origin` (contando origin
+## como 1), sin tener en cuenta puertas, barrotes ni muros destructibles.
+func _cells_within(origin: Vector2i, max_steps: int) -> Dictionary:
+	var steps := {origin: 1}
+	var queue: Array[Vector2i] = [origin]
+	while not queue.is_empty():
+		var current: Vector2i = queue.pop_front()
+		if steps[current] >= max_steps:
+			continue
+		for dir: Vector2i in [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
+			var n := current + dir
+			if _walkable.has(n) and not steps.has(n):
+				steps[n] = steps[current] + 1
+				queue.append(n)
+	return steps
+
+
 func _add_breakable(cell: Vector2i, hits: int) -> void:
 	var wall := BreakableWall.new(hits)
 	wall.position = Vector3(cell.x * CELL_SIZE, 0.0, cell.y * CELL_SIZE)
@@ -257,7 +388,7 @@ func _is_wall(cell: Vector2i) -> bool:
 	if cell.y < 0 or cell.y >= layout.size() or cell.x < 0 or cell.x >= layout[cell.y].length():
 		return true
 	var symbol := layout[cell.y][cell.x]
-	return symbol == "#" or BREAKABLE_CHARS.contains(symbol)
+	return symbol == "#" or BREAKABLE_CHARS.contains(symbol) or BUTTON_CHARS.contains(symbol)
 
 
 func _make_material(color: Color) -> StandardMaterial3D:

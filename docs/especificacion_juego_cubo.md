@@ -111,6 +111,21 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 - **Efecto visual:** mientras está activo, el cubo deja tras de sí un rastro de polvo que se desvanece en unos 2,5 segundos; con más acumulaciones el rastro es más opaco.
 - **Cámara:** al ir más rápido, la cámara se aleja un poco (ver apartado 5).
 
+### 2.11. Botones y barrotes — Implementada en el prototipo
+
+- **Barrotes:** cierran un pasillo de muro a muro, como una puerta. Son **cinco lanzas horizontales** de metal gris, apiladas en altura, con la **punta en sentido alterno** (la primera hacia un lado, la segunda hacia el otro, y así sucesivamente).
+- Al **abrirse**, cada lanza se desliza hacia el **lado contrario a su punta** y queda escondida dentro del muro de ese lado; al **cerrarse** vuelve a salir. La animación dura unos 0,3 s y las lanzas se mueven ligeramente escalonadas.
+- Cada juego de barrotes tiene un **estado inicial** propio: **abierto o cerrado**.
+- Unos barrotes **cerrados** se comportan como una **pared**: el cubo rebota al chocar con ellos y los giros hacia ellos se descartan. Abiertos, la casilla se atraviesa con normalidad. El cambio de estado es **instantáneo** para la lógica, aunque la animación siga.
+- Para los power ups, rebotar contra unos barrotes cerrados cuenta como rebotar contra una **puerta** (no se pierde la velocidad).
+- **Botones:** están **pegados a la cara de un muro**: una placa metálica con un pulsador rojo. Solo se accionan cuando el cubo **choca de frente** con ellos; el cubo rebota y el pulsador se hunde y vuelve a salir. Al pulsarlo, el móvil vibra suavemente (si la vibración está activada).
+- Para los power ups, el botón cuenta como una **pared**.
+- Cada botón tiene asignados **uno o más juegos de barrotes**. Al pulsarlo, **todos** cambian de estado: los abiertos se cierran y los cerrados se abren. Un mismo juego de barrotes puede estar asignado a varios botones. Se puede pulsar tantas veces como se quiera.
+- Como solo se accionan de frente, la casilla libre delante del botón debe permitir que el cubo llegue hasta él en esa dirección. En esa casilla no puede haber barrotes (se cerrarían encima del cubo).
+- Los barrotes y botones se restauran a su estado inicial al reiniciar el nivel.
+
+**Ejemplo:** un botón tiene asignados dos juegos de barrotes, uno abierto y otro cerrado. Al pulsarlo, el abierto se cierra y el cerrado se abre; al pulsarlo otra vez, vuelven a como estaban.
+
 ## 3. Escenario y objetivo — Confirmados
 
 - El escenario es un **laberinto**.
@@ -139,12 +154,13 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
   - Si **no cabe**, la cámara **sigue al cubo** con un **pequeño retraso** y un movimiento **suave**: acelera y frena poco a poco, no se para en seco y no rebota cuando el cubo rebota. Al acercarse al borde del tablero deja de avanzar, de modo que no se ve vacío más allá del muro exterior. En la dirección en la que el tablero sí cabe, se queda centrada.
   - Cada nivel puede fijar su propia **distancia de cámara** (campo `camera_distance`), siempre limitada al máximo. Más adelante se podrá acercar o alejar la cámara durante la partida según la situación del juego; los cambios de distancia también serán suaves.
 - **Alejamiento por velocidad — Confirmada:** cuando el cubo va más rápido de lo normal (por un power up o por cualquier otra causa), la cámara se **aleja un poco** para que se vea más mapa: un 30% más de distancia por cada ×1 de velocidad extra (con ×1,25, un 7,5%; con ×2, un 30%). Este alejamiento puede superar la distancia máxima. Al recuperar la velocidad normal, la cámara **vuelve a su distancia**. Ambas transiciones son suaves. Si el tablero entero ya cabe en pantalla, no se aleja.
+- **Encuadre de botones — Confirmada:** cuando el cubo se acerca a un botón (a 4 casillas de recorrido o menos de la casilla de delante del botón) y alguno de los barrotes que acciona queda **fuera de pantalla**, la cámara se **aleja y se centra** para que se vean a la vez el cubo, el botón y todos sus barrotes (como mucho, hasta ver el tablero entero). Cuando el cubo se aleja del botón, la cámara **vuelve** a su comportamiento normal; tras pulsarlo, espera **0,8 s** antes de volver para que se vea cómo cambian los barrotes. Si al acercarse ya se ven todos los barrotes, la cámara no cambia. Las transiciones son suaves.
 
 ## 6. Niveles — Implementada en el prototipo
 
 ### 6.1. Progresión
 
-- El juego tiene **10 niveles** de **dificultad creciente**.
+- El juego tiene **13 niveles** de **dificultad creciente**.
 - Los niveles se eligen en el **selector de niveles** (apartado 7.2). Solo se puede entrar en los **completados** y en los **desbloqueados**: el nivel 1 está siempre desbloqueado y completar un nivel desbloquea el siguiente.
 - Al llegar a la meta, el nivel queda **completado** y se muestra «¡Nivel completado!» con **Siguiente nivel**, **Repetir** y **Niveles** (vuelve al selector). Tras el último nivel se indica que se han completado todos.
 - El jugador puede **reiniciar** el nivel en cualquier momento desde el menú de pausa.
@@ -156,6 +172,8 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 - Llaves y puertas: letra minúscula para la llave y la misma en mayúscula para su puerta — `y/Y` amarillo, `o/O` naranja, `r/R` rojo, `u/U` azul, `g/G` verde.
 - Power ups: `s` velocidad.
 - Muros destructibles: un dígito del `1` al `5` con los golpes que aguantan (`5` pocas grietas, `1` muchas).
+- Barrotes: `c`, `d`, `e`, `f`, `h`, cada letra es un **grupo** (todas las casillas con la misma letra cambian juntas); en **minúscula empiezan abiertos** y en **mayúscula cerrados**. Un mismo grupo puede tener casillas abiertas y cerradas. Debe haber muro justo a ambos lados del pasillo.
+- Botones: `p`, `q`, `t`, `v`, `w` en lugar de un muro; el botón se coloca en la cara que da a su **única casilla libre** contigua. El campo `buttons` indica qué grupos de barrotes cambia cada botón, por ejemplo `"buttons": {"p": "cd", "q": "d"}`.
 - Opcional: `camera_distance`, la distancia de la cámara para ese nivel (por defecto, la máxima; ver apartado 5).
 - Los mapas pueden ser más grandes que la pantalla, apaisados o verticales: la cámara sigue al cubo (apartado 5).
 
@@ -164,21 +182,24 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 - La dificultad de un nivel se mide como el **mínimo número de giros** necesario para resolverlo con las reglas del apartado 2 (incluido el rebote, el descarte de giros bloqueados, la ausencia de giro en la casilla de salida, las llaves y puertas y los muros destructibles).
 - Ese mínimo se calcula con un **resolvedor automático** que también comprueba que todos los niveles tienen solución.
 - **Los niveles actuales son de prueba de mecánicas**; los niveles definitivos los proporcionará el diseñador.
-- Los niveles de prueba van de **1 a 19 giros** y crecen de forma progresiva, de **9×5 a 15×17 casillas** (en torno a un 15-20% más de casillas cada uno), alternando mapas apaisados y verticales. Los niveles pequeños caben enteros en pantalla; en los grandes la cámara sigue al cubo.
-- Desde el nivel 3 incluyen parejas llave/puerta, y cada puerta es imprescindible (convertida en muro, el nivel no tendría solución). Los niveles 4 y 7 tienen un power up de velocidad y el 9 tres seguidos, para probar la acumulación. Hay muros destructibles en los niveles 2, 5, 7 y 10 (hay que romperlos para pasar) y en el 8 (un atajo: sin romperlo harían falta 26 giros en vez de 14).
+- Los niveles de prueba van de **1 a 27 giros** y crecen de forma progresiva, de **9×5 a 23×17 casillas** (en torno a un 15-20% más de casillas cada uno), alternando mapas apaisados y verticales. Los niveles pequeños caben enteros en pantalla; en los grandes la cámara sigue al cubo.
+- Desde el nivel 3 incluyen parejas llave/puerta, y cada puerta es imprescindible (convertida en muro, el nivel no tendría solución). Los niveles 4 y 7 tienen un power up de velocidad y el 9 tres seguidos, para probar la acumulación. Hay muros destructibles en los niveles 2, 5, 7 y 10 (hay que romperlos para pasar) y en el 8 (un atajo: sin romperlo harían falta 26 giros en vez de 14). Los niveles 11 a 13 introducen los botones y barrotes; cada botón es imprescindible (sin él, el nivel no tendría solución).
 
-| Nivel | Nombre | Tamaño | Forma | Parejas llave/puerta | Muros destructibles | Power ups | Giros mínimos |
-|---|---|---|---|---|---|---|---|
-| 1 | Primer giro | 9×5 | apaisado | — | — | — | 1 |
-| 2 | El muro | 7×9 | vertical | — | 1 (3 golpes) | — | 3 |
-| 3 | La llave | 11×7 | apaisado | amarilla | — | — | 5 |
-| 4 | A toda prisa | 7×13 | vertical | naranja | — | 1 velocidad | 7 |
-| 5 | Escombros | 13×9 | apaisado | roja | 1 (4 golpes) | — | 9 |
-| 6 | Dos llaves | 9×15 | vertical | amarilla, azul | — | — | 10 |
-| 7 | Salas | 15×11 | apaisado | verde, naranja | 1 (2 golpes) | 1 velocidad | 12 |
-| 8 | El atajo | 11×17 | vertical | roja, azul | 1 (3 golpes, atajo) | — | 14 |
-| 9 | Galerías | 17×13 | apaisado | amarilla, roja, verde | — | 3 velocidad | 16 |
-| 10 | La gran travesía | 15×17 | casi cuadrado | naranja, azul, verde | 2 (2 y 5 golpes, seguidos) | — | 19 |
+| Nivel | Nombre | Tamaño | Forma | Parejas llave/puerta | Muros destructibles | Power ups | Botones y barrotes | Giros mínimos |
+|---|---|---|---|---|---|---|---|---|
+| 1 | Primer giro | 9×5 | apaisado | — | — | — | — | 1 |
+| 2 | El muro | 7×9 | vertical | — | 1 (3 golpes) | — | — | 3 |
+| 3 | La llave | 11×7 | apaisado | amarilla | — | — | — | 5 |
+| 4 | A toda prisa | 7×13 | vertical | naranja | — | 1 velocidad | — | 7 |
+| 5 | Escombros | 13×9 | apaisado | roja | 1 (4 golpes) | — | — | 9 |
+| 6 | Dos llaves | 9×15 | vertical | amarilla, azul | — | — | — | 10 |
+| 7 | Salas | 15×11 | apaisado | verde, naranja | 1 (2 golpes) | 1 velocidad | — | 12 |
+| 8 | El atajo | 11×17 | vertical | roja, azul | 1 (3 golpes, atajo) | — | — | 14 |
+| 9 | Galerías | 17×13 | apaisado | amarilla, roja, verde | — | 3 velocidad | — | 16 |
+| 10 | La gran travesía | 15×17 | casi cuadrado | naranja, azul, verde | 2 (2 y 5 golpes, seguidos) | — | — | 19 |
+| 11 | El botón | 19×15 | apaisado | amarilla | — | 1 velocidad | 1 botón, 1 barrote cerrado | 21 |
+| 12 | Barrotes | 15×23 | vertical | — | 1 (2 golpes) | — | 2 botones, 4 barrotes (2 cerrados y 2 abiertos); un botón abre unos y cierra otros | 22 |
+| 13 | La fortaleza | 23×17 | apaisado | amarilla | 1 (3 golpes) | 1 velocidad | 2 botones, 4 barrotes (3 cerrados y 1 abierto) | 27 |
 
 ## 7. Menús y controles — Confirmada
 
@@ -192,6 +213,7 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 
 - Una rejilla con un botón por nivel, con su número y su nombre.
 - Los niveles **bloqueados** se ven atenuados, con el texto «Bloqueado», y no se pueden pulsar. Los **completados** se marcan en verde.
+- **Truco para pruebas** (solo en las versiones de depuración): tocar **5 veces seguidas** el título «Elige un nivel» desbloquea todos los niveles (sin marcarlos como completados). Se guarda en el dispositivo.
 
 ### 7.3. Pausa
 

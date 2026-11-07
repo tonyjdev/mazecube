@@ -4,8 +4,8 @@ extends Node3D
 ## El nivel que se juega lo indica GameState.current_level (se elige en el
 ## selector de niveles del menú).
 ##
-## Vibración (si está activada en Opciones): al destruir un muro y, muy
-## suave, al descartarse un giro. La flecha sobre el cubo se puede ocultar
+## Vibración (si está activada en Opciones): al destruir un muro, al pulsar
+## un botón y, muy suave, al descartarse un giro. La flecha sobre el cubo se puede ocultar
 ## en Opciones.
 ##
 ## Interfaz: número de nivel arriba a la izquierda, botón de pausa arriba a la
@@ -62,6 +62,9 @@ func _ready() -> void:
 	cube.breakable_hit.connect(func(_cell: Vector2i, hits_left: int) -> void:
 		if hits_left == 0:
 			GameState.vibrate(GameState.VIBRATION_WALL_BROKEN))
+	cube.button_pressed.connect(func(_cell: Vector2i) -> void:
+		camera.notify_button_pressed()
+		GameState.vibrate(GameState.VIBRATION_BUTTON))
 	pause_button.pressed.connect(_set_paused.bind(true))
 	%ContinueButton.pressed.connect(_set_paused.bind(false))
 	%RestartButton.pressed.connect(func() -> void:
@@ -157,6 +160,7 @@ func _load_level(index: int) -> void:
 	var data := Levels.get_level(current_level)
 	level.layout = PackedStringArray(data["layout"])
 	level.start_heading = data["start_heading"]
+	level.button_links = data.get("buttons", {})
 	_update_level_label()
 	_restart()
 	camera.frame_level(data.get("camera_distance", 0.0))

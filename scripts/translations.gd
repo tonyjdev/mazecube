@@ -102,6 +102,9 @@ const MESSAGES := {
 		"El atajo": "The Shortcut",
 		"Galerías": "Galleries",
 		"La gran travesía": "The Long Journey",
+		"El botón": "The Button",
+		"Barrotes": "Bars",
+		"La fortaleza": "The Fortress",
 	},
 }
 
