@@ -68,19 +68,30 @@ El diseño busca combinar **lógica y planificación** con **controles y reglas 
 
 ### 2.8. Llaves y puertas — Confirmada
 
-- **Llave:** abre una puerta. El cubo la coge al llegar a su casilla; en ese momento la llave **desaparece del mapa** y pasa a mostrarse **encima del cubo**, por encima de la flecha de rumbo.
+- **Llave:** abre una puerta. El cubo la coge al llegar a su casilla; en ese momento la llave **desaparece del mapa** y pasa a mostrarse **encima del cubo**, por encima de la flecha de rumbo, donde **sigue girando** sobre sí misma.
 - Mientras está en el mapa, la llave **gira despacio sobre sí misma**.
 - El cubo **solo puede llevar una llave** a la vez. Si ya lleva una y pasa por la casilla de otra, no ocurre nada: la otra llave se queda en el mapa.
 - **Puerta:** un bloque más estrecho que el cubo que cierra el pasillo de muro a muro, girado 90° según la dirección de los muros que la rodean.
 - Cada llave está asociada a **su propia puerta**, y ambas tienen el **mismo color**. Una llave no abre puertas de otro color. Colores disponibles: **amarillo, naranja, rojo, azul y verde**.
 - Una puerta cerrada se comporta como una **pared**: el cubo rebota al chocar con ella (apartado 2.4) y los giros hacia ella se descartan (apartado 2.5), **aunque se lleve su llave**.
-- Si el cubo **choca de frente** con una puerta llevando su llave, la **puerta y la llave desaparecen**, pero el cubo **rebota igualmente** en ese movimiento; para pasar por el hueco tiene que volver.
+- Si el cubo **choca de frente** con una puerta llevando su llave, la **llave desaparece** y la **puerta se hunde en el suelo** (animación de unos 0,6 s); desde que empieza a hundirse, la casilla **ya se puede atravesar**. El cubo **rebota igualmente** en ese movimiento; para pasar por el hueco tiene que volver.
 - Como solo se abren de frente, cada puerta debe tener por al menos uno de sus lados un tramo recto por el que el cubo pueda llegar hasta ella.
 - Las puertas abiertas y las llaves cogidas se restauran al reiniciar el nivel.
 
-**Ejemplo:** el cubo avanza hacia una puerta amarilla llevando la llave amarilla; al tocarla, la puerta y la llave desaparecen y el cubo rebota. En la siguiente pasada atraviesa la casilla donde estaba la puerta.
+**Ejemplo:** el cubo avanza hacia una puerta amarilla llevando la llave amarilla; al tocarla, la llave desaparece, la puerta se hunde en el suelo y el cubo rebota. En la siguiente pasada atraviesa la casilla donde estaba la puerta.
 
-### 2.9. Power ups — Confirmada
+### 2.9. Muros destructibles — Confirmada
+
+- Muros que se rompen tras **varios golpes**. Se ven como **cubos de piedra con grietas**, más altos que las paredes normales.
+- Cada muro tiene un **estado del 5 al 1**, que son los golpes que le quedan: el **5** tiene **pocas grietas** y el **1** **muchas**. Al llegar a **0** el muro se destruye.
+- El jugador solo ve el estado por la **cantidad de grietas** (no hay número ni texto); cada golpe muestra al momento las grietas del nuevo estado, y el bloque tiembla: **cuatro empujones rápidos** y cortos en la dirección del golpe.
+- Mientras está en pie se comporta como una **pared**: el cubo rebota al chocar con él (apartado 2.4) y los giros hacia él se descartan (apartado 2.5).
+- Cada **choque de frente** le quita un golpe y el cubo rebota. El golpe que lo destruye **también rebota**; para pasar hay que volver.
+- Al destruirse, el bloque se parte en **pedazos que caen** al suelo y después **desaparecen** (en torno a 1,5 s). Desde el instante de la destrucción la casilla **ya se puede atravesar**, aunque los pedazos sigan cayendo.
+- Para los power ups cuenta como un rebote contra una **pared** (por ejemplo, se pierde la velocidad).
+- Los muros destruidos se restauran al reiniciar el nivel.
+
+### 2.10. Power ups — Confirmada
 
 Objetos que el cubo coge al llegar a su casilla y que modifican su comportamiento durante un tiempo. Al cogerlos desaparecen del mapa (vuelven a su sitio al reiniciar el nivel). Cada tipo de power up tiene **sus propias reglas**, que pueden combinar:
 
@@ -97,6 +108,7 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 - **Duración ilimitada:** el efecto **se pierde al rebotar contra una pared o el borde del tablero**. Rebotar contra una puerta (cerrada, o al abrirla con su llave) **no** lo quita.
 - **Aspecto en el mapa:** un cubo pequeño semitransparente (≈30% de transparencia) que gira rápido sobre sí mismo.
 - **Efecto visual:** mientras está activo, el cubo deja tras de sí un rastro de polvo que se desvanece en unos 2,5 segundos; con más acumulaciones el rastro es más opaco.
+- **Cámara:** al ir más rápido, la cámara se aleja un poco (ver apartado 5).
 
 ## 3. Escenario y objetivo — Confirmados
 
@@ -119,8 +131,13 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 - Juego en **3D**, con cubo y laberinto visibles desde arriba.
 - **Cámara — Decidido:** vista **cenital ligeramente inclinada**, en perspectiva (unos 65° sobre el tablero). Se descartó la isométrica, que en vertical mostraba el tablero bastante más pequeño. La cámara es fija: no hay opción para cambiarla.
 - La animación del cubo debe mostrar claramente el vuelco entre casillas; no basta con trasladar el modelo o simular un deslizamiento.
-- **Orientación de pantalla — Confirmada:** el juego se muestra en **vertical** (retrato) en el móvil.
-- La cámara encuadra el tablero completo en el espacio libre entre los elementos de la interfaz, sea cual sea la proporción de la pantalla.
+- **Orientación de pantalla — Confirmada:** el juego se muestra en **horizontal** (apaisado) en el móvil, porque así se maneja mejor con las dos manos. (Antes se jugaba en vertical; se cambió el 7 de noviembre de 2026.)
+- **Interfaz en apaisado:** el tablero ocupa el centro de la pantalla a toda la altura; a la izquierda, el nivel, el mensaje de estado y los botones; a la derecha, la ayuda de controles; y en las esquinas inferiores, las indicaciones «← Izquierda» y «Derecha →».
+- **Distancia de la cámara — Confirmada:** la cámara no se aleja más de una **distancia máxima**, la que hace falta para ver entero un tablero de 7×9 casillas (el antiguo nivel 4) en el espacio libre de la pantalla. Así el tablero no se ve diminuto aunque el mapa sea grande.
+  - Si el tablero entero cabe a esa distancia, la cámara se acerca hasta encuadrarlo justo en el espacio libre entre los elementos de la interfaz y se queda quieta.
+  - Si **no cabe**, la cámara **sigue al cubo** con un **pequeño retraso** y un movimiento **suave**: acelera y frena poco a poco, no se para en seco y no rebota cuando el cubo rebota. Al acercarse al borde del tablero deja de avanzar, de modo que no se ve vacío más allá del muro exterior. En la dirección en la que el tablero sí cabe, se queda centrada.
+  - Cada nivel puede fijar su propia **distancia de cámara** (campo `camera_distance`), siempre limitada al máximo. Más adelante se podrá acercar o alejar la cámara durante la partida según la situación del juego; los cambios de distancia también serán suaves.
+- **Alejamiento por velocidad — Confirmada:** cuando el cubo va más rápido de lo normal (por un power up o por cualquier otra causa), la cámara se **aleja un poco** para que se vea más mapa: un 30% más de distancia por cada ×1 de velocidad extra (con ×1,25, un 7,5%; con ×2, un 30%). Este alejamiento puede superar la distancia máxima. Al recuperar la velocidad normal, la cámara **vuelve a su distancia**. Ambas transiciones son suaves. Si el tablero entero ya cabe en pantalla, no se aleja.
 
 ## 6. Niveles — Implementada en el prototipo
 
@@ -136,33 +153,36 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 - Cada nivel se define como un **mapa de texto**: `#` pared, `.` casilla libre, `A` inicio y `B` meta, junto con el **rumbo inicial** del cubo.
 - Llaves y puertas: letra minúscula para la llave y la misma en mayúscula para su puerta — `y/Y` amarillo, `o/O` naranja, `r/R` rojo, `u/U` azul, `g/G` verde.
 - Power ups: `s` velocidad.
-- Los niveles son más altos que anchos, para aprovechar la pantalla vertical.
+- Muros destructibles: un dígito del `1` al `5` con los golpes que aguantan (`5` pocas grietas, `1` muchas).
+- Opcional: `camera_distance`, la distancia de la cámara para ese nivel (por defecto, la máxima; ver apartado 5).
+- Los mapas pueden ser más grandes que la pantalla, apaisados o verticales: la cámara sigue al cubo (apartado 5).
 
 ### 6.3. Medida de la dificultad
 
-- La dificultad de un nivel se mide como el **mínimo número de giros** necesario para resolverlo con las reglas del apartado 2 (incluido el rebote, el descarte de giros bloqueados, la ausencia de giro en la casilla de salida y las llaves y puertas).
+- La dificultad de un nivel se mide como el **mínimo número de giros** necesario para resolverlo con las reglas del apartado 2 (incluido el rebote, el descarte de giros bloqueados, la ausencia de giro en la casilla de salida, las llaves y puertas y los muros destructibles).
 - Ese mínimo se calcula con un **resolvedor automático** que también comprueba que todos los niveles tienen solución.
 - **Los niveles actuales son de prueba de mecánicas**; los niveles definitivos los proporcionará el diseñador.
-- Los niveles de prueba van de **1 a 19 giros** y de **5×7 a 11×15 casillas**. Desde el nivel 3 incluyen parejas llave/puerta, y cada puerta es imprescindible (convertida en muro, el nivel no tendría solución). Los niveles 4 y 7 tienen un power up de velocidad y el 9 tres seguidos, para probar la acumulación.
+- Los niveles de prueba van de **1 a 19 giros** y crecen de forma progresiva, de **9×5 a 15×17 casillas** (en torno a un 15-20% más de casillas cada uno), alternando mapas apaisados y verticales. Con la distancia máxima de la cámara solo el nivel 2 cabe entero en pantalla; en el resto la cámara sigue al cubo.
+- Desde el nivel 3 incluyen parejas llave/puerta, y cada puerta es imprescindible (convertida en muro, el nivel no tendría solución). Los niveles 4 y 7 tienen un power up de velocidad y el 9 tres seguidos, para probar la acumulación. Hay muros destructibles en los niveles 2, 5, 7 y 10 (hay que romperlos para pasar) y en el 8 (un atajo: sin romperlo harían falta 26 giros en vez de 14).
 
-| Nivel | Nombre | Tamaño | Parejas llave/puerta | Giros mínimos |
-|---|---|---|---|---|
-| 1 | Primer giro | 5×7 | — | 1 |
-| 2 | Ida y vuelta | 7×8 | — | 2 |
-| 3 | Bifurcación | 7×9 | amarilla | 5 |
-| 4 | Serpiente | 7×9 | naranja | 7 |
-| 5 | Pasillos | 9×11 | roja | 8 |
-| 6 | La plaza | 9×11 | amarilla, azul | 9 |
-| 7 | Encrucijada | 9×13 | verde, naranja | 12 |
-| 8 | Rodeo | 11×13 | roja, azul | 13 |
-| 9 | Laberinto | 11×15 | amarilla, roja, verde | 15 |
-| 10 | El gran recorrido | 11×15 | naranja, azul, verde | 19 |
+| Nivel | Nombre | Tamaño | Forma | Parejas llave/puerta | Muros destructibles | Power ups | Giros mínimos |
+|---|---|---|---|---|---|---|---|
+| 1 | Primer giro | 9×5 | apaisado | — | — | — | 1 |
+| 2 | El muro | 7×9 | vertical | — | 1 (3 golpes) | — | 3 |
+| 3 | La llave | 11×7 | apaisado | amarilla | — | — | 5 |
+| 4 | A toda prisa | 7×13 | vertical | naranja | — | 1 velocidad | 7 |
+| 5 | Escombros | 13×9 | apaisado | roja | 1 (4 golpes) | — | 9 |
+| 6 | Dos llaves | 9×15 | vertical | amarilla, azul | — | — | 10 |
+| 7 | Salas | 15×11 | apaisado | verde, naranja | 1 (2 golpes) | 1 velocidad | 12 |
+| 8 | El atajo | 11×17 | vertical | roja, azul | 1 (3 golpes, atajo) | — | 14 |
+| 9 | Galerías | 17×13 | apaisado | amarilla, roja, verde | — | 3 velocidad | 16 |
+| 10 | La gran travesía | 15×17 | casi cuadrado | naranja, azul, verde | 2 (2 y 5 golpes, seguidos) | — | 19 |
 
 ## 7. Controles táctiles en Android — Implementada en el prototipo
 
 - **Tocar la mitad izquierda de la pantalla** gira a la izquierda y **tocar la mitad derecha** gira a la derecha (relativo al rumbo, como en el apartado 2.3).
 - Toda la mitad de la pantalla es zona de toque, sin botones pequeños; cada toque cuenta como una pulsación.
-- Unas indicaciones discretas en la parte inferior («← Izquierda» y «Derecha →») se resaltan al tocar cada lado.
+- Unas indicaciones discretas en las esquinas inferiores («← Izquierda» y «Derecha →») se resaltan al tocar cada lado.
 - Botón en pantalla para **reiniciar** el nivel (y «Siguiente nivel» al completarlo); tocar los botones no cuenta como giro.
 - En PC se mantienen los controles de teclado (←/A, →/D, R reiniciar, Intro/N siguiente nivel) y el clic del ratón se trata como un toque.
 

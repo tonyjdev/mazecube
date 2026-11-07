@@ -17,6 +17,10 @@ Simula las reglas de scripts/rolling_cube.gd:
     hacia ella se descartan, aunque lleve su llave.
   * Si el cubo choca de frente con una puerta llevando su llave, la puerta y
     la llave desaparecen y el cubo rebota igualmente.
+- Muros destructibles ('1'..'5' = golpes que aguantan): obstáculos como una
+  pared (rebote y giros descartados). Cada choque de frente les quita un
+  golpe y el cubo rebota; el choque que los rompe también rebota, pero desde
+  entonces la casilla es libre.
 - Power ups (s = velocidad): no cambian qué decisiones hay que tomar, solo
   el ritmo del cubo, así que para el resolvedor son casillas libres.
 - Al llegar a la meta B termina el nivel.
@@ -53,7 +57,8 @@ DIRS = [(0, -1), (1, 0), (0, 1), (-1, 0)]
 KEY_CHARS = "yorug"
 DOOR_CHARS = KEY_CHARS.upper()
 POWERUP_CHARS = "s"
-LEVEL_CHARS = "#.AB" + KEY_CHARS + DOOR_CHARS + POWERUP_CHARS
+BREAKABLE_CHARS = "12345"
+LEVEL_CHARS = "#.AB" + KEY_CHARS + DOOR_CHARS + POWERUP_CHARS + BREAKABLE_CHARS
 
 
 def turn_left(h):
@@ -102,10 +107,18 @@ class Board:
         keys, doors = parse_items(layout)
         self.key_at = {cell: (i, color) for i, (cell, color) in enumerate(keys)}
         self.door_at = {cell: (i, color) for i, (cell, color) in enumerate(doors)}
+        breakables = [((x, z), int(c)) for z, row in enumerate(layout)
+                      for x, c in enumerate(row) if c in BREAKABLE_CHARS]
+        self.breakable_at = {cell: i for i, (cell, _) in enumerate(breakables)}
+        self.initial_hits = tuple(hits for _, hits in breakables)
+        self.unbreakable = False
 
-    def passable(self, cell, opened):
-        """Casilla libre y sin puerta cerrada."""
+    def passable(self, cell, opened, hits):
+        """Casilla libre, sin puerta cerrada y sin muro destructible en pie."""
         if cell not in self.free:
+            return False
+        wall = self.breakable_at.get(cell)
+        if wall is not None and hits[wall] > 0:
             return False
         door = self.door_at.get(cell)
         return door is None or bool(opened >> door[0] & 1)
@@ -114,44 +127,52 @@ class Board:
 def step(board, state, turn):
     """Aplica una decisión (0, -1 izquierda, 1 derecha) y avanza una casilla.
 
-    state = (casilla, rumbo, llave_llevada o None, puertas_abiertas, llaves_cogidas)
-    (los dos últimos son máscaras de bits).
+    state = (casilla, rumbo, llave_llevada o None, puertas_abiertas, llaves_cogidas,
+             golpes_restantes)
+    (puertas_abiertas y llaves_cogidas son máscaras de bits; golpes_restantes
+    es una tupla con los golpes que le quedan a cada muro destructible).
     """
-    cell, heading, held, opened, taken = state
+    cell, heading, held, opened, taken, hits = state
     if turn:
         candidate = turn_left(heading) if turn < 0 else turn_right(heading)
-        if board.passable((cell[0] + candidate[0], cell[1] + candidate[1]), opened):
+        if board.passable((cell[0] + candidate[0], cell[1] + candidate[1]), opened, hits):
             heading = candidate
     nxt = (cell[0] + heading[0], cell[1] + heading[1])
-    if not board.passable(nxt, opened):
+    if not board.passable(nxt, opened, hits):
         door = board.door_at.get(nxt)
+        wall = board.breakable_at.get(nxt)
         if door is not None and held == door[1]:
             opened |= 1 << door[0]
             held = None
+        elif wall is not None and hits[wall] > 0 and not board.unbreakable:
+            hits = hits[:wall] + (hits[wall] - 1,) + hits[wall + 1:]
         heading = (-heading[0], -heading[1])
         nxt = (cell[0] + heading[0], cell[1] + heading[1])
-        if not board.passable(nxt, opened):
-            return cell, heading, held, opened, taken
+        if not board.passable(nxt, opened, hits):
+            return cell, heading, held, opened, taken, hits
     key = board.key_at.get(nxt)
     if key is not None and held is None and not taken >> key[0] & 1:
         held = key[1]
         taken |= 1 << key[0]
-    return nxt, heading, held, opened, taken
+    return nxt, heading, held, opened, taken, hits
 
 
-def solve(layout, start_heading, doors_as_walls=False):
+def solve(layout, start_heading, doors_as_walls=False, breakables_as_walls=False):
     """Devuelve (giros_minimos, pasos, decisiones) o None si no tiene solución.
 
     decisiones es una lista de (casilla, giro) del recorrido óptimo.
     Con doors_as_walls=True las puertas no se pueden abrir (sirve para
-    comprobar que una puerta es imprescindible).
+    comprobar que una puerta es imprescindible) y con breakables_as_walls=True
+    los muros destructibles no se pueden romper.
     """
     board = Board(layout)
     if board.start is None or board.goal is None:
         raise ValueError("El nivel necesita una casilla A y una casilla B")
     if doors_as_walls:
         board.key_at = {}
-    start = (board.start, start_heading, None, 0, 0)
+    if breakables_as_walls:
+        board.unbreakable = True
+    start = (board.start, start_heading, None, 0, 0, board.initial_hits)
     best = {start: (0, 0)}
     prev = {}
     queue = deque([(0, 0, start)])

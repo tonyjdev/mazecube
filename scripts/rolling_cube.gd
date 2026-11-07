@@ -12,6 +12,10 @@ extends Node3D
 ## giros hacia ella se descartan y al chocar de frente el cubo rebota; si lleva
 ## la llave de su color, la puerta y la llave desaparecen y el cubo rebota.
 ##
+## Muros destructibles: también son obstáculos. Cada choque de frente les
+## quita un golpe y el cubo rebota; el golpe que los rompe también rebota,
+## pero desde ese momento la casilla ya se puede atravesar.
+##
 ## Power ups: al llegar a su casilla el cubo lo coge y se activa su efecto.
 ## Las reglas de cada tipo (acumulación, duración, fin al rebotar...) las
 ## define su clase (ver PowerUp); aquí se gestionan de forma genérica.
@@ -21,6 +25,7 @@ signal bounced(cell: Vector2i)
 signal rolled(cell: Vector2i)
 signal key_picked(color: String)
 signal door_opened(color: String)
+signal breakable_hit(cell: Vector2i, hits_left: int)
 signal power_up_picked(power_up: PowerUp, stacks: int)
 signal power_up_ended(power_up: PowerUp)
 
@@ -102,6 +107,9 @@ func request_turn(direction: int) -> void:
 
 func _process(delta: float) -> void:
 	_process_power_ups(delta)
+	# La llave que lleva el cubo sigue girando sobre sí misma, como en el mapa.
+	if _held_key_node:
+		_held_key_node.rotate_y(Level.KEY_SPIN_SPEED * delta)
 	if level == null or _rolling or is_finished:
 		return
 	if _cooldown > 0.0:
@@ -133,6 +141,8 @@ func _try_advance() -> void:
 			level.open_door(ahead)
 			_drop_held_key()
 			door_opened.emit(door)
+		elif level.breakable_hits(ahead) > 0:
+			breakable_hit.emit(ahead, level.hit_breakable(ahead, heading))
 		_end_power_ups_on_bounce(door != "")
 		heading = -heading
 		bounced.emit(cell)

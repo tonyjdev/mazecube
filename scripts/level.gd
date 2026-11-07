@@ -7,12 +7,15 @@ extends Node3D
 ##   Llaves (minúscula) y su puerta (mayúscula), del mismo color:
 ##   y/Y amarillo   o/O naranja   r/R rojo   u/U azul   g/G verde
 ##   Power ups: ver PowerUpCatalog (s = velocidad).
+##   Muros destructibles: '1'..'5' = golpes que aguanta (5 pocas grietas,
+##   1 muchas grietas). Ver BreakableWall.
 ## Las filas crecen hacia +Z (hacia abajo en pantalla) y las columnas hacia +X.
 
 const CELL_SIZE := 1.0
 const WALL_HEIGHT := 0.5
 const FLOOR_THICKNESS := 0.1
 const KEY_CHARS := "yorug"
+const BREAKABLE_CHARS := "12345"
 const ITEM_COLORS := {
 	"y": Color(0.98, 0.80, 0.12),
 	"o": Color(1.00, 0.50, 0.08),
@@ -26,6 +29,8 @@ const COLOR_NAMES := {
 ## La puerta es un bloque estrecho que cierra el pasillo de muro a muro.
 const DOOR_THICKNESS := 0.24
 const DOOR_HEIGHT := 0.8
+## Duración de la animación de la puerta hundiéndose al abrirse.
+const DOOR_SINK_TIME := 0.6
 ## Altura y velocidad de giro (rad/s) de las llaves que están en el mapa.
 const KEY_FLOAT_HEIGHT := 0.5
 const KEY_SCALE := 1.6
@@ -54,6 +59,8 @@ var _keys := {}
 var _doors := {}
 ## casilla -> { "power_up": PowerUp, "node": Node3D }
 var _power_ups := {}
+## casilla -> BreakableWall (solo los que siguen en pie)
+var _breakables := {}
 
 
 func _ready() -> void:
@@ -74,6 +81,7 @@ func build() -> void:
 	_keys.clear()
 	_doors.clear()
 	_power_ups.clear()
+	_breakables.clear()
 
 	var floor_a := _make_material(Color(0.86, 0.84, 0.80))
 	var floor_b := _make_material(Color(0.78, 0.76, 0.72))
@@ -105,6 +113,8 @@ func build() -> void:
 				_add_door(cell, symbol.to_lower())
 			elif PowerUpCatalog.has_symbol(symbol):
 				_add_power_up(cell, symbol)
+			elif BREAKABLE_CHARS.contains(symbol):
+				_add_breakable(cell, int(symbol))
 
 
 func _process(delta: float) -> void:
@@ -115,9 +125,27 @@ func _process(delta: float) -> void:
 		item["node"].rotate(power_up.pickup_spin_axis, power_up.pickup_spin_speed * delta)
 
 
-## Casilla por la que se puede pasar: libre y sin puerta cerrada.
+## Casilla por la que se puede pasar: libre, sin puerta cerrada y sin muro
+## destructible en pie.
 func is_walkable(cell: Vector2i) -> bool:
-	return _walkable.has(cell) and not _doors.has(cell)
+	return _walkable.has(cell) and not _doors.has(cell) and not _breakables.has(cell)
+
+
+## Golpes que le quedan al muro destructible de la casilla (0 si no hay).
+func breakable_hits(cell: Vector2i) -> int:
+	return _breakables[cell].hits if _breakables.has(cell) else 0
+
+
+## Golpea de frente el muro destructible de la casilla en la dirección
+## `heading`. Devuelve los golpes que le quedan; con 0 el muro se rompe y la
+## casilla pasa a ser libre al instante, aunque los pedazos sigan cayendo.
+func hit_breakable(cell: Vector2i, heading: Vector2i) -> int:
+	if not _breakables.has(cell):
+		return 0
+	var left: int = _breakables[cell].hit(Vector3(heading.x, 0, heading.y))
+	if left == 0:
+		_breakables.erase(cell)
+	return left
 
 
 ## Color de la puerta cerrada de la casilla, o "" si no hay.
@@ -153,11 +181,17 @@ func take_power_up(cell: Vector2i) -> PowerUp:
 	return power_up
 
 
-## Quita la puerta del mapa: la casilla pasa a ser libre.
+## Abre la puerta: la casilla pasa a ser libre al instante y la puerta se
+## hunde en el suelo hasta desaparecer.
 func open_door(cell: Vector2i) -> void:
-	if _doors.has(cell):
-		_doors[cell]["node"].queue_free()
-		_doors.erase(cell)
+	if not _doors.has(cell):
+		return
+	var door: Node3D = _doors[cell]["node"]
+	_doors.erase(cell)
+	var tween := door.create_tween()
+	tween.tween_property(door, "position:y", door.position.y - DOOR_HEIGHT - FLOOR_THICKNESS,
+			DOOR_SINK_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.tween_callback(door.queue_free)
 
 
 func cell_to_world(cell: Vector2i) -> Vector3:
@@ -203,6 +237,13 @@ func _add_power_up(cell: Vector2i, symbol: String) -> void:
 	_power_ups[cell] = {"power_up": power_up, "node": node}
 
 
+func _add_breakable(cell: Vector2i, hits: int) -> void:
+	var wall := BreakableWall.new(hits)
+	wall.position = Vector3(cell.x * CELL_SIZE, 0.0, cell.y * CELL_SIZE)
+	add_child(wall)
+	_breakables[cell] = wall
+
+
 ## La puerta se orienta según los muros que la rodean: si los muros están a
 ## izquierda y derecha, el pasillo va de arriba abajo y la puerta lo cruza en X.
 func _add_door(cell: Vector2i, color: String) -> void:
@@ -218,7 +259,8 @@ func _add_door(cell: Vector2i, color: String) -> void:
 func _is_wall(cell: Vector2i) -> bool:
 	if cell.y < 0 or cell.y >= layout.size() or cell.x < 0 or cell.x >= layout[cell.y].length():
 		return true
-	return layout[cell.y][cell.x] == "#"
+	var symbol := layout[cell.y][cell.x]
+	return symbol == "#" or BREAKABLE_CHARS.contains(symbol)
 
 
 func _make_material(color: Color) -> StandardMaterial3D:

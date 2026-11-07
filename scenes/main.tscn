@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://buw7ylyf3lyuk" path="res://scripts/main.gd" id="1_sugp2"]
 [ext_resource type="Script" uid="uid://ccjf1dwf07kqe" path="res://scripts/level.gd" id="2_jyhfs"]
+[ext_resource type="Script" path="res://scripts/follow_camera.gd" id="9_fcam"]
 [ext_resource type="Script" uid="uid://blpc1e23dcvc7" path="res://scripts/rolling_cube.gd" id="3_tbgi4"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sgp6g"]
@@ -33,6 +34,7 @@ directional_shadow_max_distance = 40.0
 [node name="Camera3D" type="Camera3D" parent="." unique_id=510444692]
 transform = Transform3D(0.70710677, -0.40820402, 0.57738155, 0, 0.81654084, 0.5772877, -0.70710677, -0.40820402, 0.57738155, 4, 8, 9)
 current = true
+script = ExtResource("9_fcam")
 
 [node name="Level" type="Node3D" parent="." unique_id=291549142]
 script = ExtResource("2_jyhfs")
@@ -51,77 +53,106 @@ anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
-theme_override_constants/margin_left = 16
-theme_override_constants/margin_top = 32
-theme_override_constants/margin_right = 16
-theme_override_constants/margin_bottom = 32
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_bottom = 24
 
-[node name="VBox" type="VBoxContainer" parent="UI/Margin" unique_id=549432227]
+[node name="HBox" type="HBoxContainer" parent="UI/Margin" unique_id=549432227]
 layout_mode = 2
 mouse_filter = 2
+theme_override_constants/separation = 16
 
-[node name="Header" type="VBoxContainer" parent="UI/Margin/VBox" unique_id=1246887751]
+[node name="LeftPanel" type="VBoxContainer" parent="UI/Margin/HBox" unique_id=1246887751]
+custom_minimum_size = Vector2(280, 0)
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 12
 
-[node name="LevelLabel" type="Label" parent="UI/Margin/VBox/Header" unique_id=175176079]
+[node name="LevelLabel" type="Label" parent="UI/Margin/HBox/LeftPanel" unique_id=175176079]
+theme_override_colors/font_outline_color = Color(0.12, 0.1, 0.08, 0.85)
+theme_override_constants/outline_size = 8
+unique_name_in_owner = true
 modulate = Color(1, 1, 1, 0.75)
 layout_mode = 2
-theme_override_font_sizes/font_size = 24
-horizontal_alignment = 1
-
-[node name="Status" type="Label" parent="UI/Margin/VBox/Header" unique_id=737000712]
-layout_mode = 2
-theme_override_font_sizes/font_size = 34
-horizontal_alignment = 1
+theme_override_font_sizes/font_size = 22
 autowrap_mode = 3
 
-[node name="Buttons" type="HBoxContainer" parent="UI/Margin/VBox/Header" unique_id=1513948294]
+[node name="Status" type="Label" parent="UI/Margin/HBox/LeftPanel" unique_id=737000712]
+theme_override_colors/font_outline_color = Color(0.12, 0.1, 0.08, 0.85)
+theme_override_constants/outline_size = 8
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 30
+autowrap_mode = 3
+
+[node name="Buttons" type="VBoxContainer" parent="UI/Margin/HBox/LeftPanel" unique_id=1513948294]
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/separation = 16
-alignment = 1
+theme_override_constants/separation = 12
 
-[node name="RestartButton" type="Button" parent="UI/Margin/VBox/Header/Buttons" unique_id=240572283]
-custom_minimum_size = Vector2(200, 72)
+[node name="RestartButton" type="Button" parent="UI/Margin/HBox/LeftPanel/Buttons" unique_id=240572283]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 72)
 layout_mode = 2
 focus_mode = 0
 theme_override_font_sizes/font_size = 26
 text = "Reiniciar"
 
-[node name="NextButton" type="Button" parent="UI/Margin/VBox/Header/Buttons" unique_id=1353986561]
+[node name="NextButton" type="Button" parent="UI/Margin/HBox/LeftPanel/Buttons" unique_id=1353986561]
+unique_name_in_owner = true
 visible = false
-custom_minimum_size = Vector2(360, 72)
+custom_minimum_size = Vector2(0, 72)
 layout_mode = 2
 focus_mode = 0
 theme_override_font_sizes/font_size = 26
 text = "Siguiente nivel →"
 
-[node name="Spacer" type="Control" parent="UI/Margin/VBox" unique_id=1233186935]
+[node name="LeftFiller" type="Control" parent="UI/Margin/HBox/LeftPanel" unique_id=1873402215]
 layout_mode = 2
 size_flags_vertical = 3
 mouse_filter = 2
 
-[node name="BottomBar" type="HBoxContainer" parent="UI/Margin/VBox" unique_id=534100608]
-custom_minimum_size = Vector2(0, 80)
-layout_mode = 2
-mouse_filter = 2
-
-[node name="LeftHint" type="Label" parent="UI/Margin/VBox/BottomBar" unique_id=1236806875]
+[node name="LeftHint" type="Label" parent="UI/Margin/HBox/LeftPanel" unique_id=1236806875]
+theme_override_colors/font_outline_color = Color(0.12, 0.1, 0.08, 0.85)
+theme_override_constants/outline_size = 8
+unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 30
 text = "← Izquierda"
 
-[node name="Help" type="Label" parent="UI/Margin/VBox/BottomBar" unique_id=2085000923]
+[node name="Spacer" type="Control" parent="UI/Margin/HBox" unique_id=1233186935]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="RightPanel" type="VBoxContainer" parent="UI/Margin/HBox" unique_id=534100608]
+custom_minimum_size = Vector2(280, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="Help" type="Label" parent="UI/Margin/HBox/RightPanel" unique_id=2085000923]
+theme_override_colors/font_outline_color = Color(0.12, 0.1, 0.08, 0.85)
+theme_override_constants/outline_size = 8
+unique_name_in_owner = true
+modulate = Color(1, 1, 1, 0.75)
+layout_mode = 2
 theme_override_font_sizes/font_size = 20
-horizontal_alignment = 1
-vertical_alignment = 1
+horizontal_alignment = 2
 autowrap_mode = 3
 
-[node name="RightHint" type="Label" parent="UI/Margin/VBox/BottomBar" unique_id=1640936461]
+[node name="RightFiller" type="Control" parent="UI/Margin/HBox/RightPanel" unique_id=1095526334]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="RightHint" type="Label" parent="UI/Margin/HBox/RightPanel" unique_id=1640936461]
+theme_override_colors/font_outline_color = Color(0.12, 0.1, 0.08, 0.85)
+theme_override_constants/outline_size = 8
+unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 30
 text = "Derecha →"
+horizontal_alignment = 2
