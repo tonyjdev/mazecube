@@ -6,6 +6,10 @@ extends Node3D
 ##   Táctil:  tocar la mitad izquierda o derecha de la pantalla gira hacia ese
 ##            lado; los botones superiores reinician y cambian la cámara.
 ##   En PC, el clic del ratón se trata como un toque (emulate_touch_from_mouse).
+##   Al completar un nivel: botón "Siguiente nivel" o Intro/N.
+##   Solo en builds de depuración: Re Pág / Av Pág cambian de nivel.
+##
+## El nivel actual se guarda en user://progress.cfg para continuar al volver.
 
 enum CameraMode { TILTED_TOP, ISOMETRIC }
 
@@ -14,6 +18,7 @@ const CAMERA_NAMES := {
 	CameraMode.ISOMETRIC: "Isométrica",
 }
 const HINT_IDLE_ALPHA := 0.45
+const PROGRESS_PATH := "user://progress.cfg"
 
 @export var camera_mode := CameraMode.TILTED_TOP
 ## Inclinación de la vista cenital (90 = totalmente desde arriba).
@@ -21,12 +26,17 @@ const HINT_IDLE_ALPHA := 0.45
 ## Margen alrededor del tablero al encuadrarlo (1.0 = justo al borde).
 @export_range(1.0, 1.5) var camera_fit_margin := 1.08
 
+var current_level := 0
 var _hint_tweens := {}
 
 @onready var level: Level = $Level
 @onready var cube: RollingCube = $Cube
 @onready var camera: Camera3D = $Camera3D
+@onready var level_label: Label = $UI/Margin/VBox/Header/LevelLabel
 @onready var status_label: Label = $UI/Margin/VBox/Header/Status
+@onready var next_button: Button = $UI/Margin/VBox/Header/Buttons/NextButton
+## Hueco libre entre la cabecera y la barra inferior: ahí se encuadra el tablero.
+@onready var play_area: Control = $UI/Margin/VBox/Spacer
 @onready var restart_button: Button = $UI/Margin/VBox/Header/Buttons/RestartButton
 @onready var camera_button: Button = $UI/Margin/VBox/Header/Buttons/CameraButton
 @onready var help_label: Label = $UI/Margin/VBox/BottomBar/Help
@@ -39,15 +49,16 @@ func _ready() -> void:
 	cube.rolled.connect(_on_rolled)
 	restart_button.pressed.connect(_restart)
 	camera_button.pressed.connect(_toggle_camera)
+	next_button.pressed.connect(_next_level)
 	left_hint.modulate.a = HINT_IDLE_ALPHA
 	right_hint.modulate.a = HINT_IDLE_ALPHA
 	if _is_touch_device():
 		help_label.text = "Toca a la izquierda o a la derecha de la pantalla para girar"
 	else:
 		help_label.text = "←/A · →/D o clic a cada lado para girar   R reiniciar   C cámara"
-	get_viewport().size_changed.connect(_apply_camera)
-	_restart()
-	_apply_camera()
+	# El hueco libre cambia al rotar o redimensionar la pantalla.
+	play_area.resized.connect(_apply_camera)
+	_load_level(_load_progress())
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -67,6 +78,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		_restart()
 	elif event.is_action_pressed("toggle_camera"):
 		_toggle_camera()
+	elif event.is_action_pressed("next_level") and cube.is_finished:
+		_next_level()
+	elif OS.is_debug_build() and event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_PAGEDOWN:
+			_load_level(current_level + 1)
+		elif event.keycode == KEY_PAGEUP:
+			_load_level(current_level - 1)
 
 
 func _turn(direction: int) -> void:
@@ -76,7 +94,37 @@ func _turn(direction: int) -> void:
 
 func _restart() -> void:
 	cube.reset(level)
+	next_button.visible = false
+	camera_button.visible = true
 	status_label.text = "Llega a la casilla verde"
+
+
+func _load_level(index: int) -> void:
+	current_level = clampi(index, 0, Levels.count() - 1)
+	var data := Levels.get_level(current_level)
+	level.load_level(data)
+	level_label.text = "Nivel %d de %d · %s" % [current_level + 1, Levels.count(), data["name"]]
+	_save_progress()
+	_restart()
+	_apply_camera()
+
+
+## Tras el último nivel se vuelve al primero.
+func _next_level() -> void:
+	_load_level((current_level + 1) % Levels.count())
+
+
+func _load_progress() -> int:
+	var cfg := ConfigFile.new()
+	if cfg.load(PROGRESS_PATH) != OK:
+		return 0
+	return int(cfg.get_value("progress", "current_level", 0))
+
+
+func _save_progress() -> void:
+	var cfg := ConfigFile.new()
+	cfg.set_value("progress", "current_level", current_level)
+	cfg.save(PROGRESS_PATH)
 
 
 func _toggle_camera() -> void:
@@ -129,15 +177,18 @@ func _board_corners(center: Vector3) -> Array[Vector3]:
 
 
 ## Búsqueda binaria del menor valor (distancia o tamaño) con el que todas las
-## esquinas quedan dentro de la vista de la cámara, sea cual sea la proporción
-## de la pantalla.
+## esquinas quedan dentro del hueco libre de la interfaz, sea cual sea la
+## proporción de la pantalla.
 func _fit(apply: Callable, corners: Array[Vector3], lo: float, hi: float) -> void:
+	var area := play_area.get_global_rect()
+	if area.size.x < 1.0 or area.size.y < 1.0:
+		area = get_viewport().get_visible_rect()
 	for i in 30:
 		var mid := (lo + hi) * 0.5
 		apply.call(mid)
 		var inside := true
 		for p in corners:
-			if not camera.is_position_in_frustum(p):
+			if camera.is_position_behind(p) or not area.has_point(camera.unproject_position(p)):
 				inside = false
 				break
 		if inside:
@@ -149,8 +200,10 @@ func _fit(apply: Callable, corners: Array[Vector3], lo: float, hi: float) -> voi
 
 ## Los toques sobre los botones no cuentan como giro.
 func _is_over_buttons(pos: Vector2) -> bool:
-	return restart_button.get_global_rect().has_point(pos) \
-		or camera_button.get_global_rect().has_point(pos)
+	for button: Button in [restart_button, camera_button, next_button]:
+		if button.visible and button.get_global_rect().has_point(pos):
+			return true
+	return false
 
 
 func _is_touch_device() -> bool:
@@ -173,4 +226,12 @@ func _on_rolled(_cell: Vector2i) -> void:
 
 
 func _on_reached_goal() -> void:
-	status_label.text = "¡Meta alcanzada! Reinicia para volver a jugar"
+	if current_level == Levels.count() - 1:
+		status_label.text = "¡Has completado todos los niveles!"
+		next_button.text = "Volver al nivel 1"
+	else:
+		status_label.text = "¡Nivel completado!"
+		next_button.text = "Siguiente nivel →"
+	# Ocupa el lugar del botón de cámara para que la cabecera no cambie de alto.
+	camera_button.visible = false
+	next_button.visible = true

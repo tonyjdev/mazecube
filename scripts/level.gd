@@ -33,6 +33,13 @@ func _ready() -> void:
 	build()
 
 
+## Sustituye el tablero por el de un nivel de Levels.LIST.
+func load_level(data: Dictionary) -> void:
+	layout = PackedStringArray(data["layout"])
+	start_heading = data["start_heading"]
+	build()
+
+
 func build() -> void:
 	for child in get_children():
 		child.queue_free()
