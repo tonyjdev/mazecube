@@ -3,7 +3,8 @@ extends Node3D
 ## Explosión del cubo al morir: el cubo se hincha un instante y revienta en
 ## GRID³ pedazos que conservan los colores de sus caras. Los pedazos saltan
 ## hacia fuera, caen, rebotan en el suelo girando y al final se encogen hasta
-## desaparecer. Al terminar emite `finished` y se libera sola.
+## desaparecer. Al terminar emite `finished` y se libera sola. Si el cubo
+## explota en el vacío (sin suelo), los pedazos siguen cayendo sin rebotar.
 ##
 ## Se crea con create(); el nodo es top_level y se coloca en el centro del
 ## cubo (en coordenadas globales).
@@ -33,6 +34,7 @@ var _pieces: Array[Dictionary] = []
 var _piece_mesh: Mesh
 var _body_basis := Basis.IDENTITY
 var _size := 1.0
+var _has_floor := true
 var _time := 0.0
 var _burst := false
 var _rng := RandomNumberGenerator.new()
@@ -40,9 +42,11 @@ var _rng := RandomNumberGenerator.new()
 
 ## `body_mesh` es la malla del cubo (para el hinchado), `piece_mesh` la de un
 ## pedazo (un cubo con los mismos colores por cara), `basis` la orientación
-## del cubo y `size` su lado.
-static func create(body_mesh: Mesh, piece_mesh: Mesh, basis: Basis, size: float) -> CubeExplosion:
+## del cubo, `size` su lado y `has_floor` si hay suelo debajo para rebotar.
+static func create(body_mesh: Mesh, piece_mesh: Mesh, basis: Basis, size: float,
+		has_floor := true) -> CubeExplosion:
 	var explosion := CubeExplosion.new()
+	explosion._has_floor = has_floor
 	explosion.top_level = true
 	explosion._piece_mesh = piece_mesh
 	explosion._body_basis = basis
@@ -110,7 +114,7 @@ func _update_piece(piece: Dictionary, delta: float, shrink: float) -> void:
 	node.position += velocity * delta
 	# El suelo está a la altura del origen del cubo menos medio lado.
 	var floor_y: float = -_size * 0.5 + piece["half"]
-	if node.position.y < floor_y and velocity.y < 0.0:
+	if _has_floor and node.position.y < floor_y and velocity.y < 0.0:
 		node.position.y = floor_y
 		velocity.y = -velocity.y * BOUNCE
 		velocity.x *= FRICTION

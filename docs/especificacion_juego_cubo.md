@@ -172,6 +172,13 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 - **Mecanismos para evitarlo:** los **barrotes** lo detienen igual que al cubo; pulsando un botón en el momento justo se le puede **encerrar** o dejar fuera.
 - Si el cubo queda encajonado entre el obstáculo y un muro (bloqueado delante y detrás), rebota en su casilla a ritmo de vuelco hasta que se libere el paso.
 
+### 2.14. Caída al vacío — Implementada en el prototipo
+
+- Hay zonas del mapa **sin paredes y sin suelo**: el **vacío**. Fuera de los límites del mapa también es vacío. Los niveles con vacío son **islas** (salas con paredes y **mesetas** abiertas sin paredes) unidas por **puentes** de una casilla sobre el abismo; bajo el suelo y las paredes se ve un bloque de roca, algo más claro en las casillas del borde, para que el tablero parezca flotar.
+- El vacío **no es un obstáculo**: el cubo **no rebota** en él y los **giros hacia el vacío se aplican** (no se descartan). En un puente, cualquier giro tira al cubo; al final de un puente o en el borde de una meseta hay que girar a tiempo.
+- Si el cubo entra en el vacío, **vuelca por el borde**, **cae girando** (≈0,6 s, con un silbido que baja de tono) y **explota en el aire**: los pedazos siguen cayendo sin rebotar. Cuando termina la explosión vuelve a la salida igual que al morir por un enemigo (apartado 2.13). Se cae aunque esté en su tiempo de invulnerabilidad.
+- Los enemigos nunca entran en el vacío.
+
 ## 3. Escenario y objetivo — Confirmados
 
 - El escenario es un **laberinto**.
@@ -190,7 +197,7 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 
 ## 5. Presentación visual
 
-- **Efectos de sonido:** vuelco del cubo (golpe sordo, con el tono un poco al azar), rebote, giro descartado, llave cogida (campanitas), puerta abierta, golpe y derrumbe de muros destructibles, botón y barrotes, power up, media vuelta (soplido), explosión del cubo, meta (fanfarria), alarma cuando un perseguidor ve al cubo y clic en los botones de la interfaz. Son sonidos sintetizados (no hay grabaciones externas) con `tools/make_sfx.py` y suenan por el canal «SFX».
+- **Efectos de sonido:** vuelco del cubo (golpe sordo, con el tono un poco al azar), rebote, giro descartado, llave cogida (campanitas), puerta abierta, golpe y derrumbe de muros destructibles, botón y barrotes, power up, media vuelta (soplido), explosión del cubo, caída al vacío (silbido), meta (fanfarria), alarma cuando un perseguidor ve al cubo y clic en los botones de la interfaz. Son sonidos sintetizados (no hay grabaciones externas) con `tools/make_sfx.py` y suenan por el canal «SFX».
 
 - **Icono de la aplicación:** un cubo isométrico con los colores de las caras del cubo del juego (amarillo, azul y rojo) y la flecha de rumbo, sobre el fondo marrón del menú con trozos de muro de laberinto. En Android se usa también como icono adaptativo (primer plano, fondo y versión monocromática). Se genera con `tools/make_icon.py`.
 - Juego en **3D**, con cubo y laberinto visibles desde arriba.
@@ -224,6 +231,7 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 - Barrotes: `c`, `d`, `e`, `f`, `h`, cada letra es un **grupo** (todas las casillas con la misma letra cambian juntas); en **minúscula empiezan abiertos** y en **mayúscula cerrados**. Un mismo grupo puede tener casillas abiertas y cerradas. Debe haber muro justo a ambos lados del pasillo.
 - Botones: `p`, `q`, `t`, `v`, `w` en lugar de un muro; el botón se coloca en la cara que da a su **única casilla libre** contigua. El campo `buttons` indica qué grupos de barrotes cambia cada botón, por ejemplo `"buttons": {"p": "cd", "q": "d"}`.
 - Enemigos (sobre una casilla libre): `x` perseguidor, `z` obstáculo, y `i`, `j`, `k`, `m`, `n` patrulleros. El campo `patrols` da la ruta de cada patrullero (apartado 2.13), por ejemplo `"patrols": {"i": "D6", "j": "R4 D2 L4 U2"}`.
+- Vacío: `~` (ni suelo ni pared; apartado 2.14).
 - Opcional: `camera_distance`, la distancia de la cámara para ese nivel (por defecto, la máxima; ver apartado 5).
 - Los mapas pueden ser más grandes que la pantalla, apaisados o verticales: la cámara sigue al cubo (apartado 5).
 
@@ -231,12 +239,14 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 
 - La dificultad de un nivel se mide como el **mínimo número de giros** necesario para resolverlo con las reglas del apartado 2 (incluido el rebote, el descarte de giros bloqueados, la ausencia de giro en la casilla de salida, las llaves y puertas y los muros destructibles).
 - Los **enemigos** se mueven en tiempo real y el resolvedor no los simula: los perseguidores y patrulleros no cuentan y el obstáculo cuenta como un **muro fijo** en su casilla de partida. El resolvedor sí comprueba que las rutas de los patrulleros solo pasan por casillas libres y no tocan la salida ni la meta.
+- Caer al vacío devuelve el cubo a la salida; el resolvedor descarta esos movimientos (nunca usa una caída como atajo).
 - Ese mínimo se calcula con un **resolvedor automático** que también comprueba que todos los niveles tienen solución.
 - **Los niveles actuales son de prueba de mecánicas**; los niveles definitivos los proporcionará el diseñador.
 - Los niveles de prueba van de **1 a 27 giros** y crecen de forma progresiva, de **9×5 a 23×17 casillas** (en torno a un 15-20% más de casillas cada uno), alternando mapas apaisados y verticales. Los niveles pequeños caben enteros en pantalla; en los grandes la cámara sigue al cubo.
 - Desde el nivel 3 incluyen parejas llave/puerta, y cada puerta es imprescindible (convertida en muro, el nivel no tendría solución). Los niveles 4 y 7 tienen un power up de velocidad y el 9 tres seguidos, para probar la acumulación. Hay muros destructibles en los niveles 2, 5, 7 y 10 (hay que romperlos para pasar) y en el 8 (un atajo: sin romperlo harían falta 26 giros en vez de 14). Los niveles 11 a 13 introducen los botones y barrotes; cada botón es imprescindible (sin él, el nivel no tendría solución). Los niveles 14 a 16 presentan los enemigos, uno por nivel, en laberintos con bucles para poder esquivarlos; por eso sus giros mínimos no siguen la progresión.
 - Los niveles **17 a 30** son **mapas grandes** (de 27×19 a 64×34 casillas) que combinan todos los mecanismos y enemigos, con dificultad creciente de **27 a 64 giros**. Se alternan dos tipos de mapa: **salas y pasillos** (salas rectangulares, algunas con pilares, unidas por pasillos de una casilla, rectos o en zigzag) y **laberintos** con pocos bucles. Las puertas, los barrotes cerrados y los muros destructibles están siempre en pasillos de paso obligado (son imprescindibles), cada llave está entre su puerta y la anterior (a ser posible en un rincón apartado) y cada **botón está a 6 casillas o menos de sus barrotes**, para que se vean juntos. Los patrulleros rodean salas o recorren pasillos rectos lejos de la salida y los perseguidores empiezan a 12 casillas o más de ella.
-- Estos niveles los crea el **generador de niveles** `tools/build_levels.py` (determinista: con las mismas semillas sale siempre lo mismo), que los valida con el resolvedor y elige, para cada nivel, el candidato cuyo mínimo de giros se acerca más al objetivo.
+- Los niveles **31** («Al borde», 33×26, 23 giros) y **32** («El abismo», 39×27, 33 giros) presentan el **vacío**: islas y mesetas unidas por puentes, con puentes sin salida como trampa. El 31 tiene dos parejas llave/puerta y un power up de velocidad en un puente; el 32 añade un patrullero que rodea una meseta, un perseguidor en otra, un botón con barrotes que guardan una llave y un muro destructible, todos imprescindibles.
+- Los niveles 17 a 30 los crea el **generador de niveles** `tools/build_levels.py` (determinista: con las mismas semillas sale siempre lo mismo), que los valida con el resolvedor y elige, para cada nivel, el candidato cuyo mínimo de giros se acerca más al objetivo.
 
 | Nivel | Nombre | Tamaño | Forma | Parejas llave/puerta | Muros destructibles | Power ups | Botones y barrotes | Giros mínimos |
 |---|---|---|---|---|---|---|---|---|

@@ -34,6 +34,12 @@ extends Node3D
 ## obstáculo es como una pared. Si queda encajonado (bloqueado delante y
 ## detrás), rebota en su casilla a ritmo de vuelco hasta que se libere el paso.
 ##
+## Vacío: las casillas de vacío no son obstáculos (el cubo no rebota y los
+## giros hacia ellas se aceptan). Si el cubo entra en una, vuelca por el
+## borde, cae girando y, tras FALL_TIME segundos, explota en el aire; cuando
+## termina la explosión vuelve a la salida como si lo hubiera matado un
+## enemigo. Se cae aunque esté en el tiempo de invulnerabilidad.
+##
 ## Power ups: al llegar a su casilla el cubo lo coge y se activa su efecto.
 ## Las reglas de cada tipo (acumulación, duración, fin al rebotar...) las
 ## define su clase (ver PowerUp); aquí se gestionan de forma genérica.
@@ -51,8 +57,11 @@ signal reversed(cell: Vector2i)
 signal turn_rejected(direction: Vector2i)
 signal power_up_picked(power_up: PowerUp, stacks: int)
 signal power_up_ended(power_up: PowerUp)
-## Un enemigo ha matado al cubo en esa casilla.
+## Un enemigo ha matado al cubo en esa casilla, o ha explotado tras caer al
+## vacío desde ella.
 signal died(cell: Vector2i)
+## El cubo ha empezado a caer al vacío desde esa casilla (explotará después).
+signal fell(cell: Vector2i)
 ## El cubo ha vuelto a la salida tras morir.
 signal respawned
 
@@ -75,6 +84,13 @@ const REVERSE_SMOKE_LIFETIME := 0.8
 ## (con parpadeo de RESPAWN_BLINK segundos por ciclo).
 const RESPAWN_GRACE := 1.5
 const RESPAWN_BLINK := 0.12
+## Caída al vacío: tiempo de caída libre hasta explotar, gravedad, velocidad
+## inicial (hacia delante y hacia abajo) y giro (rad/s) al salir del borde.
+const FALL_TIME := 0.6
+const FALL_GRAVITY := 11.0
+const FALL_FORWARD_SPEED := 1.0
+const FALL_DOWN_SPEED := 0.8
+const FALL_SPIN := 6.5
 ## Lado del cubo.
 const SIZE := 0.98
 ## Color de cada cara del cubo (derecha, izquierda, arriba, abajo, detrás, delante).
@@ -118,6 +134,11 @@ var _rolling := false
 ## Casilla hacia la que está volcando (solo vale mientras _rolling).
 var _roll_target := Vector2i.ZERO
 var _dead := false
+## Cayendo al vacío: vuelco por el borde (_rolling) y caída libre después.
+var _falling := false
+var _fall_time := 0.0
+var _fall_velocity := Vector3.ZERO
+var _fall_axis := Vector3.RIGHT
 var _explosion: CubeExplosion
 ## Malla de un pedazo de la explosión (un cubo pequeño con los mismos colores).
 var _piece_mesh: Mesh
@@ -164,6 +185,7 @@ func reset(target_level: Level) -> void:
 	if is_instance_valid(_explosion):
 		_explosion.queue_free()
 	_explosion = null
+	_falling = false
 	global_position = level.cell_to_world(cell)
 	_body.transform = Transform3D(Basis.IDENTITY, Vector3(0, HALF, 0))
 	_update_arrow(Vector3.ZERO)
@@ -190,6 +212,8 @@ func request_reverse() -> void:
 
 
 func _process(delta: float) -> void:
+	if _falling and not _rolling:
+		_process_fall(delta)
 	if _dead:
 		return
 	if _grace_left > 0.0:
@@ -225,7 +249,7 @@ func _try_advance() -> void:
 	if _pending_turn != 0:
 		var candidate := turned(heading, _pending_turn)
 		_pending_turn = 0
-		if level.is_walkable(cell + candidate):
+		if level.is_walkable(cell + candidate) or level.is_void(cell + candidate):
 			heading = candidate
 		else:
 			_flash_rejected_turn(candidate)
@@ -237,7 +261,7 @@ func _try_advance() -> void:
 	# se gasta), pero el cubo rebota igualmente.
 	# Al chocar con un botón, se pulsa y el cubo rebota.
 	var ahead := cell + heading
-	if not level.is_walkable(ahead):
+	if not level.is_walkable(ahead) and not level.is_void(ahead):
 		var door := level.door_color(ahead)
 		# Para los power ups, los barrotes cuentan como una puerta.
 		var door_like := door != "" or level.bars_closed(ahead)
@@ -256,7 +280,9 @@ func _try_advance() -> void:
 		_update_arrow(Vector3.ZERO)
 
 	var next := cell + heading
-	if level.is_walkable(next):
+	if level.is_void(next):
+		_fall_to(next)
+	elif level.is_walkable(next):
 		_roll_to(next)
 	else:
 		# Encajonado (p. ej. entre un obstáculo y un muro): espera lo que
@@ -278,6 +304,45 @@ func _roll_to(next: Vector2i) -> void:
 			roll_duration / speed_multiplier()) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_tween.finished.connect(_on_roll_finished.bind(next))
+
+
+## Entra en una casilla de vacío: vuelca por el borde acelerando y luego cae
+## (ver _process_fall).
+func _fall_to(next: Vector2i) -> void:
+	_dead = true
+	_falling = true
+	_fall_time = 0.0
+	_rolling = true
+	_roll_target = next
+	_pending_turn = 0
+	_pending_reverse = false
+	_clear_rejected_flash()
+	_end_all_power_ups()
+	_arrow.visible = false
+	if _held_key_node:
+		_held_key_node.visible = false
+	var dir := Vector3(heading.x, 0, heading.y)
+	var start := _body.transform
+	var pivot := dir * HALF
+	_fall_axis = Vector3.UP.cross(dir)
+	_fall_velocity = dir * FALL_FORWARD_SPEED + Vector3.DOWN * FALL_DOWN_SPEED
+	_tween = create_tween()
+	_tween.tween_method(_apply_roll.bind(start, pivot, _fall_axis, Vector3.ZERO, PI * 0.5), 0.0, 1.0,
+			roll_duration / speed_multiplier()) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	_tween.finished.connect(func() -> void: _rolling = false)
+	fell.emit(cell)
+
+
+## Caída libre girando; al acabar FALL_TIME explota en el aire.
+func _process_fall(delta: float) -> void:
+	_fall_time += delta
+	_fall_velocity.y -= FALL_GRAVITY * delta
+	_body.position += _fall_velocity * delta
+	_body.basis = Basis(_fall_axis, FALL_SPIN * delta) * _body.basis
+	if _fall_time >= FALL_TIME:
+		_falling = false
+		_explode(false)
 
 
 func _apply_roll(t: float, start: Transform3D, pivot: Vector3, axis: Vector3, arrow_dir: Vector3, angle: float) -> void:
@@ -365,8 +430,14 @@ func step_time() -> float:
 func die() -> void:
 	if not is_vulnerable():
 		return
-	var at := global_position + _body_offset() + Vector3(0, HALF, 0)
-	var body_basis := _body.transform.basis
+	_explode(true)
+
+
+## Revienta en pedazos donde está Body (en el suelo o cayendo en el vacío) y,
+## cuando termina la explosión, vuelve a la salida.
+func _explode(on_floor: bool) -> void:
+	var at := _body.global_position
+	var body_basis := _body.transform.basis.orthonormalized()
 	if _tween and _tween.is_valid():
 		_tween.kill()
 	_dead = true
@@ -375,11 +446,12 @@ func die() -> void:
 	_pending_reverse = false
 	_clear_rejected_flash()
 	_end_all_power_ups()
-	_explosion = CubeExplosion.create(_body.mesh, _piece_mesh, body_basis, SIZE)
+	_explosion = CubeExplosion.create(_body.mesh, _piece_mesh, body_basis, SIZE, on_floor)
 	_explosion.finished.connect(_respawn)
 	add_child(_explosion)
 	_explosion.global_position = at
-	_spawn_dust(at)
+	if on_floor:
+		_spawn_dust(at)
 	_body.visible = false
 	_arrow.visible = false
 	if _held_key_node:

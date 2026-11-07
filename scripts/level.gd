@@ -17,6 +17,10 @@ extends Node3D
 ##   Enemigos (sobre una casilla libre): x perseguidor (ver Chaser),
 ##   z obstáculo (ver Blocker), i j k m n patrulleros (ver Patroller); la ruta
 ##   de cada patrullero se indica en `patrol_routes` ({"i": "R3 D2 L3 U2"}).
+##   Vacío: '~' = ni suelo ni pared. Si el cubo entra en el vacío, se cae y
+##   explota (ver RollingCube). Fuera del mapa también es vacío. En los
+##   niveles con vacío, bajo cada casilla con suelo o pared se dibuja un
+##   bloque de roca para que el tablero parezca flotar.
 ## Las filas crecen hacia +Z (hacia abajo en pantalla) y las columnas hacia +X.
 
 const CELL_SIZE := 1.0
@@ -29,6 +33,9 @@ const BUTTON_CHARS := "pqtvw"
 const CHASER_CHAR := "x"
 const BLOCKER_CHAR := "z"
 const PATROL_CHARS := "ijkmn"
+const VOID_CHAR := "~"
+## Profundidad del bloque de roca bajo las casillas en los niveles con vacío.
+const FOUNDATION_DEPTH := 0.9
 ## Distancia (en casillas) entre el centro del cubo y el de un enemigo letal a
 ## partir de la cual el cubo muere.
 const ENEMY_HIT_DISTANCE := 0.72
@@ -84,6 +91,8 @@ var cube: RollingCube:
 var start_cell := Vector2i.ZERO
 var goal_cell := Vector2i.ZERO
 var _walkable := {}
+## Casillas de vacío ('~').
+var _void := {}
 ## casilla -> { "color": String, "node": Node3D }
 var _keys := {}
 var _doors := {}
@@ -115,6 +124,7 @@ func build() -> void:
 	for child in get_children():
 		child.queue_free()
 	_walkable.clear()
+	_void.clear()
 	_keys.clear()
 	_doors.clear()
 	_power_ups.clear()
@@ -139,6 +149,9 @@ func build() -> void:
 		for x in row.length():
 			var cell := Vector2i(x, z)
 			var symbol := row[x]
+			if symbol == VOID_CHAR:
+				_void[cell] = true
+				continue
 			if symbol == "#" or BUTTON_CHARS.contains(symbol):
 				wall_cells.append(cell)
 				if symbol != "#":
@@ -170,6 +183,8 @@ func build() -> void:
 	var tile_size := Vector3(CELL_SIZE * 0.96, FLOOR_THICKNESS, CELL_SIZE * 0.96)
 	_add_multimesh(floor_cells[0], tile_size, -FLOOR_THICKNESS * 0.5, floor_a)
 	_add_multimesh(floor_cells[1], tile_size, -FLOOR_THICKNESS * 0.5, floor_b)
+	if not _void.is_empty():
+		_add_foundations(wall_cells)
 	for cell: Vector2i in enemy_cells:
 		_add_enemy(cell, enemy_cells[cell])
 	for button in _buttons.values():
@@ -196,6 +211,13 @@ func is_walkable(cell: Vector2i) -> bool:
 func is_terrain_walkable(cell: Vector2i) -> bool:
 	return _walkable.has(cell) and not _doors.has(cell) and not _breakables.has(cell) \
 		and not bars_closed(cell)
+
+
+## Casilla de vacío ('~' o fuera del mapa): el cubo que entra en ella se cae.
+func is_void(cell: Vector2i) -> bool:
+	if _void.has(cell):
+		return true
+	return cell.y < 0 or cell.y >= layout.size() or cell.x < 0 or cell.x >= layout[cell.y].length()
 
 
 ## Casilla con suelo (no es pared), haya lo que haya en ella.
@@ -380,6 +402,28 @@ func _add_multimesh(cells: Array, size: Vector3, y: float, mat: Material) -> voi
 	var instance := MultiMeshInstance3D.new()
 	instance.multimesh = multimesh
 	add_child(instance)
+
+
+## Bloques de roca bajo el suelo y las paredes (niveles con vacío): el
+## tablero parece una isla flotando sobre el abismo. Las casillas que dan al
+## vacío llevan un bloque algo más claro para que se vea el borde.
+func _add_foundations(wall_cells: Array[Vector2i]) -> void:
+	var inner := []
+	var edge := []
+	var cells: Array[Vector2i] = []
+	cells.append_array(wall_cells)
+	cells.append_array(_walkable.keys())
+	for cell in cells:
+		var at_edge := false
+		for dir: Vector2i in [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
+			if is_void(cell + dir):
+				at_edge = true
+				break
+		(edge if at_edge else inner).append(cell)
+	var size := Vector3(CELL_SIZE, FOUNDATION_DEPTH, CELL_SIZE)
+	var y := -FLOOR_THICKNESS - FOUNDATION_DEPTH * 0.5
+	_add_multimesh(inner, size, y, _make_material(Color(0.36, 0.31, 0.27)))
+	_add_multimesh(edge, size, y, _make_material(Color(0.47, 0.41, 0.35)))
 
 
 func _add_box(cell: Vector2i, size: Vector3, y: float, mat: Material) -> MeshInstance3D:

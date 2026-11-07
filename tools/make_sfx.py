@@ -151,6 +151,9 @@ def main():
     # Interfaz: clic de botón.
     save("click", mix(tone(1800, 0.03, "sine", decay=0.008), noise(0.015, decay=0.003, lowpass=0.8, volume=0.4)),
          peak=0.4)
+    # Caída al vacío: silbido que baja de tono con un soplo de aire.
+    save("fall", mix(tone(1100, 0.7, "triangle", attack=0.02, decay=0.45, sweep_to=180, vibrato=0.015),
+                     noise(0.7, decay=0.4, lowpass=0.12, volume=0.35, attack=0.05)), peak=0.45)
     print("Sonidos generados en", OUT)
 
 

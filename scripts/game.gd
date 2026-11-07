@@ -79,6 +79,10 @@ func _ready() -> void:
 		level.notify_cube_died()
 		camera.shake()
 		GameState.vibrate(GameState.VIBRATION_DEATH))
+	cube.fell.connect(func(_cell: Vector2i) -> void:
+		Sfx.play("fall")
+		level.notify_cube_died()
+		GameState.vibrate(GameState.VIBRATION_TURN_REJECTED))
 	cube.show_arrow = GameState.show_arrow
 	cube.turn_rejected.connect(func(_dir: Vector2i) -> void:
 		Sfx.play("reject")

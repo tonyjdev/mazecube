@@ -11,7 +11,8 @@ extends RefCounted
 ## Sonidos: roll (vuelco), bounce (rebote), reject (giro descartado), key,
 ## door, crack (golpe a un muro destructible), break (muro roto), button,
 ## bars, powerup, reverse (media vuelta), explode (muerte del cubo), goal,
-## alert (un perseguidor ha visto al cubo) y click (botones de la interfaz).
+## alert (un perseguidor ha visto al cubo), fall (caída al vacío) y click
+## (botones de la interfaz).
 
 const POOL_SIZE := 10
 ## Ajuste de volumen (dB) de cada sonido respecto a los demás.

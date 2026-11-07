@@ -37,6 +37,10 @@ Simula las reglas de scripts/rolling_cube.gd:
   aproximación sin enemigos en movimiento; "validate"
   comprueba que las rutas de los patrulleros pasan solo por casillas libres
   y no tocan la salida ni la meta.
+- Vacío ('~', y también fuera del mapa): ni suelo ni pared. No es un
+  obstáculo: el cubo no rebota y los giros hacia el vacío se aplican. Si el
+  cubo entra en el vacío se cae y vuelve a la salida; el resolvedor descarta
+  esos movimientos (nunca usa la caída como atajo).
 - Al llegar a la meta B termina el nivel.
 
 La dificultad de un nivel es el mínimo de giros necesarios (búsqueda 0-1 BFS),
@@ -77,10 +81,11 @@ BUTTON_CHARS = "pqtvw"
 CHASER_CHAR = "x"
 BLOCKER_CHAR = "z"
 PATROL_CHARS = "ijkmn"
+VOID_CHAR = "~"
 ENEMY_CHARS = CHASER_CHAR + BLOCKER_CHAR + PATROL_CHARS
 ROUTE_DIRS = {"R": (1, 0), "L": (-1, 0), "U": (0, -1), "D": (0, 1)}
 LEVEL_CHARS = ("#.AB" + KEY_CHARS + DOOR_CHARS + POWERUP_CHARS + BREAKABLE_CHARS
-               + BAR_CHARS + BAR_CHARS.upper() + BUTTON_CHARS + ENEMY_CHARS)
+               + BAR_CHARS + BAR_CHARS.upper() + BUTTON_CHARS + ENEMY_CHARS + VOID_CHAR)
 
 
 def turn_left(h):
@@ -100,7 +105,7 @@ def parse(layout):
     free, start, goal = set(), None, None
     for z, row in enumerate(layout):
         for x, c in enumerate(row):
-            if c != "#" and c not in BUTTON_CHARS and c != BLOCKER_CHAR:
+            if c not in "#" + VOID_CHAR + BUTTON_CHARS + BLOCKER_CHAR:
                 free.add((x, z))
             if c == "A":
                 start = (x, z)
@@ -126,6 +131,7 @@ class Board:
 
     def __init__(self, layout, buttons=None):
         self.free, self.start, self.goal = parse(layout)
+        self.rows = layout
         buttons = buttons or {}
         groups = sorted({c.lower() for row in layout for c in row if c.lower() in BAR_CHARS})
         group_bit = {g: i for i, g in enumerate(groups)}
@@ -153,6 +159,12 @@ class Board:
         self.unbreakable = False
         self.no_buttons = False
 
+    def is_void(self, cell):
+        """Casilla de vacío ('~' o fuera del mapa)."""
+        x, z = cell
+        return z < 0 or z >= len(self.rows) or x < 0 or x >= len(self.rows[z]) \
+            or self.rows[z][x] == VOID_CHAR
+
     def passable(self, cell, opened, hits, flipped=0):
         """Casilla libre, sin puerta ni barrotes cerrados y sin muro en pie."""
         if cell not in self.free:
@@ -174,14 +186,17 @@ def step(board, state, turn):
              golpes_restantes, barrotes_conmutados)
     (puertas_abiertas, llaves_cogidas y barrotes_conmutados son máscaras de
     bits; golpes_restantes es una tupla con los golpes que le quedan a cada
-    muro destructible).
+    muro destructible). Devuelve None si el cubo cae al vacío.
     """
     cell, heading, held, opened, taken, hits, flipped = state
     if turn:
         candidate = turn_left(heading) if turn < 0 else turn_right(heading)
-        if board.passable((cell[0] + candidate[0], cell[1] + candidate[1]), opened, hits, flipped):
+        side = (cell[0] + candidate[0], cell[1] + candidate[1])
+        if board.passable(side, opened, hits, flipped) or board.is_void(side):
             heading = candidate
     nxt = (cell[0] + heading[0], cell[1] + heading[1])
+    if board.is_void(nxt):
+        return None
     if not board.passable(nxt, opened, hits, flipped):
         door = board.door_at.get(nxt)
         wall = board.breakable_at.get(nxt)
@@ -195,6 +210,8 @@ def step(board, state, turn):
             flipped ^= button
         heading = (-heading[0], -heading[1])
         nxt = (cell[0] + heading[0], cell[1] + heading[1])
+        if board.is_void(nxt):
+            return None
         if not board.passable(nxt, opened, hits, flipped):
             return cell, heading, held, opened, taken, hits, flipped
     key = board.key_at.get(nxt)
@@ -239,6 +256,8 @@ def solve(layout, start_heading, doors_as_walls=False, breakables_as_walls=False
         options = (0,) if steps == 0 else (0, -1, 1)
         for turn in options:
             nstate = step(board, state, turn)
+            if nstate is None:
+                continue
             cost = (turns + (1 if turn else 0), steps + 1)
             if nstate not in best or cost < best[nstate]:
                 best[nstate] = cost

@@ -69,6 +69,7 @@ const MESSAGES := {
 		"TIP_CHASER": "Las esferas rojas no saben dónde estás hasta que te acercas. Si te ven, ¡huye!",
 		"TIP_PATROL": "Los octaedros morados siempre siguen la misma ruta: observa su ritmo y pasa cuando no estén.",
 		"TIP_BLOCKER": "El dodecaedro no hace daño, pero intenta cortarte el paso. Usa los barrotes para encerrarlo.",
+		"TIP_VOID": "Donde no hay paredes ni suelo está el vacío: si no giras a tiempo, el cubo se cae.",
 	},
 	"en": {
 		"MENU_PLAY": "Play",
@@ -132,6 +133,7 @@ const MESSAGES := {
 		"TIP_CHASER": "The red spheres don't know where you are until you get close. If they see you, run!",
 		"TIP_PATROL": "The purple octahedra always follow the same route: watch their rhythm and pass when they're away.",
 		"TIP_BLOCKER": "The dodecahedron doesn't hurt you, but it tries to block your way. Use the bars to lock it in.",
+		"TIP_VOID": "Where there are no walls and no floor lies the void: turn in time or the cube will fall.",
 		"Primer giro": "First Turn",
 		"El muro": "The Wall",
 		"La llave": "The Key",
@@ -162,6 +164,8 @@ const MESSAGES := {
 		"El bastión": "The Bastion",
 		"El palacio": "The Palace",
 		"El gran laberinto": "The Great Labyrinth",
+		"Al borde": "On the Edge",
+		"El abismo": "The Abyss",
 	},
 }
 
