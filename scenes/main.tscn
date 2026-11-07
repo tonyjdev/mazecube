@@ -55,17 +55,55 @@ theme_override_constants/margin_bottom = 16
 layout_mode = 2
 mouse_filter = 2
 
-[node name="Status" type="Label" parent="UI/Margin/VBox" unique_id=258101299]
+[node name="TopBar" type="HBoxContainer" parent="UI/Margin/VBox" unique_id=1796202710]
 layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="Status" type="Label" parent="UI/Margin/VBox/TopBar" unique_id=1092812086]
+layout_mode = 2
+size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 28
 horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="RestartButton" type="Button" parent="UI/Margin/VBox/TopBar" unique_id=169120549]
+custom_minimum_size = Vector2(140, 56)
+layout_mode = 2
+focus_mode = 0
+theme_override_font_sizes/font_size = 22
+text = "Reiniciar"
+
+[node name="CameraButton" type="Button" parent="UI/Margin/VBox/TopBar" unique_id=980948795]
+custom_minimum_size = Vector2(300, 56)
+layout_mode = 2
+focus_mode = 0
+theme_override_font_sizes/font_size = 22
+text = "Cámara"
 
 [node name="Spacer" type="Control" parent="UI/Margin/VBox" unique_id=1233186935]
 layout_mode = 2
 size_flags_vertical = 3
 mouse_filter = 2
 
-[node name="Help" type="Label" parent="UI/Margin/VBox" unique_id=1456882990]
+[node name="BottomBar" type="HBoxContainer" parent="UI/Margin/VBox" unique_id=534100608]
 layout_mode = 2
+mouse_filter = 2
+
+[node name="LeftHint" type="Label" parent="UI/Margin/VBox/BottomBar" unique_id=1236806875]
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+text = "← Izquierda"
+
+[node name="Help" type="Label" parent="UI/Margin/VBox/BottomBar" unique_id=2085000923]
+layout_mode = 2
+size_flags_horizontal = 3
 horizontal_alignment = 1
+vertical_alignment = 1
 autowrap_mode = 3
+
+[node name="RightHint" type="Label" parent="UI/Margin/VBox/BottomBar" unique_id=1640936461]
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+text = "Derecha →"
