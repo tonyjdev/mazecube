@@ -2,25 +2,20 @@ extends Node3D
 ## Escena principal del prototipo: entrada, cámara y estado de la partida.
 ##
 ## Controles:
-##   Teclado: ←/A gira a la izquierda, →/D a la derecha, R reinicia, C cámara.
+##   Teclado: ←/A gira a la izquierda, →/D a la derecha, R reinicia.
 ##   Táctil:  tocar la mitad izquierda o derecha de la pantalla gira hacia ese
-##            lado; los botones superiores reinician y cambian la cámara.
+##            lado; el botón superior reinicia el nivel.
 ##   En PC, el clic del ratón se trata como un toque (emulate_touch_from_mouse).
 ##   Al completar un nivel: botón "Siguiente nivel" o Intro/N.
 ##   Solo en builds de depuración: Re Pág / Av Pág cambian de nivel.
 ##
 ## El nivel actual se guarda en user://progress.cfg para continuar al volver.
+##
+## Cámara: vista cenital inclinada en perspectiva (decisión definitiva).
 
-enum CameraMode { TILTED_TOP, ISOMETRIC }
-
-const CAMERA_NAMES := {
-	CameraMode.TILTED_TOP: "Cenital inclinada",
-	CameraMode.ISOMETRIC: "Isométrica",
-}
 const HINT_IDLE_ALPHA := 0.45
 const PROGRESS_PATH := "user://progress.cfg"
 
-@export var camera_mode := CameraMode.TILTED_TOP
 ## Inclinación de la vista cenital (90 = totalmente desde arriba).
 @export_range(45.0, 90.0) var tilted_pitch_degrees := 65.0
 ## Margen alrededor del tablero al encuadrarlo (1.0 = justo al borde).
@@ -38,7 +33,6 @@ var _hint_tweens := {}
 ## Hueco libre entre la cabecera y la barra inferior: ahí se encuadra el tablero.
 @onready var play_area: Control = $UI/Margin/VBox/Spacer
 @onready var restart_button: Button = $UI/Margin/VBox/Header/Buttons/RestartButton
-@onready var camera_button: Button = $UI/Margin/VBox/Header/Buttons/CameraButton
 @onready var help_label: Label = $UI/Margin/VBox/BottomBar/Help
 @onready var left_hint: Label = $UI/Margin/VBox/BottomBar/LeftHint
 @onready var right_hint: Label = $UI/Margin/VBox/BottomBar/RightHint
@@ -46,16 +40,18 @@ var _hint_tweens := {}
 
 func _ready() -> void:
 	cube.reached_goal.connect(_on_reached_goal)
-	cube.rolled.connect(_on_rolled)
+	cube.key_picked.connect(_on_key_picked)
+	cube.door_opened.connect(_on_door_opened)
+	cube.power_up_picked.connect(_on_power_up_picked)
+	cube.power_up_ended.connect(_on_power_up_ended)
 	restart_button.pressed.connect(_restart)
-	camera_button.pressed.connect(_toggle_camera)
 	next_button.pressed.connect(_next_level)
 	left_hint.modulate.a = HINT_IDLE_ALPHA
 	right_hint.modulate.a = HINT_IDLE_ALPHA
 	if _is_touch_device():
 		help_label.text = "Toca a la izquierda o a la derecha de la pantalla para girar"
 	else:
-		help_label.text = "←/A · →/D o clic a cada lado para girar   R reiniciar   C cámara"
+		help_label.text = "←/A · →/D o clic a cada lado para girar   R reiniciar"
 	# El hueco libre cambia al rotar o redimensionar la pantalla.
 	play_area.resized.connect(_apply_camera)
 	_load_level(_load_progress())
@@ -76,8 +72,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		_turn(RollingCube.TURN_RIGHT)
 	elif event.is_action_pressed("restart"):
 		_restart()
-	elif event.is_action_pressed("toggle_camera"):
-		_toggle_camera()
 	elif event.is_action_pressed("next_level") and cube.is_finished:
 		_next_level()
 	elif OS.is_debug_build() and event is InputEventKey and event.pressed and not event.echo:
@@ -93,16 +87,18 @@ func _turn(direction: int) -> void:
 
 
 func _restart() -> void:
+	# Reconstruir el tablero devuelve a su sitio las llaves y puertas.
+	level.build()
 	cube.reset(level)
 	next_button.visible = false
-	camera_button.visible = true
 	status_label.text = "Llega a la casilla verde"
 
 
 func _load_level(index: int) -> void:
 	current_level = clampi(index, 0, Levels.count() - 1)
 	var data := Levels.get_level(current_level)
-	level.load_level(data)
+	level.layout = PackedStringArray(data["layout"])
+	level.start_heading = data["start_heading"]
 	level_label.text = "Nivel %d de %d · %s" % [current_level + 1, Levels.count(), data["name"]]
 	_save_progress()
 	_restart()
@@ -127,38 +123,20 @@ func _save_progress() -> void:
 	cfg.save(PROGRESS_PATH)
 
 
-func _toggle_camera() -> void:
-	camera_mode = CameraMode.ISOMETRIC if camera_mode == CameraMode.TILTED_TOP else CameraMode.TILTED_TOP
-	_apply_camera()
-
-
 func _apply_camera() -> void:
 	var center := level.get_center()
 	var corners := _board_corners(center)
-	if camera_mode == CameraMode.TILTED_TOP:
-		camera.projection = Camera3D.PROJECTION_PERSPECTIVE
-		camera.fov = 45.0
-		var pitch := deg_to_rad(tilted_pitch_degrees)
-		var dir := Vector3(0, sin(pitch), cos(pitch))
-		# Distancia mínima a la que cabe todo el tablero.
-		_fit(_place_camera.bind(center, dir), corners, 2.0, 200.0)
-	else:
-		camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-		var extent := float(maxi(level.get_grid_size().x, level.get_grid_size().y))
-		camera.position = center + Vector3(1, 1, 1).normalized() * extent * 2.0
-		camera.look_at(center, Vector3.UP)
-		# Tamaño ortográfico mínimo con el que cabe todo el tablero.
-		_fit(_set_ortho_size, corners, 1.0, 200.0)
-	camera_button.text = "Cámara: %s" % CAMERA_NAMES[camera_mode]
+	camera.projection = Camera3D.PROJECTION_PERSPECTIVE
+	camera.fov = 45.0
+	var pitch := deg_to_rad(tilted_pitch_degrees)
+	var dir := Vector3(0, sin(pitch), cos(pitch))
+	# Distancia mínima a la que cabe todo el tablero.
+	_fit(_place_camera.bind(center, dir), corners, 2.0, 200.0)
 
 
 func _place_camera(distance: float, center: Vector3, dir: Vector3) -> void:
 	camera.position = center + dir * distance
 	camera.look_at(center, Vector3.UP)
-
-
-func _set_ortho_size(size: float) -> void:
-	camera.size = size
 
 
 ## Esquinas del tablero (suelo y altura de las paredes), ampliadas con el margen.
@@ -176,7 +154,7 @@ func _board_corners(center: Vector3) -> Array[Vector3]:
 	return corners
 
 
-## Búsqueda binaria del menor valor (distancia o tamaño) con el que todas las
+## Búsqueda binaria de la menor distancia con la que todas las
 ## esquinas quedan dentro del hueco libre de la interfaz, sea cual sea la
 ## proporción de la pantalla.
 func _fit(apply: Callable, corners: Array[Vector3], lo: float, hi: float) -> void:
@@ -200,7 +178,7 @@ func _fit(apply: Callable, corners: Array[Vector3], lo: float, hi: float) -> voi
 
 ## Los toques sobre los botones no cuentan como giro.
 func _is_over_buttons(pos: Vector2) -> bool:
-	for button: Button in [restart_button, camera_button, next_button]:
+	for button: Button in [restart_button, next_button]:
 		if button.visible and button.get_global_rect().has_point(pos):
 			return true
 	return false
@@ -220,9 +198,21 @@ func _flash_hint(hint: Label) -> void:
 	_hint_tweens[hint] = tween
 
 
-func _on_rolled(_cell: Vector2i) -> void:
+func _on_key_picked(color: String) -> void:
+	status_label.text = "Llevas la llave %s" % Level.COLOR_NAMES[color]
+
+
+func _on_door_opened(color: String) -> void:
+	status_label.text = "Puerta %s abierta" % Level.COLOR_NAMES[color]
+
+
+func _on_power_up_picked(power_up: PowerUp, stacks: int) -> void:
+	status_label.text = power_up.describe(stacks)
+
+
+func _on_power_up_ended(power_up: PowerUp) -> void:
 	if not cube.is_finished:
-		status_label.text = "Llega a la casilla verde"
+		status_label.text = "%s perdida" % power_up.display_name
 
 
 func _on_reached_goal() -> void:
@@ -232,6 +222,4 @@ func _on_reached_goal() -> void:
 	else:
 		status_label.text = "¡Nivel completado!"
 		next_button.text = "Siguiente nivel →"
-	# Ocupa el lugar del botón de cámara para que la cabecera no cambie de alto.
-	camera_button.visible = false
 	next_button.visible = true

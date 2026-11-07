@@ -90,13 +90,6 @@ focus_mode = 0
 theme_override_font_sizes/font_size = 26
 text = "Reiniciar"
 
-[node name="CameraButton" type="Button" parent="UI/Margin/VBox/Header/Buttons" unique_id=128880647]
-custom_minimum_size = Vector2(360, 72)
-layout_mode = 2
-focus_mode = 0
-theme_override_font_sizes/font_size = 26
-text = "Cámara"
-
 [node name="NextButton" type="Button" parent="UI/Margin/VBox/Header/Buttons" unique_id=1353986561]
 visible = false
 custom_minimum_size = Vector2(360, 72)

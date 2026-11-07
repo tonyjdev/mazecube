@@ -66,6 +66,38 @@ El diseño busca combinar **lógica y planificación** con **controles y reglas 
 - Si se pulsa varias veces antes de que se aplique, **solo cuenta la última pulsación** (dos pulsaciones a la izquierda no producen un giro de 180°).
 - **No se puede girar en la casilla de salida:** el primer movimiento de cada nivel es siempre en el rumbo inicial, porque no hay tiempo de reacción. Los niveles se diseñan teniendo en cuenta esta regla.
 
+### 2.8. Llaves y puertas — Confirmada
+
+- **Llave:** abre una puerta. El cubo la coge al llegar a su casilla; en ese momento la llave **desaparece del mapa** y pasa a mostrarse **encima del cubo**, por encima de la flecha de rumbo.
+- Mientras está en el mapa, la llave **gira despacio sobre sí misma**.
+- El cubo **solo puede llevar una llave** a la vez. Si ya lleva una y pasa por la casilla de otra, no ocurre nada: la otra llave se queda en el mapa.
+- **Puerta:** un bloque más estrecho que el cubo que cierra el pasillo de muro a muro, girado 90° según la dirección de los muros que la rodean.
+- Cada llave está asociada a **su propia puerta**, y ambas tienen el **mismo color**. Una llave no abre puertas de otro color. Colores disponibles: **amarillo, naranja, rojo, azul y verde**.
+- Una puerta cerrada se comporta como una **pared**: el cubo rebota al chocar con ella (apartado 2.4) y los giros hacia ella se descartan (apartado 2.5), **aunque se lleve su llave**.
+- Si el cubo **choca de frente** con una puerta llevando su llave, la **puerta y la llave desaparecen**, pero el cubo **rebota igualmente** en ese movimiento; para pasar por el hueco tiene que volver.
+- Como solo se abren de frente, cada puerta debe tener por al menos uno de sus lados un tramo recto por el que el cubo pueda llegar hasta ella.
+- Las puertas abiertas y las llaves cogidas se restauran al reiniciar el nivel.
+
+**Ejemplo:** el cubo avanza hacia una puerta amarilla llevando la llave amarilla; al tocarla, la puerta y la llave desaparecen y el cubo rebota. En la siguiente pasada atraviesa la casilla donde estaba la puerta.
+
+### 2.9. Power ups — Confirmada
+
+Objetos que el cubo coge al llegar a su casilla y que modifican su comportamiento durante un tiempo. Al cogerlos desaparecen del mapa (vuelven a su sitio al reiniciar el nivel). Cada tipo de power up tiene **sus propias reglas**, que pueden combinar:
+
+- **Duración:** limitada (segundos) o ilimitada hasta que otra regla termine el efecto.
+- **Acumulación:** si coger otro igual mientras está activo suma su efecto (con un máximo) o solo lo renueva.
+- **Fin al rebotar:** si el efecto termina al rebotar contra una pared o el borde del tablero, contra una puerta, o en ningún caso.
+
+Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (el número mínimo de giros es el mismo), pero sí el ritmo al que hay que tomarlas.
+
+#### Velocidad
+
+- **Efecto:** aumenta la velocidad del cubo un **25%**.
+- **Acumulable sumando:** cada uno suma un 25% sobre la velocidad base (×1,25 → ×1,50 → ×1,75 → ×2,00), con un **máximo de ×2** (4 acumulaciones); a partir de ahí coger más no acelera.
+- **Duración ilimitada:** el efecto **se pierde al rebotar contra una pared o el borde del tablero**. Rebotar contra una puerta (cerrada, o al abrirla con su llave) **no** lo quita.
+- **Aspecto en el mapa:** un cubo pequeño semitransparente (≈30% de transparencia) que gira rápido sobre sí mismo.
+- **Efecto visual:** mientras está activo, el cubo deja tras de sí un rastro de polvo que se desvanece en unos 2,5 segundos; con más acumulaciones el rastro es más opaco.
+
 ## 3. Escenario y objetivo — Confirmados
 
 - El escenario es un **laberinto**.
@@ -85,10 +117,7 @@ El diseño busca combinar **lógica y planificación** con **controles y reglas 
 ## 5. Presentación visual
 
 - Juego en **3D**, con cubo y laberinto visibles desde arriba.
-- Se están valorando dos perspectivas de cámara:
-  1. **Cenital ligeramente inclinada.**
-  2. **Isométrica.**
-- En el prototipo se pueden alternar ambas; **la perspectiva final no está elegida**. En vertical, la isométrica muestra el tablero bastante más pequeño.
+- **Cámara — Decidido:** vista **cenital ligeramente inclinada**, en perspectiva (unos 65° sobre el tablero). Se descartó la isométrica, que en vertical mostraba el tablero bastante más pequeño. La cámara es fija: no hay opción para cambiarla.
 - La animación del cubo debe mostrar claramente el vuelco entre casillas; no basta con trasladar el modelo o simular un deslizamiento.
 - **Orientación de pantalla — Confirmada:** el juego se muestra en **vertical** (retrato) en el móvil.
 - La cámara encuadra el tablero completo en el espacio libre entre los elementos de la interfaz, sea cual sea la proporción de la pantalla.
@@ -105,34 +134,37 @@ El diseño busca combinar **lógica y planificación** con **controles y reglas 
 ### 6.2. Formato de los niveles
 
 - Cada nivel se define como un **mapa de texto**: `#` pared, `.` casilla libre, `A` inicio y `B` meta, junto con el **rumbo inicial** del cubo.
+- Llaves y puertas: letra minúscula para la llave y la misma en mayúscula para su puerta — `y/Y` amarillo, `o/O` naranja, `r/R` rojo, `u/U` azul, `g/G` verde.
+- Power ups: `s` velocidad.
 - Los niveles son más altos que anchos, para aprovechar la pantalla vertical.
 
 ### 6.3. Medida de la dificultad
 
-- La dificultad de un nivel se mide como el **mínimo número de giros** necesario para resolverlo con las reglas del apartado 2 (incluido el rebote, el descarte de giros bloqueados y la ausencia de giro en la casilla de salida).
+- La dificultad de un nivel se mide como el **mínimo número de giros** necesario para resolverlo con las reglas del apartado 2 (incluido el rebote, el descarte de giros bloqueados, la ausencia de giro en la casilla de salida y las llaves y puertas).
 - Ese mínimo se calcula con un **resolvedor automático** que también comprueba que todos los niveles tienen solución.
-- Los niveles actuales van de **1 a 13 giros** y de **5×7 a 11×15 casillas**; a partir del nivel 6 incluyen zonas abiertas en las que importa en qué casilla exacta se gira.
+- **Los niveles actuales son de prueba de mecánicas**; los niveles definitivos los proporcionará el diseñador.
+- Los niveles de prueba van de **1 a 19 giros** y de **5×7 a 11×15 casillas**. Desde el nivel 3 incluyen parejas llave/puerta, y cada puerta es imprescindible (convertida en muro, el nivel no tendría solución). Los niveles 4 y 7 tienen un power up de velocidad y el 9 tres seguidos, para probar la acumulación.
 
-| Nivel | Nombre | Tamaño | Giros mínimos |
-|---|---|---|---|
-| 1 | Primer giro | 5×7 | 1 |
-| 2 | Ida y vuelta | 7×8 | 2 |
-| 3 | Bifurcación | 7×9 | 3 |
-| 4 | Serpiente | 7×9 | 5 |
-| 5 | Pasillos | 9×11 | 6 |
-| 6 | La plaza | 9×11 | 7 |
-| 7 | Encrucijada | 9×13 | 8 |
-| 8 | Rodeo | 11×13 | 9 |
-| 9 | Laberinto | 11×15 | 11 |
-| 10 | El gran recorrido | 11×15 | 13 |
+| Nivel | Nombre | Tamaño | Parejas llave/puerta | Giros mínimos |
+|---|---|---|---|---|
+| 1 | Primer giro | 5×7 | — | 1 |
+| 2 | Ida y vuelta | 7×8 | — | 2 |
+| 3 | Bifurcación | 7×9 | amarilla | 5 |
+| 4 | Serpiente | 7×9 | naranja | 7 |
+| 5 | Pasillos | 9×11 | roja | 8 |
+| 6 | La plaza | 9×11 | amarilla, azul | 9 |
+| 7 | Encrucijada | 9×13 | verde, naranja | 12 |
+| 8 | Rodeo | 11×13 | roja, azul | 13 |
+| 9 | Laberinto | 11×15 | amarilla, roja, verde | 15 |
+| 10 | El gran recorrido | 11×15 | naranja, azul, verde | 19 |
 
 ## 7. Controles táctiles en Android — Implementada en el prototipo
 
 - **Tocar la mitad izquierda de la pantalla** gira a la izquierda y **tocar la mitad derecha** gira a la derecha (relativo al rumbo, como en el apartado 2.3).
 - Toda la mitad de la pantalla es zona de toque, sin botones pequeños; cada toque cuenta como una pulsación.
 - Unas indicaciones discretas en la parte inferior («← Izquierda» y «Derecha →») se resaltan al tocar cada lado.
-- Botones en pantalla para **reiniciar** el nivel y **cambiar de cámara**; tocar los botones no cuenta como giro.
-- En PC se mantienen los controles de teclado (←/A, →/D, R reiniciar, C cámara) y el clic del ratón se trata como un toque.
+- Botón en pantalla para **reiniciar** el nivel (y «Siguiente nivel» al completarlo); tocar los botones no cuenta como giro.
+- En PC se mantienen los controles de teclado (←/A, →/D, R reiniciar, Intro/N siguiente nivel) y el clic del ratón se trata como un toque.
 
 ## 8. Tecnologías — Decididas y propuestas
 
@@ -168,7 +200,7 @@ Se ha propuesto usar transformaciones y animaciones calculadas (por ejemplo, con
 - Entrada izquierda/derecha, inicialmente mediante teclado para probarlo en PC.
 - Cambio de dirección correcto y persistente.
 - Un inicio y una meta.
-- Prueba de las dos perspectivas de cámara sobre el mismo recorrido.
+- Prueba de las dos perspectivas de cámara sobre el mismo recorrido *(realizada; se eligió la cenital inclinada)*.
 - Adaptación posterior a controles táctiles en Android.
 
 ## 10. Posibles ampliaciones — No aprobadas todavía
@@ -183,7 +215,7 @@ Estas ideas se mencionaron como posibilidades futuras, **no como requisitos del 
 
 ## 11. Decisiones pendientes
 
-1. Elegir entre vista cenital inclinada e isométrica.
+1. ~~Elegir entre vista cenital inclinada e isométrica.~~ **Decidido:** cenital inclinada (apartado 5).
 2. Definir velocidad y ritmo de los vuelcos.
 3. ~~Establecer cómo se gestionan pulsaciones mientras el cubo está girando.~~ **Implementado en el prototipo:** apartado 2.7, pendiente de confirmación.
 4. ~~Definir qué ocurre al encontrar una pared, un obstáculo o el borde del tablero.~~ **Decidido:** el cubo rebota y sigue en sentido contrario (apartado 2.4); los giros hacia una pared se descartan (apartado 2.5).

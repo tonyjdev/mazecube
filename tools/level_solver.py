@@ -9,6 +9,16 @@ Simula las reglas de scripts/rolling_cube.gd:
 - Si la casilla de delante está bloqueada, el rumbo se invierte (rebote).
   Si tras invertir sigue bloqueada, el cubo se queda en su casilla.
 - En la casilla de salida no se puede girar (no hay tiempo de reacción).
+- Llaves y puertas (minúscula = llave, mayúscula = su puerta, del mismo color):
+  y/Y amarillo, o/O naranja, r/R rojo, u/U azul, g/G verde.
+  * Al llegar a la casilla de una llave el cubo la coge, salvo que ya lleve
+    una (solo puede llevar una; si ya lleva otra, la llave se queda en el mapa).
+  * Una puerta cerrada se comporta como una pared: el cubo rebota y los giros
+    hacia ella se descartan, aunque lleve su llave.
+  * Si el cubo choca de frente con una puerta llevando su llave, la puerta y
+    la llave desaparecen y el cubo rebota igualmente.
+- Power ups (s = velocidad): no cambian qué decisiones hay que tomar, solo
+  el ritmo del cubo, así que para el resolvedor son casillas libres.
 - Al llegar a la meta B termina el nivel.
 
 La dificultad de un nivel es el mínimo de giros necesarios (búsqueda 0-1 BFS),
@@ -40,6 +50,10 @@ LEVELS_GD = Path(__file__).resolve().parent.parent / "scripts" / "levels.gd"
 
 # Direcciones en casillas (x, z). En pantalla "arriba" es -z.
 DIRS = [(0, -1), (1, 0), (0, 1), (-1, 0)]
+KEY_CHARS = "yorug"
+DOOR_CHARS = KEY_CHARS.upper()
+POWERUP_CHARS = "s"
+LEVEL_CHARS = "#.AB" + KEY_CHARS + DOOR_CHARS + POWERUP_CHARS
 
 
 def turn_left(h):
@@ -51,7 +65,11 @@ def turn_right(h):
 
 
 def parse(layout):
-    """Devuelve (casillas_libres, inicio, meta) de un mapa de texto."""
+    """Devuelve (casillas_libres, inicio, meta) de un mapa de texto.
+
+    Las casillas con llave o puerta cuentan como libres; para el detalle de
+    llaves y puertas se usa parse_items().
+    """
     free, start, goal = set(), None, None
     for z, row in enumerate(layout):
         for x, c in enumerate(row):
@@ -64,54 +82,100 @@ def parse(layout):
     return free, start, goal
 
 
-def step(free, cell, heading, turn):
-    """Aplica una decisión (0, -1 izquierda, 1 derecha) y avanza una casilla."""
+def parse_items(layout):
+    """Devuelve (llaves, puertas): listas de (casilla, color) en orden de lectura."""
+    keys, doors = [], []
+    for z, row in enumerate(layout):
+        for x, c in enumerate(row):
+            if c in KEY_CHARS:
+                keys.append(((x, z), c))
+            elif c in DOOR_CHARS:
+                doors.append(((x, z), c.lower()))
+    return keys, doors
+
+
+class Board:
+    """Mapa preparado para simular: casillas libres, llaves y puertas."""
+
+    def __init__(self, layout):
+        self.free, self.start, self.goal = parse(layout)
+        keys, doors = parse_items(layout)
+        self.key_at = {cell: (i, color) for i, (cell, color) in enumerate(keys)}
+        self.door_at = {cell: (i, color) for i, (cell, color) in enumerate(doors)}
+
+    def passable(self, cell, opened):
+        """Casilla libre y sin puerta cerrada."""
+        if cell not in self.free:
+            return False
+        door = self.door_at.get(cell)
+        return door is None or bool(opened >> door[0] & 1)
+
+
+def step(board, state, turn):
+    """Aplica una decisión (0, -1 izquierda, 1 derecha) y avanza una casilla.
+
+    state = (casilla, rumbo, llave_llevada o None, puertas_abiertas, llaves_cogidas)
+    (los dos últimos son máscaras de bits).
+    """
+    cell, heading, held, opened, taken = state
     if turn:
         candidate = turn_left(heading) if turn < 0 else turn_right(heading)
-        if (cell[0] + candidate[0], cell[1] + candidate[1]) in free:
+        if board.passable((cell[0] + candidate[0], cell[1] + candidate[1]), opened):
             heading = candidate
     nxt = (cell[0] + heading[0], cell[1] + heading[1])
-    if nxt not in free:
+    if not board.passable(nxt, opened):
+        door = board.door_at.get(nxt)
+        if door is not None and held == door[1]:
+            opened |= 1 << door[0]
+            held = None
         heading = (-heading[0], -heading[1])
         nxt = (cell[0] + heading[0], cell[1] + heading[1])
-        if nxt not in free:
-            return cell, heading
-    return nxt, heading
+        if not board.passable(nxt, opened):
+            return cell, heading, held, opened, taken
+    key = board.key_at.get(nxt)
+    if key is not None and held is None and not taken >> key[0] & 1:
+        held = key[1]
+        taken |= 1 << key[0]
+    return nxt, heading, held, opened, taken
 
 
-def solve(layout, start_heading):
+def solve(layout, start_heading, doors_as_walls=False):
     """Devuelve (giros_minimos, pasos, decisiones) o None si no tiene solución.
 
     decisiones es una lista de (casilla, giro) del recorrido óptimo.
+    Con doors_as_walls=True las puertas no se pueden abrir (sirve para
+    comprobar que una puerta es imprescindible).
     """
-    free, start, goal = parse(layout)
-    if start is None or goal is None:
+    board = Board(layout)
+    if board.start is None or board.goal is None:
         raise ValueError("El nivel necesita una casilla A y una casilla B")
-    best = {(start, start_heading): (0, 0)}
+    if doors_as_walls:
+        board.key_at = {}
+    start = (board.start, start_heading, None, 0, 0)
+    best = {start: (0, 0)}
     prev = {}
-    queue = deque([(0, 0, start, start_heading)])
+    queue = deque([(0, 0, start)])
     while queue:
-        turns, steps, cell, heading = queue.popleft()
-        if best.get((cell, heading)) != (turns, steps):
+        turns, steps, state = queue.popleft()
+        if best.get(state) != (turns, steps):
             continue
-        if cell == goal:
-            path, key = [], (cell, heading)
+        if state[0] == board.goal:
+            path, key = [], state
             while key in prev:
-                key, turn, at = prev[key]
-                path.append((at, turn))
+                key, turn = prev[key]
+                path.append((key[0], turn))
             return turns, steps, path[::-1]
         options = (0,) if steps == 0 else (0, -1, 1)
         for turn in options:
-            ncell, nheading = step(free, cell, heading, turn)
+            nstate = step(board, state, turn)
             cost = (turns + (1 if turn else 0), steps + 1)
-            key = (ncell, nheading)
-            if key not in best or cost < best[key]:
-                best[key] = cost
-                prev[key] = ((cell, heading), turn, cell)
+            if nstate not in best or cost < best[nstate]:
+                best[nstate] = cost
+                prev[nstate] = (state, turn)
                 if turn:
-                    queue.append((cost[0], cost[1], ncell, nheading))
+                    queue.append((cost[0], cost[1], nstate))
                 else:
-                    queue.appendleft((cost[0], cost[1], ncell, nheading))
+                    queue.appendleft((cost[0], cost[1], nstate))
     return None
 
 
@@ -190,7 +254,7 @@ def read_levels(path=LEVELS_GD):
         re.S)
     levels = []
     for name, turns, hx, hz, body in pattern.findall(source):
-        rows = re.findall(r'"([#.AB]+)"', body)
+        rows = re.findall(r'"([' + re.escape(LEVEL_CHARS) + r']+)"', body)
         levels.append({"name": name, "turns": int(turns),
                        "heading": (int(hx), int(hz)), "layout": rows})
     return levels

@@ -6,3 +6,6 @@
 /build/
 *.apk
 *.aab
+
+# Python
+__pycache__/
