@@ -20,6 +20,12 @@ extends Node3D
 ## puerta. Un botón es una pared: al chocar con él de frente el cubo rebota y
 ## los barrotes asociados cambian de estado (ver Level.press_button).
 ##
+## Media vuelta: el jugador puede pedirla (izquierda y derecha a la vez). Se
+## aplica en el siguiente límite entre casillas, como un giro: el rumbo se
+## invierte como si el cubo chocara contra una pared (también para los power
+## ups), el cubo se queda parado REVERSE_PAUSE segundos y por sus cuatro
+## lados sale humo gris.
+##
 ## Power ups: al llegar a su casilla el cubo lo coge y se activa su efecto.
 ## Las reglas de cada tipo (acumulación, duración, fin al rebotar...) las
 ## define su clase (ver PowerUp); aquí se gestionan de forma genérica.
@@ -31,6 +37,8 @@ signal key_picked(color: String)
 signal door_opened(color: String)
 signal breakable_hit(cell: Vector2i, hits_left: int)
 signal button_pressed(cell: Vector2i)
+## El cubo ha dado media vuelta a petición del jugador.
+signal reversed(cell: Vector2i)
 ## Se ha pedido un giro hacia una casilla bloqueada y se ha descartado.
 signal turn_rejected(direction: Vector2i)
 signal power_up_picked(power_up: PowerUp, stacks: int)
@@ -44,6 +52,16 @@ const ARROW_REJECTED_COLOR := Color(0.95, 0.2, 0.2, 0.95)
 ## Altura sobre el suelo de la flecha y de la llave que lleva el cubo.
 const ARROW_HEIGHT := 1.35
 const HELD_KEY_HEIGHT := 2.05
+## Media vuelta: tiempo que el cubo se queda parado.
+const REVERSE_PAUSE := 0.2
+## Humo de la media vuelta: bocanadas por cada lado de la base que salen hacia
+## fuera, crecen y se desvanecen.
+const REVERSE_SMOKE_COLOR := Color(0.38, 0.39, 0.42)
+const REVERSE_SMOKE_PUFFS := 10
+const REVERSE_SMOKE_LIFETIME := 0.8
+
+## Material del humo, compartido (bocanada redonda de bordes suaves).
+static var _smoke_material: StandardMaterial3D
 
 ## Duración de cada vuelco en segundos.
 @export var roll_duration := 0.35
@@ -70,6 +88,9 @@ var show_arrow := true:
 ## límite entre casillas si esa dirección está libre; la última pulsación
 ## sustituye a la anterior.
 var _pending_turn := 0
+## Media vuelta pendiente: se aplica en el siguiente límite entre casillas y
+## sustituye al giro pendiente.
+var _pending_reverse := false
 var _rolling := false
 var _cooldown := 0.0
 var _tween: Tween
@@ -99,6 +120,7 @@ func reset(target_level: Level) -> void:
 	cell = level.start_cell
 	heading = level.start_heading
 	_pending_turn = 0
+	_pending_reverse = false
 	_drop_held_key()
 	_end_all_power_ups()
 	_clear_rejected_flash()
@@ -116,6 +138,17 @@ func request_turn(direction: int) -> void:
 		return
 	_clear_rejected_flash()
 	_pending_turn = direction
+	_pending_reverse = false
+	_update_arrow(_body_offset())
+
+
+## Registra una media vuelta (sustituye al giro pendiente, si lo hay).
+func request_reverse() -> void:
+	if is_finished:
+		return
+	_clear_rejected_flash()
+	_pending_turn = 0
+	_pending_reverse = true
 	_update_arrow(_body_offset())
 
 
@@ -133,6 +166,18 @@ func _process(delta: float) -> void:
 
 
 func _try_advance() -> void:
+	# Media vuelta: el rumbo se invierte como al chocar con una pared y el
+	# cubo se queda parado un momento antes de seguir.
+	if _pending_reverse:
+		_pending_reverse = false
+		heading = -heading
+		_end_power_ups_on_bounce(false)
+		_spawn_reverse_smoke()
+		_update_arrow(Vector3.ZERO)
+		reversed.emit(cell)
+		_cooldown = REVERSE_PAUSE
+		return
+
 	# Un giro solo se aplica si la casilla en esa dirección está libre; si no,
 	# se descarta y el cubo sigue con su rumbo actual.
 	if _pending_turn != 0:
@@ -317,6 +362,78 @@ func _drop_held_key() -> void:
 		_held_key_node = null
 
 
+## Ráfaga de humo gris desde cada uno de los cuatro lados de la base.
+func _spawn_reverse_smoke() -> void:
+	for dir: Vector3 in [Vector3.FORWARD, Vector3.BACK, Vector3.LEFT, Vector3.RIGHT]:
+		var smoke := CPUParticles3D.new()
+		smoke.top_level = true
+		smoke.local_coords = false
+		smoke.one_shot = true
+		smoke.explosiveness = 0.85
+		smoke.amount = REVERSE_SMOKE_PUFFS
+		smoke.lifetime = REVERSE_SMOKE_LIFETIME
+		# Las bocanadas nacen a lo largo de la arista inferior de ese lado.
+		var along := Vector3(absf(dir.z), 0, absf(dir.x))
+		smoke.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+		smoke.emission_box_extents = along * 0.45 + Vector3(0.03, 0.03, 0.03)
+		smoke.direction = (dir + Vector3.UP * 0.35).normalized()
+		smoke.spread = 25.0
+		smoke.initial_velocity_min = 0.9
+		smoke.initial_velocity_max = 1.6
+		smoke.damping_min = 2.5
+		smoke.damping_max = 3.5
+		smoke.gravity = Vector3(0, 0.25, 0)
+		smoke.angle_min = 0.0
+		smoke.angle_max = 360.0
+		smoke.scale_amount_min = 0.8
+		smoke.scale_amount_max = 1.2
+		var grow := Curve.new()
+		grow.max_value = 3.0
+		grow.add_point(Vector2(0, 0.6))
+		grow.add_point(Vector2(1, 2.4))
+		smoke.scale_amount_curve = grow
+		var fade := Gradient.new()
+		fade.set_color(0, Color(1, 1, 1, 0.75))
+		fade.set_color(1, Color(1, 1, 1, 0.0))
+		smoke.color_ramp = fade
+		var quad := QuadMesh.new()
+		quad.size = Vector2.ONE * 0.4
+		quad.material = _get_smoke_material()
+		smoke.mesh = quad
+		smoke.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(smoke)
+		smoke.global_position = global_position + dir * HALF + Vector3(0, 0.12, 0)
+		smoke.emitting = true
+		smoke.finished.connect(smoke.queue_free)
+
+
+static func _get_smoke_material() -> StandardMaterial3D:
+	if _smoke_material:
+		return _smoke_material
+	# Círculo blanco que se difumina hacia el borde.
+	var gradient := Gradient.new()
+	gradient.set_color(0, Color(1, 1, 1, 1))
+	gradient.set_color(1, Color(1, 1, 1, 0))
+	var texture := GradientTexture2D.new()
+	texture.gradient = gradient
+	texture.fill = GradientTexture2D.FILL_RADIAL
+	texture.fill_from = Vector2(0.5, 0.5)
+	texture.fill_to = Vector2(0.5, 0.0)
+	texture.width = 64
+	texture.height = 64
+	_smoke_material = StandardMaterial3D.new()
+	_smoke_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_smoke_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_smoke_material.vertex_color_use_as_albedo = true
+	_smoke_material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	# Necesario para que el billboard respete la escala de cada partícula (ver
+	# el rastro de SpeedPowerUp).
+	_smoke_material.billboard_keep_scale = true
+	_smoke_material.albedo_color = REVERSE_SMOKE_COLOR
+	_smoke_material.albedo_texture = texture
+	return _smoke_material
+
+
 func _clear_rejected_flash() -> void:
 	if _flash_tween and _flash_tween.is_valid():
 		_flash_tween.kill()
@@ -328,7 +445,9 @@ func _clear_rejected_flash() -> void:
 ## en rojo, el giro descartado.
 func _update_arrow(offset: Vector3) -> void:
 	var shown := heading
-	if _pending_turn != 0:
+	if _pending_reverse:
+		shown = -heading
+	elif _pending_turn != 0:
 		shown = turned(heading, _pending_turn)
 	elif _rejected_dir != Vector2i.ZERO:
 		shown = _rejected_dir

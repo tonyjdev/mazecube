@@ -16,10 +16,14 @@ const SETTINGS_PATH := "user://settings.cfg"
 const MENU_SCENE := "res://scenes/menu.tscn"
 const GAME_SCENE := "res://scenes/game.tscn"
 const LOCALES := ["es", "en"]
+## Fotogramas que se deja el nivel construido detrás de la pantalla de carga
+## antes de mostrar Continuar (para que se compilen sus materiales).
+const LOADING_SETTLE_FRAMES := 4
 ## Vibraciones: (duración en ms, intensidad de 0 a 1).
 const VIBRATION_WALL_BROKEN := Vector2(90, 0.8)
 const VIBRATION_TURN_REJECTED := Vector2(18, 0.25)
 const VIBRATION_BUTTON := Vector2(40, 0.5)
+const VIBRATION_REVERSE := Vector2(70, 0.7)
 ## Al activar la vibración en Opciones, para notar que funciona.
 const VIBRATION_PREVIEW := Vector2(60, 0.6)
 
@@ -27,6 +31,9 @@ const VIBRATION_PREVIEW := Vector2(60, 0.6)
 var current_level := 0
 ## Pantalla del menú que se abre al volver de la partida ("main" o "levels").
 var menu_screen := "main"
+## Se está mostrando la pantalla de carga de un nivel: el juego de debajo
+## está en pausa y no debe atender a la entrada.
+var is_loading := false
 
 ## Volúmenes de 0.0 a 1.0.
 var sfx_volume := 1.0
@@ -192,9 +199,43 @@ func _apply_antialiasing() -> void:
 
 # --- Navegación -------------------------------------------------------------
 
+## Juega un nivel pasando por la pantalla de carga (ver LoadingScreen):
+## 1. La pantalla de carga aparece al momento, por encima de todo.
+## 2. La escena del juego se carga en otro hilo, así que la pantalla de carga
+##    sigue animándose.
+## 3. Se cambia a la escena del juego, que se construye en pausa detrás de la
+##    pantalla de carga, y se dejan pasar unos fotogramas para que se preparen
+##    sus materiales.
+## 4. Aparece el botón Continuar; al pulsarlo, el juego se reanuda.
 func play_level(index: int) -> void:
+	if is_loading:
+		return
 	current_level = clampi(index, 0, Levels.count() - 1)
-	_change_scene(GAME_SCENE)
+	is_loading = true
+	var tree := get_tree()
+	tree.paused = false
+	var screen := LoadingScreen.new(current_level)
+	tree.root.add_child(screen)
+	# Dos fotogramas para que la pantalla de carga se vea antes de cargar nada.
+	await tree.process_frame
+	await tree.process_frame
+
+	var packed: PackedScene = null
+	if ResourceLoader.load_threaded_request(GAME_SCENE) == OK:
+		while ResourceLoader.load_threaded_get_status(GAME_SCENE) == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+			await tree.process_frame
+		packed = ResourceLoader.load_threaded_get(GAME_SCENE) as PackedScene
+	if packed == null:
+		packed = load(GAME_SCENE)
+
+	tree.paused = true
+	tree.change_scene_to_packed(packed)
+	for i in LOADING_SETTLE_FRAMES:
+		await tree.process_frame
+	screen.mark_loaded()
+	await screen.continued
+	tree.paused = false
+	is_loading = false
 
 
 ## Vuelve al menú, abriendo la pantalla indicada ("main" o "levels").

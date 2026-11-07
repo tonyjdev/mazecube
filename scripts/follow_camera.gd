@@ -24,6 +24,7 @@ extends Camera3D
 ##   Al alejarse el cubo del botón, vuelve a su comportamiento normal, aunque
 ##   tras pulsarlo espera un momento (ATTENTION_HOLD) para que se vea cómo
 ##   cambian los barrotes. Si al llegar ya se ven todos, no cambia nada.
+## - shake() hace temblar la cámara un momento (media vuelta del cubo).
 ## - Tanto el foco como la distancia se mueven con un amortiguamiento crítico:
 ##   arrancan y frenan con suavidad, van con un pequeño retraso respecto al
 ##   cubo y nunca se pasan del objetivo (no rebotan cuando el cubo rebota).
@@ -40,6 +41,11 @@ const EDGE_MARGIN := 0.4
 ## Segundos que la cámara sigue enseñando los barrotes tras pulsar un botón,
 ## aunque el cubo ya se haya alejado.
 const ATTENTION_HOLD := 0.8
+## Temblor: desplazamiento máximo de la imagen (unidades de mundo), duración
+## y frecuencias de oscilación en cada eje (rad/s).
+const SHAKE_STRENGTH := 0.06
+const SHAKE_TIME := 0.25
+const SHAKE_FREQ := Vector2(71.0, 53.0)
 
 ## Inclinación de la vista cenital (90 = totalmente desde arriba).
 @export_range(45.0, 90.0) var pitch_degrees := 65.0
@@ -73,6 +79,7 @@ var _attention_frame: Array = []
 var _attention_frame_cell := Level.NO_CELL
 ## Hasta cuándo (Time.get_ticks_msec) se mantiene el encuadre tras pulsar.
 var _attention_hold_until := 0
+var _shake_left := 0.0
 
 
 func _ready() -> void:
@@ -121,6 +128,9 @@ func snap() -> void:
 	_attention_active = false
 	_attention_frame_cell = Level.NO_CELL
 	_attention_hold_until = 0
+	_shake_left = 0.0
+	h_offset = 0.0
+	v_offset = 0.0
 	_distance = _target_distance()
 	_distance_vel = 0.0
 	_place(_distance, Vector3.ZERO)
@@ -149,6 +159,19 @@ func _process(delta: float) -> void:
 	_focus = f[0]
 	_focus_vel = f[1]
 	_place(_distance, _focus)
+	_update_shake(delta)
+
+
+## Desplaza la imagen (h_offset/v_offset, sin mover la cámara) con una
+## oscilación rápida que se apaga al acabar el temblor.
+func _update_shake(delta: float) -> void:
+	if _shake_left <= 0.0:
+		return
+	_shake_left = maxf(_shake_left - delta, 0.0)
+	var t := SHAKE_TIME - _shake_left
+	var amount := SHAKE_STRENGTH * (_shake_left / SHAKE_TIME)
+	h_offset = sin(t * SHAKE_FREQ.x) * amount
+	v_offset = cos(t * SHAKE_FREQ.y) * amount
 
 
 ## Distancia a la que debe ir la cámara: la del nivel (limitada al máximo y a
@@ -199,6 +222,11 @@ func _clamped_focus(anchor: Vector3, distance: float) -> Vector3:
 		focus.z = clampf(anchor.z, bounds.position.y - EDGE_MARGIN + view.z,
 				bounds.end.y + EDGE_MARGIN - view.w)
 	return focus
+
+
+## Temblor breve de la imagen que se va apagando.
+func shake() -> void:
+	_shake_left = SHAKE_TIME
 
 
 ## Avisa de que el cubo ha pulsado un botón: si la cámara está enseñando sus

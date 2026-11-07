@@ -14,10 +14,14 @@ extends Node3D
 ## nivel como completado y se muestra otro (Siguiente nivel, Repetir, Niveles).
 ##
 ## Controles:
+##   Media vuelta: pulsar izquierda y derecha a la vez (con el otro lado aún
+##   pulsado, o con menos de SIMULTANEOUS_WINDOW segundos de diferencia). La
+##   primera pulsación ya ha pedido un giro, pero la media vuelta lo sustituye.
+##   Al darla, la cámara tiembla y el móvil vibra.
 ##   Teclado: ←/A gira a la izquierda, →/D a la derecha, R reinicia,
 ##            Esc pausa o reanuda; al completar un nivel, Intro/N pasa al siguiente.
 ##   Táctil:  tocar la mitad izquierda o derecha de la pantalla gira hacia ese
-##            lado. El botón Atrás de Android pausa o reanuda.
+##            lado (con dos dedos, uno en cada mitad, media vuelta). El botón Atrás de Android pausa o reanuda.
 ##   En PC, el clic del ratón se trata como un toque (emulate_touch_from_mouse).
 ##   Solo en builds de depuración: Re Pág / Av Pág cambian de nivel.
 ##
@@ -31,9 +35,18 @@ extends Node3D
 const HINT_IDLE_ALPHA := 0.45
 ## Pausa entre llegar a la meta y mostrar el menú de nivel completado.
 const COMPLETE_MENU_DELAY := 0.5
+## Diferencia máxima entre pulsar izquierda y derecha para que cuente como a
+## la vez (media vuelta).
+const SIMULTANEOUS_WINDOW := 0.15
 
 var current_level := 0
 var _hint_tweens := {}
+## Por lado (TURN_LEFT / TURN_RIGHT): momento de la última pulsación
+## (Time.get_ticks_msec) y si sigue pulsado (teclas o dedos).
+var _side_pressed_at := {RollingCube.TURN_LEFT: -100000, RollingCube.TURN_RIGHT: -100000}
+var _keys_held := {RollingCube.TURN_LEFT: false, RollingCube.TURN_RIGHT: false}
+## Dedo (índice del toque) -> lado de la pantalla en que se apoyó.
+var _touches := {}
 
 @onready var level: Level = $Level
 @onready var cube: RollingCube = $Cube
@@ -62,6 +75,9 @@ func _ready() -> void:
 	cube.breakable_hit.connect(func(_cell: Vector2i, hits_left: int) -> void:
 		if hits_left == 0:
 			GameState.vibrate(GameState.VIBRATION_WALL_BROKEN))
+	cube.reversed.connect(func(_cell: Vector2i) -> void:
+		camera.shake()
+		GameState.vibrate(GameState.VIBRATION_REVERSE))
 	cube.button_pressed.connect(func(_cell: Vector2i) -> void:
 		camera.notify_button_pressed()
 		GameState.vibrate(GameState.VIBRATION_BUTTON))
@@ -86,15 +102,18 @@ func _ready() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_TRANSLATION_CHANGED and is_node_ready():
 		_update_level_label()
-	elif what == NOTIFICATION_WM_GO_BACK_REQUEST:
+	elif what == NOTIFICATION_WM_GO_BACK_REQUEST and not GameState.is_loading:
 		_toggle_pause()
 	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT and OS.has_feature("mobile") \
-			and is_node_ready() and not cube.is_finished:
+			and is_node_ready() and not cube.is_finished and not GameState.is_loading:
 		# En el móvil, al salir de la aplicación (llamada, cambiar de app...) se pausa.
 		_set_paused(true)
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Mientras se ve la pantalla de carga, el juego no atiende a la entrada.
+	if GameState.is_loading:
+		return
 	if event.is_action_pressed("ui_cancel"):
 		_toggle_pause()
 		get_viewport().set_input_as_handled()
@@ -104,16 +123,26 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if event is InputEventScreenTouch:
 		var touch := event as InputEventScreenTouch
-		if touch.pressed and not _is_over_buttons(touch.position):
+		if not touch.pressed:
+			_touches.erase(touch.index)
+		elif not _is_over_buttons(touch.position):
 			var half := get_viewport().get_visible_rect().size.x * 0.5
-			_turn(RollingCube.TURN_LEFT if touch.position.x < half else RollingCube.TURN_RIGHT)
+			var side := RollingCube.TURN_LEFT if touch.position.x < half else RollingCube.TURN_RIGHT
+			_touches[touch.index] = side
+			_press_side(side)
 			get_viewport().set_input_as_handled()
 		return
 
-	if event.is_action_pressed("turn_left"):
-		_turn(RollingCube.TURN_LEFT)
+	if event.is_action_released("turn_left"):
+		_keys_held[RollingCube.TURN_LEFT] = false
+	elif event.is_action_released("turn_right"):
+		_keys_held[RollingCube.TURN_RIGHT] = false
+	elif event.is_action_pressed("turn_left"):
+		_keys_held[RollingCube.TURN_LEFT] = true
+		_press_side(RollingCube.TURN_LEFT)
 	elif event.is_action_pressed("turn_right"):
-		_turn(RollingCube.TURN_RIGHT)
+		_keys_held[RollingCube.TURN_RIGHT] = true
+		_press_side(RollingCube.TURN_RIGHT)
 	elif event.is_action_pressed("restart"):
 		_restart()
 	elif event.is_action_pressed("next_level") and complete_menu.visible:
@@ -125,9 +154,34 @@ func _unhandled_input(event: InputEvent) -> void:
 			_load_level(current_level - 1)
 
 
-func _turn(direction: int) -> void:
-	cube.request_turn(direction)
-	_flash_hint(left_hint if direction == RollingCube.TURN_LEFT else right_hint)
+## Pulsación de un lado: giro hacia ese lado o, si el otro lado sigue pulsado
+## o se acaba de pulsar, media vuelta.
+func _press_side(side: int) -> void:
+	var other := -side
+	var now := Time.get_ticks_msec()
+	var simultaneous: bool = _is_side_held(other) \
+		or now - int(_side_pressed_at[other]) <= int(SIMULTANEOUS_WINDOW * 1000.0)
+	_side_pressed_at[side] = now
+	if simultaneous:
+		# Evita que una tercera pulsación cuente otra vez con la misma.
+		_side_pressed_at[other] = -100000
+		cube.request_reverse()
+		_flash_hint(left_hint)
+		_flash_hint(right_hint)
+	else:
+		cube.request_turn(side)
+		_flash_hint(left_hint if side == RollingCube.TURN_LEFT else right_hint)
+
+
+func _clear_held_sides() -> void:
+	_touches.clear()
+	for side in _keys_held:
+		_keys_held[side] = false
+		_side_pressed_at[side] = -100000
+
+
+func _is_side_held(side: int) -> bool:
+	return _keys_held[side] or _touches.values().has(side)
 
 
 func _toggle_pause() -> void:
@@ -141,6 +195,8 @@ func _set_paused(paused: bool) -> void:
 		return
 	get_tree().paused = paused
 	pause_menu.visible = paused
+	# En la pausa no llegan las sueltas de teclas y dedos.
+	_clear_held_sides()
 	if paused:
 		_focus_first(pause_menu)
 
@@ -150,6 +206,7 @@ func _restart() -> void:
 	level.build()
 	cube.reset(level)
 	camera.snap()
+	_clear_held_sides()
 	complete_menu.visible = false
 	pause_button.visible = true
 
@@ -174,7 +231,7 @@ func _next_level() -> void:
 	if current_level >= Levels.count() - 1:
 		GameState.go_to_menu("levels")
 	else:
-		_load_level(current_level + 1)
+		GameState.play_level(current_level + 1)
 
 
 func _on_reached_goal() -> void:

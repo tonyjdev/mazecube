@@ -33,6 +33,7 @@ El diseño busca combinar **lógica y planificación** con **controles y reglas 
 - **Derecha:** el siguiente movimiento es un vuelco de 90° hacia la derecha respecto a su rumbo actual.
 - Tras el giro, la dirección elegida pasa a ser el nuevo rumbo de avance automático.
 - Los controles son **relativos al rumbo del cubo**, no a direcciones absolutas del tablero o de la pantalla.
+- **Media vuelta:** pulsar **izquierda y derecha a la vez** (ver apartado 2.12).
 
 **Ejemplo:** si el cubo avanza hacia arriba en el tablero y el jugador pulsa izquierda, vuelca sobre la arista inferior izquierda y continúa avanzando hacia la izquierda. Si después vuelve a pulsar izquierda, su nuevo rumbo será hacia abajo.
 
@@ -126,6 +127,16 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 
 **Ejemplo:** un botón tiene asignados dos juegos de barrotes, uno abierto y otro cerrado. Al pulsarlo, el abierto se cierra y el cerrado se abre; al pulsarlo otra vez, vuelven a como estaban.
 
+### 2.12. Media vuelta — Implementada en el prototipo
+
+- Al pulsar **izquierda y derecha a la vez**, el cubo cambia al **sentido contrario** al que lleva, igual que si chocara contra una pared. Si va hacia arriba, pasa a ir hacia abajo.
+- Cuentan como «a la vez» si al pulsar un lado el otro **sigue pulsado** o se pulsó hace **menos de 0,15 s**. La primera pulsación pide un giro, pero la media vuelta lo sustituye.
+- Se aplica en el **siguiente límite entre casillas**, como los giros (apartado 2.7): el cubo termina el vuelco en curso y da la media vuelta al llegar a la casilla.
+- Es un movimiento **grande y costoso**: el cubo se queda **parado unos 200 ms**; por sus **cuatro lados sale humo gris** que se expande y se desvanece (≈0,8 s); la **cámara tiembla** levemente (≈0,25 s) y el móvil **vibra** (si la vibración está activada). En el futuro podría penalizar puntos.
+- Mientras está pendiente, la flecha de rumbo señala el sentido contrario.
+- Para los power ups cuenta como un rebote contra una **pared** (se pierde la velocidad).
+- El resolvedor de niveles **no la usa**: los niveles se diseñan y miden sin media vuelta, que queda como ayuda extra para el jugador.
+
 ## 3. Escenario y objetivo — Confirmados
 
 - El escenario es un **laberinto**.
@@ -215,7 +226,14 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 - Los niveles **bloqueados** se ven atenuados, con el texto «Bloqueado», y no se pueden pulsar. Los **completados** se marcan en verde.
 - **Truco para pruebas** (solo en las versiones de depuración): tocar **5 veces seguidas** el título «Elige un nivel» desbloquea todos los niveles (sin marcarlos como completados). Se guarda en el dispositivo.
 
-### 7.3. Pausa
+### 7.3. Pantalla de carga
+
+- Al entrar en un nivel (desde el selector o con «Siguiente nivel») aparece al momento una **pantalla de carga**: fondo **negro**, el **cubo** del juego **volcando** sobre sí mismo en el centro, el número y el nombre del nivel y el texto «Cargando…».
+- Debajo se muestra un **consejo** sobre las mecánicas o los movimientos, elegido al azar de una lista (sin repetir el anterior). Los consejos están traducidos a los dos idiomas.
+- El nivel se carga sin bloquear la pantalla (el cubo sigue moviéndose) y se prepara detrás, en pausa. Cuando está listo, «Cargando…» se cambia por el botón **Continuar**; al pulsarlo, la pantalla se desvanece y empieza el nivel.
+- **Reiniciar** y **Repetir** no pasan por la pantalla de carga.
+
+### 7.4. Pausa
 
 - El botón de **pausa** (arriba a la derecha) detiene el juego y muestra un menú con:
   - **Continuar:** reanuda la partida.
@@ -223,10 +241,11 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
   - **Salir:** vuelve al selector de niveles.
 - En el móvil, el juego también se pausa al salir de la aplicación (por ejemplo, al recibir una llamada).
 
-### 7.4. Controles
+### 7.5. Controles
 
 - **Tocar la mitad izquierda de la pantalla** gira a la izquierda y **tocar la mitad derecha** gira a la derecha (relativo al rumbo, como en el apartado 2.3).
 - Toda la mitad de la pantalla es zona de toque, sin botones pequeños; cada toque cuenta como una pulsación. Tocar el botón de pausa no cuenta como giro.
+- **Media vuelta:** tocar las dos mitades a la vez, con un dedo en cada una (en el teclado, las dos flechas a la vez). Se resaltan las dos indicaciones.
 - Las indicaciones de las esquinas inferiores («← Izquierda» y «Derecha →») se resaltan al tocar cada lado.
 - El botón **Atrás** de Android pausa y reanuda la partida; en los menús vuelve a la pantalla anterior y, desde el menú principal, cierra el juego.
 - En PC se mantienen los controles de teclado (←/A, →/D, R reiniciar, Esc pausa/atrás, Intro/N siguiente nivel) y el clic del ratón se trata como un toque.
