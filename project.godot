@@ -23,6 +23,7 @@ _mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
 
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
+window/handheld/orientation=4
 
 [editor_plugins]
 
@@ -65,3 +66,4 @@ pointing/emulate_touch_from_mouse=true
 
 rendering_device/driver.windows="d3d12"
 renderer/rendering_method="mobile"
+textures/vram_compression/import_etc2_astc=true
