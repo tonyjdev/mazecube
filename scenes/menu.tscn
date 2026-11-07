@@ -127,7 +127,7 @@ layout_mode = 2
 [node name="Grid" type="GridContainer" parent="OptionsScreen/VBox/Panel"]
 layout_mode = 2
 theme_override_constants/h_separation = 48
-theme_override_constants/v_separation = 26
+theme_override_constants/v_separation = 12
 columns = 2
 
 [node name="SfxLabel" type="Label" parent="OptionsScreen/VBox/Panel/Grid"]
@@ -162,6 +162,26 @@ text = "OPT_AA"
 unique_name_in_owner = true
 layout_mode = 2
 custom_minimum_size = Vector2(120, 56)
+size_flags_horizontal = 0
+
+[node name="VibrationLabel" type="Label" parent="OptionsScreen/VBox/Panel/Grid"]
+layout_mode = 2
+text = "OPT_VIBRATION"
+
+[node name="VibrationToggle" type="CheckButton" parent="OptionsScreen/VBox/Panel/Grid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 56)
+layout_mode = 2
+size_flags_horizontal = 0
+
+[node name="ArrowLabel" type="Label" parent="OptionsScreen/VBox/Panel/Grid"]
+layout_mode = 2
+text = "OPT_ARROW"
+
+[node name="ArrowToggle" type="CheckButton" parent="OptionsScreen/VBox/Panel/Grid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 56)
+layout_mode = 2
 size_flags_horizontal = 0
 
 [node name="LanguageLabel" type="Label" parent="OptionsScreen/VBox/Panel/Grid"]

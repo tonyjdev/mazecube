@@ -1,5 +1,8 @@
 [gd_resource type="Theme" format=3]
 
+[ext_resource type="Texture2D" path="res://ui/switch_on.svg" id="sw_on"]
+[ext_resource type="Texture2D" path="res://ui/switch_off.svg" id="sw_off"]
+
 [sub_resource type="StyleBoxFlat" id="btn_normal"]
 content_margin_left = 28.0
 content_margin_top = 14.0
@@ -160,3 +163,9 @@ CheckButton/styles/pressed = SubResource("empty")
 CheckButton/styles/hover_pressed = SubResource("empty")
 CheckButton/styles/disabled = SubResource("empty")
 CheckButton/styles/focus = SubResource("btn_focus")
+CheckButton/icons/checked = ExtResource("sw_on")
+CheckButton/icons/unchecked = ExtResource("sw_off")
+CheckButton/icons/checked_disabled = ExtResource("sw_on")
+CheckButton/icons/unchecked_disabled = ExtResource("sw_off")
+CheckButton/icons/checked_mirrored = ExtResource("sw_on")
+CheckButton/icons/unchecked_mirrored = ExtResource("sw_off")

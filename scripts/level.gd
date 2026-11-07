@@ -26,8 +26,11 @@ const ITEM_COLORS := {
 ## La puerta es un bloque estrecho que cierra el pasillo de muro a muro.
 const DOOR_THICKNESS := 0.24
 const DOOR_HEIGHT := 0.8
-## Duración de la animación de la puerta hundiéndose al abrirse.
-const DOOR_SINK_TIME := 0.6
+## La puerta tiene dos hojas que, al abrirse, se deslizan hacia los lados
+## (hacia dentro de los muros) y después se recogen hasta desaparecer.
+const DOOR_LEAF_GAP := 0.02
+const DOOR_SLIDE_TIME := 0.45
+const DOOR_FOLD_TIME := 0.2
 ## Altura y velocidad de giro (rad/s) de las llaves que están en el mapa.
 const KEY_FLOAT_HEIGHT := 0.5
 const KEY_SCALE := 1.6
@@ -178,17 +181,23 @@ func take_power_up(cell: Vector2i) -> PowerUp:
 	return power_up
 
 
-## Abre la puerta: la casilla pasa a ser libre al instante y la puerta se
-## hunde en el suelo hasta desaparecer.
+## Abre la puerta: la casilla pasa a ser libre al instante y las dos hojas
+## se deslizan hacia los lados, dentro de los muros, y luego se recogen
+## hacia el suelo hasta desaparecer.
 func open_door(cell: Vector2i) -> void:
 	if not _doors.has(cell):
 		return
 	var door: Node3D = _doors[cell]["node"]
 	_doors.erase(cell)
-	var tween := door.create_tween()
-	tween.tween_property(door, "position:y", door.position.y - DOOR_HEIGHT - FLOOR_THICKNESS,
-			DOOR_SINK_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tween.tween_callback(door.queue_free)
+	var tween := door.create_tween().set_parallel()
+	for leaf: Node3D in door.get_children():
+		var outward := leaf.position.normalized()
+		var slide := leaf.position + outward * (CELL_SIZE * 0.5)
+		tween.tween_property(leaf, "position", slide, DOOR_SLIDE_TIME) \
+			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+		tween.tween_property(leaf, "scale:y", 0.01, DOOR_FOLD_TIME) \
+			.set_delay(DOOR_SLIDE_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.chain().tween_callback(door.queue_free)
 
 
 func cell_to_world(cell: Vector2i) -> Vector3:
@@ -243,13 +252,30 @@ func _add_breakable(cell: Vector2i, hits: int) -> void:
 
 ## La puerta se orienta según los muros que la rodean: si los muros están a
 ## izquierda y derecha, el pasillo va de arriba abajo y la puerta lo cruza en X.
+## Está formada por dos hojas, una a cada lado del centro del pasillo; cada
+## hoja tiene su origen a ras de suelo para poder recogerla hacia abajo.
 func _add_door(cell: Vector2i, color: String) -> void:
 	var across_x := _is_wall(cell + Vector2i.LEFT) and _is_wall(cell + Vector2i.RIGHT)
-	var size := Vector3(CELL_SIZE * 0.98, DOOR_HEIGHT, DOOR_THICKNESS) if across_x \
-		else Vector3(DOOR_THICKNESS, DOOR_HEIGHT, CELL_SIZE * 0.98)
+	var axis := Vector3.RIGHT if across_x else Vector3.BACK
+	var leaf_width := (CELL_SIZE * 0.98 - DOOR_LEAF_GAP) * 0.5
+	var size := Vector3(leaf_width, DOOR_HEIGHT, DOOR_THICKNESS) if across_x \
+		else Vector3(DOOR_THICKNESS, DOOR_HEIGHT, leaf_width)
 	var mat := _make_material(ITEM_COLORS[color])
 	mat.roughness = 0.5
-	var door := _add_box(cell, size, DOOR_HEIGHT * 0.5, mat)
+	var door := Node3D.new()
+	door.position = Vector3(cell.x * CELL_SIZE, 0.0, cell.y * CELL_SIZE)
+	add_child(door)
+	for side in [-1.0, 1.0]:
+		var mesh := BoxMesh.new()
+		mesh.size = size
+		mesh.material = mat
+		var leaf_mesh := MeshInstance3D.new()
+		leaf_mesh.mesh = mesh
+		leaf_mesh.position = Vector3(0, DOOR_HEIGHT * 0.5, 0)
+		var leaf := Node3D.new()
+		leaf.position = axis * side * (leaf_width + DOOR_LEAF_GAP) * 0.5
+		leaf.add_child(leaf_mesh)
+		door.add_child(leaf)
 	_doors[cell] = {"color": color, "node": door}
 
 

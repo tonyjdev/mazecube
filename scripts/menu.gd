@@ -127,6 +127,8 @@ func _setup_options() -> void:
 	%SfxSlider.value = GameState.sfx_volume * 100.0
 	%MusicSlider.value = GameState.music_volume * 100.0
 	%AaToggle.button_pressed = GameState.antialiasing
+	%VibrationToggle.button_pressed = GameState.vibration
+	%ArrowToggle.button_pressed = GameState.show_arrow
 	var language: OptionButton = %LanguageOption
 	language.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	language.clear()
@@ -137,6 +139,8 @@ func _setup_options() -> void:
 	%SfxSlider.value_changed.connect(func(v: float) -> void: GameState.set_sfx_volume(v / 100.0))
 	%MusicSlider.value_changed.connect(func(v: float) -> void: GameState.set_music_volume(v / 100.0))
 	%AaToggle.toggled.connect(GameState.set_antialiasing)
+	%VibrationToggle.toggled.connect(GameState.set_vibration)
+	%ArrowToggle.toggled.connect(GameState.set_show_arrow)
 	language.item_selected.connect(func(index: int) -> void:
 		GameState.set_locale(GameState.LOCALES[index]))
 

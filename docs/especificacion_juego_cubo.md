@@ -57,7 +57,8 @@ El diseño busca combinar **lógica y planificación** con **controles y reglas 
 
 - Sobre el cubo se muestra una **flecha** que indica su rumbo actual.
 - Al pulsar un giro, la flecha pasa a señalar la dirección pedida, para confirmar que la pulsación se ha registrado.
-- Si el giro no se puede realizar (apartado 2.5), la flecha se muestra **en rojo** señalando la dirección descartada durante un instante y después **vuelve a su color normal** señalando el rumbo real.
+- Si el giro no se puede realizar (apartado 2.5), la flecha se muestra **en rojo** señalando la dirección descartada durante un instante y después **vuelve a su color normal** señalando el rumbo real. Además, el móvil **vibra muy levemente** (si la vibración está activada).
+- La flecha se puede **ocultar** en Opciones (apartado 7.1).
 
 ### 2.7. Momento en que se aplica un giro — Implementada en el prototipo
 
@@ -74,11 +75,11 @@ El diseño busca combinar **lógica y planificación** con **controles y reglas 
 - **Puerta:** un bloque más estrecho que el cubo que cierra el pasillo de muro a muro, girado 90° según la dirección de los muros que la rodean.
 - Cada llave está asociada a **su propia puerta**, y ambas tienen el **mismo color**. Una llave no abre puertas de otro color. Colores disponibles: **amarillo, naranja, rojo, azul y verde**.
 - Una puerta cerrada se comporta como una **pared**: el cubo rebota al chocar con ella (apartado 2.4) y los giros hacia ella se descartan (apartado 2.5), **aunque se lleve su llave**.
-- Si el cubo **choca de frente** con una puerta llevando su llave, la **llave desaparece** y la **puerta se hunde en el suelo** (animación de unos 0,6 s); desde que empieza a hundirse, la casilla **ya se puede atravesar**. El cubo **rebota igualmente** en ese movimiento; para pasar por el hueco tiene que volver.
+- Si el cubo **choca de frente** con una puerta llevando su llave, la **llave desaparece** y la **puerta se abre**: está formada por **dos hojas** que se deslizan **hacia los lados**, dentro de los muros, y después se recogen hasta desaparecer (unos 0,65 s). Desde que empieza a abrirse, la casilla **ya se puede atravesar**. El cubo **rebota igualmente** en ese movimiento; para pasar por el hueco tiene que volver.
 - Como solo se abren de frente, cada puerta debe tener por al menos uno de sus lados un tramo recto por el que el cubo pueda llegar hasta ella.
 - Las puertas abiertas y las llaves cogidas se restauran al reiniciar el nivel.
 
-**Ejemplo:** el cubo avanza hacia una puerta amarilla llevando la llave amarilla; al tocarla, la llave desaparece, la puerta se hunde en el suelo y el cubo rebota. En la siguiente pasada atraviesa la casilla donde estaba la puerta.
+**Ejemplo:** el cubo avanza hacia una puerta amarilla llevando la llave amarilla; al tocarla, la llave desaparece, las dos hojas de la puerta se abren hacia los lados y el cubo rebota. En la siguiente pasada atraviesa la casilla donde estaba la puerta.
 
 ### 2.9. Muros destructibles — Confirmada
 
@@ -87,7 +88,7 @@ El diseño busca combinar **lógica y planificación** con **controles y reglas 
 - El jugador solo ve el estado por la **cantidad de grietas** (no hay número ni texto); cada golpe muestra al momento las grietas del nuevo estado, y el bloque tiembla: **cuatro empujones rápidos** y cortos en la dirección del golpe.
 - Mientras está en pie se comporta como una **pared**: el cubo rebota al chocar con él (apartado 2.4) y los giros hacia él se descartan (apartado 2.5).
 - Cada **choque de frente** le quita un golpe y el cubo rebota. El golpe que lo destruye **también rebota**; para pasar hay que volver.
-- Al destruirse, el bloque se parte en **pedazos que caen** al suelo y después **desaparecen** (en torno a 1,5 s). Desde el instante de la destrucción la casilla **ya se puede atravesar**, aunque los pedazos sigan cayendo.
+- Al destruirse, el bloque se parte en **pedazos que caen** al suelo y después **desaparecen** (en torno a 1,5 s). Desde el instante de la destrucción la casilla **ya se puede atravesar**, aunque los pedazos sigan cayendo. Al destruirse, el móvil **vibra** (si la vibración está activada); al golpearlo sin romperlo, no.
 - Para los power ups cuenta como un rebote contra una **pared** (por ejemplo, se pierde la velocidad).
 - Los muros destruidos se restauran al reiniciar el nivel.
 
@@ -184,7 +185,7 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 ### 7.1. Menú principal
 
 - **Jugar:** abre el selector de niveles.
-- **Opciones:** volumen de **efectos de sonido** y de **música** (0-100%; todavía no hay sonidos ni música, pero ya existen los canales de audio «SFX» y «Music»), **antialiasing** (activado/desactivado) e **idioma** (español o inglés). Los cambios se aplican al momento y se guardan en el dispositivo. Por defecto se usa el idioma del sistema si es español o inglés, y si no, inglés.
+- **Opciones:** volumen de **efectos de sonido** y de **música** (0-100%; todavía no hay sonidos ni música, pero ya existen los canales de audio «SFX» y «Music»), **antialiasing** (activado/desactivado), **vibración** (activada/desactivada; al activarla vibra brevemente como prueba), **flecha de dirección** sobre el cubo (mostrar/ocultar) e **idioma** (español o inglés). Los cambios se aplican al momento y se guardan en el dispositivo. Por defecto se usa el idioma del sistema si es español o inglés, y si no, inglés.
 - **Créditos:** equipo de desarrollo, gráficos, sonido, tipografía, herramientas y licencia del motor, en una lista que se puede desplazar.
 
 ### 7.2. Selector de niveles

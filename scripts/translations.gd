@@ -5,7 +5,7 @@ extends RefCounted
 ## (que se traduce solo) usan el idioma elegido en Opciones.
 ##
 ## Los nombres de los niveles se traducen usando su nombre en español como
-## clave (ver Levels.LIST); en español no hace falta entrada.
+## clave (ver Levels.LIST); en español no hace falta entrada (ver register()).
 
 const MESSAGES := {
 	"es": {
@@ -21,6 +21,8 @@ const MESSAGES := {
 		"OPT_MUSIC": "Música",
 		"OPT_AA": "Antialiasing",
 		"OPT_LANGUAGE": "Idioma",
+		"OPT_VIBRATION": "Vibración",
+		"OPT_ARROW": "Flecha de dirección",
 		"CREDITS_TITLE": "Créditos",
 		"HUD_LEVEL": "Nivel %d",
 		"HINT_LEFT": "← Izquierda",
@@ -61,6 +63,8 @@ const MESSAGES := {
 		"OPT_MUSIC": "Music",
 		"OPT_AA": "Anti-aliasing",
 		"OPT_LANGUAGE": "Language",
+		"OPT_VIBRATION": "Vibration",
+		"OPT_ARROW": "Direction arrow",
 		"CREDITS_TITLE": "Credits",
 		"HUD_LEVEL": "Level %d",
 		"HINT_LEFT": "← Left",
@@ -102,11 +106,17 @@ const MESSAGES := {
 }
 
 
+## Las claves que no tienen entrada en un idioma (como los nombres de los
+## niveles en español) se registran con su propio texto; si no, Godot usaría
+## el texto del idioma de respaldo (inglés).
 static func register() -> void:
+	var all_keys := {}
+	for locale in MESSAGES:
+		all_keys.merge(MESSAGES[locale])
 	for locale in MESSAGES:
 		var translation := Translation.new()
 		translation.locale = locale
 		var messages: Dictionary = MESSAGES[locale]
-		for key in messages:
-			translation.add_message(key, messages[key])
+		for key in all_keys:
+			translation.add_message(key, messages.get(key, key))
 		TranslationServer.add_translation(translation)

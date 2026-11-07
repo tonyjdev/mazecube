@@ -5,7 +5,9 @@ extends Node
 ##   nivel 1 siempre está desbloqueado; completar un nivel desbloquea el
 ##   siguiente.
 ## - Ajustes (user://settings.cfg): volumen de efectos y de música (buses
-##   "SFX" y "Music", ver default_bus_layout.tres), antialiasing e idioma.
+##   "SFX" y "Music", ver default_bus_layout.tres), antialiasing, idioma,
+##   vibración y flecha de rumbo sobre el cubo.
+## - Vibración del móvil (vibrate()), que respeta el ajuste.
 ## - Traducciones: se registran al arrancar a partir de Translations.
 ## - Navegación entre el menú y la partida.
 
@@ -14,6 +16,11 @@ const SETTINGS_PATH := "user://settings.cfg"
 const MENU_SCENE := "res://scenes/menu.tscn"
 const GAME_SCENE := "res://scenes/game.tscn"
 const LOCALES := ["es", "en"]
+## Vibraciones: (duración en ms, intensidad de 0 a 1).
+const VIBRATION_WALL_BROKEN := Vector2(90, 0.8)
+const VIBRATION_TURN_REJECTED := Vector2(18, 0.25)
+## Al activar la vibración en Opciones, para notar que funciona.
+const VIBRATION_PREVIEW := Vector2(60, 0.6)
 
 ## Nivel que se va a jugar (índice en Levels.LIST).
 var current_level := 0
@@ -25,6 +32,9 @@ var sfx_volume := 1.0
 var music_volume := 1.0
 var antialiasing := true
 var locale := "es"
+var vibration := true
+## Mostrar la flecha de rumbo sobre el cubo.
+var show_arrow := true
 
 var _completed: Array[int] = []
 
@@ -100,6 +110,26 @@ func set_locale(value: String) -> void:
 	save_settings()
 
 
+func set_vibration(enabled: bool) -> void:
+	vibration = enabled
+	save_settings()
+	if enabled:
+		vibrate(VIBRATION_PREVIEW)
+
+
+func set_show_arrow(enabled: bool) -> void:
+	show_arrow = enabled
+	save_settings()
+
+
+## Hace vibrar el móvil (si la vibración está activada). `strength` va de 0 a
+## 1; en los móviles que no permiten regular la intensidad solo cuenta la
+## duración.
+func vibrate(pattern: Vector2) -> void:
+	if vibration and OS.has_feature("mobile"):
+		Input.vibrate_handheld(int(pattern.x), pattern.y)
+
+
 func apply_settings() -> void:
 	_apply_bus_volume("SFX", sfx_volume)
 	_apply_bus_volume("Music", music_volume)
@@ -113,6 +143,8 @@ func save_settings() -> void:
 	cfg.set_value("audio", "music_volume", music_volume)
 	cfg.set_value("video", "antialiasing", antialiasing)
 	cfg.set_value("general", "locale", locale)
+	cfg.set_value("general", "vibration", vibration)
+	cfg.set_value("game", "show_arrow", show_arrow)
 	cfg.save(SETTINGS_PATH)
 
 
@@ -126,6 +158,8 @@ func _load_settings() -> void:
 	sfx_volume = float(cfg.get_value("audio", "sfx_volume", sfx_volume))
 	music_volume = float(cfg.get_value("audio", "music_volume", music_volume))
 	antialiasing = bool(cfg.get_value("video", "antialiasing", antialiasing))
+	vibration = bool(cfg.get_value("general", "vibration", vibration))
+	show_arrow = bool(cfg.get_value("game", "show_arrow", show_arrow))
 	var saved := str(cfg.get_value("general", "locale", locale))
 	if LOCALES.has(saved):
 		locale = saved

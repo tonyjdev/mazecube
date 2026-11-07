@@ -4,6 +4,10 @@ extends Node3D
 ## El nivel que se juega lo indica GameState.current_level (se elige en el
 ## selector de niveles del menú).
 ##
+## Vibración (si está activada en Opciones): al destruir un muro y, muy
+## suave, al descartarse un giro. La flecha sobre el cubo se puede ocultar
+## en Opciones.
+##
 ## Interfaz: número de nivel arriba a la izquierda, botón de pausa arriba a la
 ## derecha e indicaciones de giro abajo. La pausa muestra un menú (Continuar,
 ## Reiniciar, Salir al selector de niveles); al llegar a la meta se marca el
@@ -52,6 +56,12 @@ func _ready() -> void:
 		node.process_mode = Node.PROCESS_MODE_PAUSABLE
 
 	cube.reached_goal.connect(_on_reached_goal)
+	cube.show_arrow = GameState.show_arrow
+	cube.turn_rejected.connect(func(_dir: Vector2i) -> void:
+		GameState.vibrate(GameState.VIBRATION_TURN_REJECTED))
+	cube.breakable_hit.connect(func(_cell: Vector2i, hits_left: int) -> void:
+		if hits_left == 0:
+			GameState.vibrate(GameState.VIBRATION_WALL_BROKEN))
 	pause_button.pressed.connect(_set_paused.bind(true))
 	%ContinueButton.pressed.connect(_set_paused.bind(false))
 	%RestartButton.pressed.connect(func() -> void:

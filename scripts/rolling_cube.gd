@@ -26,6 +26,8 @@ signal rolled(cell: Vector2i)
 signal key_picked(color: String)
 signal door_opened(color: String)
 signal breakable_hit(cell: Vector2i, hits_left: int)
+## Se ha pedido un giro hacia una casilla bloqueada y se ha descartado.
+signal turn_rejected(direction: Vector2i)
 signal power_up_picked(power_up: PowerUp, stacks: int)
 signal power_up_ended(power_up: PowerUp)
 
@@ -51,6 +53,13 @@ var heading := Vector2i(1, 0)
 var is_finished := false
 ## Color de la llave que lleva el cubo ("" si no lleva ninguna).
 var held_key := ""
+## Mostrar la flecha de rumbo sobre el cubo (ajuste de Opciones). Aunque esté
+## oculta, los giros descartados se siguen notificando con turn_rejected.
+var show_arrow := true:
+	set(value):
+		show_arrow = value
+		if is_node_ready():
+			_update_arrow(_body_offset())
 
 ## Giro pendiente (TURN_LEFT, TURN_RIGHT o 0). Se aplica en el siguiente
 ## límite entre casillas si esa dirección está libre; la última pulsación
@@ -219,6 +228,7 @@ func _flash_rejected_turn(dir: Vector2i) -> void:
 	_clear_rejected_flash()
 	_rejected_dir = dir
 	_arrow_mat.albedo_color = ARROW_REJECTED_COLOR
+	turn_rejected.emit(dir)
 	_flash_tween = create_tween()
 	_flash_tween.tween_interval(rejected_turn_flash)
 	_flash_tween.tween_callback(func() -> void:
@@ -314,7 +324,7 @@ func _update_arrow(offset: Vector3) -> void:
 	var dir := Vector3(shown.x, 0, shown.y)
 	var base := Basis.looking_at(dir, Vector3.UP) * Basis(Vector3.RIGHT, -PI * 0.5)
 	_arrow.global_transform = Transform3D(base, global_position + offset + dir * 0.1 + Vector3(0, ARROW_HEIGHT, 0))
-	_arrow.visible = not is_finished
+	_arrow.visible = show_arrow and not is_finished
 	if _held_key_node:
 		_held_key_node.global_position = global_position + offset + Vector3(0, HELD_KEY_HEIGHT, 0)
 
