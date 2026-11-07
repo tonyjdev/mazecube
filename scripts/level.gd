@@ -464,13 +464,14 @@ func _add_bars(cell: Vector2i, symbol: String) -> void:
 	_bars[cell] = {"group": symbol.to_lower(), "node": bars}
 
 
-## El botón se pega a la cara del muro que da a la casilla libre de al lado.
+## El botón se pega a la cara del muro que da a la casilla libre de al lado
+## (nunca a una de vacío: su cara exterior no se puede pulsar).
 func _add_button(cell: Vector2i, symbol: String) -> void:
 	var facing := Vector2i.ZERO
 	for dir: Vector2i in [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
 		var n := cell + dir
 		if n.y >= 0 and n.y < layout.size() and n.x >= 0 and n.x < layout[n.y].length() \
-				and layout[n.y][n.x] != "#" and not BUTTON_CHARS.contains(layout[n.y][n.x]):
+				and not "#~".contains(layout[n.y][n.x]) and not BUTTON_CHARS.contains(layout[n.y][n.x]):
 			facing = dir
 			break
 	if facing == Vector2i.ZERO:
