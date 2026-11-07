@@ -13,6 +13,13 @@ extends Enemy
 ## su camino deja de pasar por él, vuelve a moverse. Si no puede ganar la
 ## carrera a ninguna casilla, va hacia la que menos ventaja le saque el cubo.
 ##
+## No vigila siempre: tiene una paciencia al azar (entre MIN_PATIENCE y
+## MAX_BLOCK_TIME segundos). Cuando lleva ese tiempo quieto en la misma
+## casilla, se aburre y se va a dar una vuelta por casillas al azar cercanas
+## durante ROAM_MIN_TIME-ROAM_MAX_TIME segundos, sin hacer caso al cubo; luego
+## vuelve a vigilar. Así nunca bloquea una misma casilla más de
+## MAX_BLOCK_TIME segundos seguidos y el jugador siempre tiene ocasión de pasar.
+##
 ## Repiensa su objetivo cada THINK_TIME segundos (su tiempo de reacción). Es
 ## más lento que el cubo, así que se le puede dejar atrás. Los barrotes lo
 ## detienen igual que al cubo: sirven para encerrarlo o dejarlo fuera.
@@ -24,10 +31,25 @@ const COLOR := Color(0.22, 0.62, 0.55)
 const PARKED_COLOR := Color(0.15, 0.46, 0.41)
 ## Giro (rad/s) mientras se mueve.
 const SPIN_SPEED := 3.0
+## Paciencia: segundos que aguanta quieto en una misma casilla (al azar entre
+## estos dos valores) antes de irse a dar una vuelta.
+const MIN_PATIENCE := 3.0
+const MAX_BLOCK_TIME := 8.0
+## Duración de la vuelta y distancia (en pasos) de las casillas a las que va.
+const ROAM_MIN_TIME := 2.5
+const ROAM_MAX_TIME := 5.0
+const ROAM_MIN_STEPS := 3
+const ROAM_MAX_STEPS := 7
 
 var _target := Level.NO_CELL
 var _think_left := 0.0
 var _parked := false
+var _roaming := false
+var _roam_left := 0.0
+## Segundos que lleva quieto en la casilla actual.
+var _still_time := 0.0
+var _patience := 0.0
+var _rng := RandomNumberGenerator.new()
 var _mesh: MeshInstance3D
 var _mat: StandardMaterial3D
 
@@ -37,6 +59,8 @@ func _init() -> void:
 	solid = true
 	step_time = STEP_TIME
 	float_height = RADIUS * 0.93
+	_rng.randomize()
+	_patience = _rng.randf_range(MIN_PATIENCE, MAX_BLOCK_TIME)
 
 
 func on_cube_died() -> void:
@@ -46,6 +70,8 @@ func on_cube_died() -> void:
 
 func _process(delta: float) -> void:
 	_think_left -= delta
+	_roam_left -= delta
+	_still_time = 0.0 if _moving else _still_time + delta
 	super(delta)
 
 
@@ -53,6 +79,22 @@ func _choose_next() -> Vector2i:
 	if cube == null or not cube.is_alive() or cube.is_finished:
 		_set_parked(true)
 		return cell
+	if not _roaming and _still_time >= _patience:
+		_roaming = true
+		_roam_left = _rng.randf_range(ROAM_MIN_TIME, ROAM_MAX_TIME)
+		_target = cell
+	if _roaming:
+		if _roam_left <= 0.0:
+			# Vuelve a vigilar con una paciencia nueva.
+			_roaming = false
+			_patience = _rng.randf_range(MIN_PATIENCE, MAX_BLOCK_TIME)
+			_target = Level.NO_CELL
+		else:
+			_set_parked(false)
+			# Al llegar (o si se queda atascado), elige otra casilla.
+			if _target == cell or _still_time >= 1.0:
+				_target = _pick_roam_target()
+			return _first_step_towards(_target, _can_enter)
 	if _think_left <= 0.0 or _target == Level.NO_CELL:
 		_think_left = THINK_TIME
 		_target = _pick_target()
@@ -86,6 +128,27 @@ func _pick_target() -> Vector2i:
 			best_score = score
 			best = target
 	return best
+
+
+## Casilla al azar a la que ir de paseo: a entre ROAM_MIN_STEPS y
+## ROAM_MAX_STEPS pasos, mejor si está fuera del camino del cubo. Si no hay
+## ninguna así, cualquier otra alcanzable; si no puede ir a ninguna, la suya.
+func _pick_roam_target() -> Vector2i:
+	var dist := _distances(cell, _can_enter, ROAM_MAX_STEPS)
+	var route := _predicted_route()
+	var preferred: Array[Vector2i] = []
+	var others: Array[Vector2i] = []
+	for target: Vector2i in dist:
+		if target == cell:
+			continue
+		if dist[target] >= ROAM_MIN_STEPS and not route.has(target):
+			preferred.append(target)
+		else:
+			others.append(target)
+	var pool := preferred if not preferred.is_empty() else others
+	if pool.is_empty():
+		return cell
+	return pool[_rng.randi_range(0, pool.size() - 1)]
 
 
 ## Casillas por las que pasará el cubo camino de la meta (sin contar la suya).
@@ -125,8 +188,8 @@ func _animate(delta: float) -> void:
 
 
 ## Dodecaedro regular de caras planas con vértices a `radius` del centro.
-## Cada cara es la de los cinco vértices más alineados con uno de los doce
-## vértices de un icosaedro (las normales de las caras del dodecaedro).
+## Cada cara es la de los cinco vértices más alineados con su normal: las
+## doce normales son (0, ±φ, ±1), (±φ, ±1, 0) y (±1, 0, ±φ) (un icosaedro).
 static func _build_dodecahedron(radius: float, mat: Material) -> ArrayMesh:
 	var phi := (1.0 + sqrt(5.0)) * 0.5
 	var inv := 1.0 / phi
@@ -143,9 +206,9 @@ static func _build_dodecahedron(radius: float, mat: Material) -> ArrayMesh:
 	var normals: Array[Vector3] = []
 	for a: float in [-1.0, 1.0]:
 		for b: float in [-1.0, 1.0]:
-			normals.append(Vector3(0, a, b * phi).normalized())
-			normals.append(Vector3(a, b * phi, 0).normalized())
-			normals.append(Vector3(a * phi, 0, b).normalized())
+			normals.append(Vector3(0, a * phi, b).normalized())
+			normals.append(Vector3(a * phi, b, 0).normalized())
+			normals.append(Vector3(a, 0, b * phi).normalized())
 	var factor := radius / sqrt(3.0)
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)

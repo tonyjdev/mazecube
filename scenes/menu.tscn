@@ -1,6 +1,7 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/menu.gd" id="1_menu"]
+[ext_resource type="Script" path="res://scripts/level_map.gd" id="2_map"]
 
 [node name="Menu" type="Control"]
 layout_mode = 3
@@ -73,7 +74,7 @@ layout_mode = 2
 size_flags_horizontal = 4
 text = "MENU_QUIT"
 
-[node name="LevelsScreen" type="CenterContainer" parent="."]
+[node name="LevelsScreen" type="MarginContainer" parent="."]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
@@ -82,10 +83,14 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 16
 
 [node name="VBox" type="VBoxContainer" parent="LevelsScreen"]
 layout_mode = 2
-theme_override_constants/separation = 28
+theme_override_constants/separation = 8
 
 [node name="Title" type="Label" parent="LevelsScreen/VBox"]
 layout_mode = 2
@@ -93,13 +98,11 @@ theme_override_font_sizes/font_size = 52
 text = "LEVELS_TITLE"
 horizontal_alignment = 1
 
-[node name="LevelGrid" type="GridContainer" parent="LevelsScreen/VBox"]
+[node name="LevelMap" type="Control" parent="LevelsScreen/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_horizontal = 4
-theme_override_constants/h_separation = 18
-theme_override_constants/v_separation = 18
-columns = 5
+size_flags_vertical = 3
+script = ExtResource("2_map")
 
 [node name="LevelsBack" type="Button" parent="LevelsScreen/VBox"]
 unique_name_in_owner = true

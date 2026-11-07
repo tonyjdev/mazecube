@@ -27,8 +27,8 @@ extends Node3D
 ## lados sale humo gris.
 ##
 ## Enemigos: si un perseguidor o un patrullero lo toca (lo comprueba Level),
-## el cubo explota en pedazos de sus colores, desaparece RESPAWN_DELAY
-## segundos y vuelve a su casilla de salida con el rumbo inicial. Conserva la
+## el cubo explota en pedazos de sus colores (ver CubeExplosion) y, cuando
+## termina la explosión, vuelve a su casilla de salida con el rumbo inicial. Conserva la
 ## llave que llevaba, pierde los power ups y el tablero se queda como estaba.
 ## Al reaparecer parpadea y es invulnerable durante RESPAWN_GRACE segundos. Un
 ## obstáculo es como una pared. Si queda encajonado (bloqueado delante y
@@ -71,14 +71,12 @@ const REVERSE_PAUSE := 0.2
 const REVERSE_SMOKE_COLOR := Color(0.38, 0.39, 0.42)
 const REVERSE_SMOKE_PUFFS := 10
 const REVERSE_SMOKE_LIFETIME := 0.8
-## Muerte: tiempo hasta reaparecer en la salida e invulnerabilidad posterior
+## Muerte: invulnerabilidad al reaparecer en la salida
 ## (con parpadeo de RESPAWN_BLINK segundos por ciclo).
-const RESPAWN_DELAY := 1.1
 const RESPAWN_GRACE := 1.5
 const RESPAWN_BLINK := 0.12
-## Pedazos de la explosión.
-const EXPLOSION_PIECES := 36
-const EXPLOSION_LIFETIME := 0.8
+## Lado del cubo.
+const SIZE := 0.98
 ## Color de cada cara del cubo (derecha, izquierda, arriba, abajo, detrás, delante).
 const FACE_COLORS: Array[Color] = [
 	Color(0.90, 0.30, 0.30), Color(0.30, 0.70, 0.95), Color(0.98, 0.85, 0.30),
@@ -120,7 +118,9 @@ var _rolling := false
 ## Casilla hacia la que está volcando (solo vale mientras _rolling).
 var _roll_target := Vector2i.ZERO
 var _dead := false
-var _respawn_left := 0.0
+var _explosion: CubeExplosion
+## Malla de un pedazo de la explosión (un cubo pequeño con los mismos colores).
+var _piece_mesh: Mesh
 var _grace_left := 0.0
 var _cooldown := 0.0
 var _tween: Tween
@@ -137,7 +137,8 @@ var _power_ups := {}
 
 
 func _ready() -> void:
-	_body.mesh = _build_colored_cube(0.98)
+	_body.mesh = _build_colored_cube(SIZE)
+	_piece_mesh = _build_colored_cube(SIZE / CubeExplosion.GRID * 0.94)
 	_arrow.top_level = true
 	_arrow.mesh = _build_arrow_mesh()
 	_arrow_mat = _arrow.mesh.material
@@ -160,6 +161,9 @@ func reset(target_level: Level) -> void:
 	_dead = false
 	_grace_left = 0.0
 	_body.visible = true
+	if is_instance_valid(_explosion):
+		_explosion.queue_free()
+	_explosion = null
 	global_position = level.cell_to_world(cell)
 	_body.transform = Transform3D(Basis.IDENTITY, Vector3(0, HALF, 0))
 	_update_arrow(Vector3.ZERO)
@@ -187,9 +191,6 @@ func request_reverse() -> void:
 
 func _process(delta: float) -> void:
 	if _dead:
-		_respawn_left -= delta
-		if _respawn_left <= 0.0:
-			_respawn()
 		return
 	if _grace_left > 0.0:
 		_grace_left -= delta
@@ -359,12 +360,13 @@ func step_time() -> float:
 	return (roll_duration + pause_between_rolls) / speed_multiplier()
 
 
-## Lo ha tocado un enemigo: explota y, al cabo de RESPAWN_DELAY, vuelve a la
-## salida.
+## Lo ha tocado un enemigo: explota y, cuando termina la explosión, vuelve a
+## la salida.
 func die() -> void:
 	if not is_vulnerable():
 		return
-	var at := global_position + _body_offset()
+	var at := global_position + _body_offset() + Vector3(0, HALF, 0)
+	var body_basis := _body.transform.basis
 	if _tween and _tween.is_valid():
 		_tween.kill()
 	_dead = true
@@ -373,16 +375,22 @@ func die() -> void:
 	_pending_reverse = false
 	_clear_rejected_flash()
 	_end_all_power_ups()
-	_spawn_explosion(at)
+	_explosion = CubeExplosion.create(_body.mesh, _piece_mesh, body_basis, SIZE)
+	_explosion.finished.connect(_respawn)
+	add_child(_explosion)
+	_explosion.global_position = at
+	_spawn_dust(at)
 	_body.visible = false
 	_arrow.visible = false
 	if _held_key_node:
 		_held_key_node.visible = false
-	_respawn_left = RESPAWN_DELAY
 	died.emit(cell)
 
 
 func _respawn() -> void:
+	if not _dead:
+		return
+	_explosion = null
 	_dead = false
 	cell = level.start_cell
 	heading = level.start_heading
@@ -512,51 +520,8 @@ func _spawn_reverse_smoke() -> void:
 		smoke.finished.connect(smoke.queue_free)
 
 
-## Explosión: pedazos de los colores de las caras que saltan y caen, y una
-## nube de polvo.
-func _spawn_explosion(at: Vector3) -> void:
-	var debris := CPUParticles3D.new()
-	debris.top_level = true
-	debris.local_coords = false
-	debris.one_shot = true
-	debris.explosiveness = 1.0
-	debris.amount = EXPLOSION_PIECES
-	debris.lifetime = EXPLOSION_LIFETIME
-	debris.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
-	debris.emission_box_extents = Vector3.ONE * 0.35
-	debris.direction = Vector3.UP
-	debris.spread = 50.0
-	debris.initial_velocity_min = 2.0
-	debris.initial_velocity_max = 3.6
-	debris.gravity = Vector3(0, -16.0, 0)
-	debris.scale_amount_min = 0.6
-	debris.scale_amount_max = 1.3
-	var shrink := Curve.new()
-	shrink.add_point(Vector2(0, 1))
-	shrink.add_point(Vector2(0.7, 1))
-	shrink.add_point(Vector2(1, 0))
-	debris.scale_amount_curve = shrink
-	# Cada pedazo toma al azar uno de los colores de las caras.
-	var colors := Gradient.new()
-	colors.interpolation_mode = Gradient.GRADIENT_INTERPOLATE_CONSTANT
-	var offsets := PackedFloat32Array()
-	for i in FACE_COLORS.size():
-		offsets.append(float(i) / FACE_COLORS.size())
-	colors.offsets = offsets
-	colors.colors = PackedColorArray(FACE_COLORS)
-	debris.color_initial_ramp = colors
-	var piece := BoxMesh.new()
-	piece.size = Vector3.ONE * 0.16
-	var mat := StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mat.roughness = 0.6
-	piece.material = mat
-	debris.mesh = piece
-	add_child(debris)
-	debris.global_position = at + Vector3(0, HALF, 0)
-	debris.emitting = true
-	debris.finished.connect(debris.queue_free)
-
+## Nube de polvo de la explosión.
+func _spawn_dust(at: Vector3) -> void:
 	var dust := CPUParticles3D.new()
 	dust.top_level = true
 	dust.local_coords = false
@@ -586,7 +551,7 @@ func _spawn_explosion(at: Vector3) -> void:
 	dust.mesh = quad
 	dust.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(dust)
-	dust.global_position = at + Vector3(0, HALF, 0)
+	dust.global_position = at
 	dust.emitting = true
 	dust.finished.connect(dust.queue_free)
 

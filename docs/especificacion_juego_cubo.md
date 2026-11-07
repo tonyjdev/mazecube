@@ -142,7 +142,7 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vuelcan) y en tiempo real, independientemente del ritmo del cubo.
 
 - Todos se mueven solo por casillas libres: las **puertas cerradas, los barrotes cerrados y los muros destructibles** también los detienen. **Nunca entran en la casilla de salida ni en la meta.**
-- **Muerte del cubo:** si un **perseguidor** o un **patrullero** toca al cubo, el cubo **explota** en pedazos de los colores de sus caras (con una nube de polvo, temblor de cámara y vibración), desaparece ≈1,1 s y **vuelve a su casilla de salida** con el rumbo inicial. **Conserva la llave** que llevaba, **pierde los power ups**, y el tablero (puertas abiertas, muros rotos, barrotes) y los enemigos se quedan como estaban. Al reaparecer **parpadea** y es **invulnerable** durante 1,5 s.
+- **Muerte del cubo:** si un **perseguidor** o un **patrullero** toca al cubo, el cubo **explota**: se hincha un instante y revienta en 27 pedazos que conservan los colores de sus caras, saltan, rebotan en el suelo girando y se encogen hasta desaparecer (≈1,6 s en total, con una nube de polvo, temblor de cámara y vibración). **Cuando termina la explosión**, el cubo **vuelve a su casilla de salida** con el rumbo inicial. **Conserva la llave** que llevaba, **pierde los power ups**, y el tablero (puertas abiertas, muros rotos, barrotes) y los enemigos se quedan como estaban. Al reaparecer **parpadea** y es **invulnerable** durante 1,5 s.
 
 #### Perseguidor (esfera)
 
@@ -167,6 +167,7 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 - Dodecaedro verde azulado. **No mata**: es **sólido como un muro**. El cubo rebota al chocar con él y los giros hacia él se descartan; los demás enemigos tampoco pueden atravesarlo. Nunca entra en la casilla del cubo (ni en la que está ni en la que va a entrar).
 - **Se anticipa al jugador:** calcula el camino más corto del cubo hasta la meta (como si las puertas y los muros destructibles estuvieran abiertos, pero respetando los barrotes cerrados) y va a la casilla de ese camino a la que puede **llegar antes que el cubo**, la más cercana a él. Si no puede ganar la carrera a ninguna, va a la que menos ventaja le saque el cubo.
 - Si ya está sobre ese camino, **se queda quieto bloqueándolo** (se oscurece). Cuando el cubo cambia de zona y su camino deja de pasar por él, **vuelve a moverse** para cortarle el paso en el nuevo camino.
+- **No vigila siempre:** tiene una paciencia al azar de **3 a 8 s**. Cuando lleva ese tiempo quieto en la misma casilla, se aburre y se va a dar una vuelta por casillas al azar cercanas (mejor si están fuera del camino del cubo) durante 2,5-5 s, sin hacer caso al cubo; después vuelve a vigilar. Así **nunca bloquea una misma casilla más de 8 s seguidos** y el jugador siempre tiene ocasión de pasar.
 - Repiensa su objetivo cada 0,35 s (su tiempo de reacción) y es más lento que el cubo (0,55 s por casilla), así que se le puede ganar una carrera.
 - **Mecanismos para evitarlo:** los **barrotes** lo detienen igual que al cubo; pulsando un botón en el momento justo se le puede **encerrar** o dejar fuera.
 - Si el cubo queda encajonado entre el obstáculo y un muro (bloqueado delante y detrás), rebota en su casilla a ritmo de vuelco hasta que se libere el paso.
@@ -189,6 +190,7 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 
 ## 5. Presentación visual
 
+- **Icono de la aplicación:** un cubo isométrico con los colores de las caras del cubo del juego (amarillo, azul y rojo) y la flecha de rumbo, sobre el fondo marrón del menú con trozos de muro de laberinto. En Android se usa también como icono adaptativo (primer plano, fondo y versión monocromática). Se genera con `tools/make_icon.py`.
 - Juego en **3D**, con cubo y laberinto visibles desde arriba.
 - **Cámara — Decidido:** vista **cenital ligeramente inclinada**, en perspectiva (unos 65° sobre el tablero). Se descartó la isométrica, que en vertical mostraba el tablero bastante más pequeño. La cámara es fija: no hay opción para cambiarla.
 - La animación del cubo debe mostrar claramente el vuelco entre casillas; no basta con trasladar el modelo o simular un deslizamiento.
@@ -262,8 +264,9 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 
 ### 7.2. Selector de niveles
 
-- Una rejilla con un botón por nivel, con su número y su nombre.
-- Los niveles **bloqueados** se ven atenuados, con el texto «Bloqueado», y no se pueden pulsar. Los **completados** se marcan en verde.
+- Un **mapa con desplazamiento vertical**: un camino de baldosas que serpentea de abajo (nivel 1) hacia arriba, con una parada por nivel (baldosa con su número y el nombre debajo) y bloques de muro decorativos a los lados.
+- Se desplaza **arrastrando** con el dedo (con inercia) o con la rueda del ratón. Al entrar, se centra en el **siguiente nivel por jugar**, que se marca en dorado, late y tiene encima un cubito con los colores del cubo. Tocar una parada desbloqueada la juega. Con el teclado, arriba y abajo cambian el nivel elegido e Intro lo juega.
+- Los niveles **completados** y el tramo de camino ya recorrido se ven en **verde**; los **bloqueados** en gris, con un candado y el texto «Bloqueado», y no se pueden pulsar.
 - **Truco para pruebas** (solo en las versiones de depuración): tocar **5 veces seguidas** el título «Elige un nivel» desbloquea todos los niveles (sin marcarlos como completados). Se guarda en el dispositivo.
 
 ### 7.3. Pantalla de carga

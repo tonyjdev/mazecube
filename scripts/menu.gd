@@ -11,8 +11,6 @@ extends Control
 ## selector de niveles desbloquea todos los niveles.
 
 const LANGUAGE_NAMES := {"es": "Español", "en": "English"}
-const LEVEL_BUTTON_SIZE := Vector2(210, 128)
-const DONE_COLOR := Color(0.62, 0.92, 0.55)
 ## Truco de desbloqueo: toques necesarios y tiempo máximo entre dos toques.
 const UNLOCK_TAPS := 5
 const UNLOCK_TAP_WINDOW := 0.6
@@ -47,6 +45,7 @@ func _ready() -> void:
 	%OptionsButton.pressed.connect(_show.bind("options"))
 	%CreditsButton.pressed.connect(_show.bind("credits"))
 	%QuitButton.pressed.connect(get_tree().quit)
+	%LevelMap.level_chosen.connect(GameState.play_level)
 	for back in [%LevelsBack, %OptionsBack, %CreditsBack]:
 		back.pressed.connect(_show.bind("main"))
 	_setup_options()
@@ -91,7 +90,11 @@ func _show(screen: String) -> void:
 		"credits":
 			_build_credits()
 			%Scroll.scroll_vertical = 0
-	_focus_first(_screens[screen])
+	if screen == "levels" and not OS.has_feature("mobile"):
+		# Con el teclado se elige nivel en el mapa (arriba/abajo e Intro).
+		%LevelMap.grab_focus.call_deferred()
+	else:
+		_focus_first(_screens[screen])
 
 
 ## Da el foco al primer botón de la pantalla para poder usar el teclado (no
@@ -108,30 +111,10 @@ func _focus_first(root: Node) -> void:
 
 # --- Selector de niveles ----------------------------------------------------
 
-## Un botón por nivel: número y nombre. Solo se puede entrar en los niveles
-## desbloqueados; los completados se marcan en verde.
+## Mapa de niveles con desplazamiento (ver LevelMap): solo se puede entrar
+## en los niveles desbloqueados; los completados se marcan en verde.
 func _build_level_grid() -> void:
-	var grid: GridContainer = %LevelGrid
-	for child in grid.get_children():
-		grid.remove_child(child)
-		child.queue_free()
-	for i in Levels.count():
-		var data := Levels.get_level(i)
-		var button := Button.new()
-		button.custom_minimum_size = LEVEL_BUTTON_SIZE
-		button.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
-		button.add_theme_font_size_override("font_size", 24)
-		var unlocked := GameState.is_unlocked(i)
-		var subtitle := tr(data["name"]) if unlocked else tr("LEVEL_LOCKED")
-		button.text = "%d\n%s" % [i + 1, subtitle]
-		button.disabled = not unlocked
-		if GameState.is_completed(i):
-			button.add_theme_color_override("font_color", DONE_COLOR)
-			button.add_theme_color_override("font_hover_color", DONE_COLOR)
-			button.add_theme_color_override("font_focus_color", DONE_COLOR)
-			button.tooltip_text = tr("LEVEL_DONE")
-		button.pressed.connect(GameState.play_level.bind(i))
-		grid.add_child(button)
+	%LevelMap.refresh()
 
 
 func _on_levels_title_input(event: InputEvent) -> void:
