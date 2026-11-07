@@ -75,11 +75,11 @@ El diseño busca combinar **lógica y planificación** con **controles y reglas 
 - **Puerta:** un bloque más estrecho que el cubo que cierra el pasillo de muro a muro, girado 90° según la dirección de los muros que la rodean.
 - Cada llave está asociada a **su propia puerta**, y ambas tienen el **mismo color**. Una llave no abre puertas de otro color. Colores disponibles: **amarillo, naranja, rojo, azul y verde**.
 - Una puerta cerrada se comporta como una **pared**: el cubo rebota al chocar con ella (apartado 2.4) y los giros hacia ella se descartan (apartado 2.5), **aunque se lleve su llave**.
-- Si el cubo **choca de frente** con una puerta llevando su llave, la **llave desaparece** y la **puerta se abre**: está formada por **dos hojas** que se deslizan **hacia los lados**, dentro de los muros, y después se recogen hasta desaparecer (unos 0,65 s). Desde que empieza a abrirse, la casilla **ya se puede atravesar**. El cubo **rebota igualmente** en ese movimiento; para pasar por el hueco tiene que volver.
+- Si el cubo **choca de frente** con una puerta llevando su llave, la **llave desaparece** y la **puerta se hunde en el suelo** (animación de unos 0,6 s); desde que empieza a hundirse, la casilla **ya se puede atravesar**. El cubo **rebota igualmente** en ese movimiento; para pasar por el hueco tiene que volver.
 - Como solo se abren de frente, cada puerta debe tener por al menos uno de sus lados un tramo recto por el que el cubo pueda llegar hasta ella.
 - Las puertas abiertas y las llaves cogidas se restauran al reiniciar el nivel.
 
-**Ejemplo:** el cubo avanza hacia una puerta amarilla llevando la llave amarilla; al tocarla, la llave desaparece, las dos hojas de la puerta se abren hacia los lados y el cubo rebota. En la siguiente pasada atraviesa la casilla donde estaba la puerta.
+**Ejemplo:** el cubo avanza hacia una puerta amarilla llevando la llave amarilla; al tocarla, la llave desaparece, la puerta se hunde en el suelo y el cubo rebota. En la siguiente pasada atraviesa la casilla donde estaba la puerta.
 
 ### 2.9. Muros destructibles — Confirmada
 
