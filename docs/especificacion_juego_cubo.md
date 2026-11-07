@@ -132,7 +132,7 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 - **Cámara — Decidido:** vista **cenital ligeramente inclinada**, en perspectiva (unos 65° sobre el tablero). Se descartó la isométrica, que en vertical mostraba el tablero bastante más pequeño. La cámara es fija: no hay opción para cambiarla.
 - La animación del cubo debe mostrar claramente el vuelco entre casillas; no basta con trasladar el modelo o simular un deslizamiento.
 - **Orientación de pantalla — Confirmada:** el juego se muestra en **horizontal** (apaisado) en el móvil, porque así se maneja mejor con las dos manos. (Antes se jugaba en vertical; se cambió el 7 de noviembre de 2026.)
-- **Interfaz en apaisado:** el tablero ocupa el centro de la pantalla a toda la altura; a la izquierda, el nivel, el mensaje de estado y los botones; a la derecha, la ayuda de controles; y en las esquinas inferiores, las indicaciones «← Izquierda» y «Derecha →».
+- **Interfaz de juego — Confirmada:** solo el **número de nivel** arriba a la izquierda, el botón de **pausa** arriba a la derecha y las indicaciones «← Izquierda» y «Derecha →» en las esquinas inferiores. El tablero ocupa el resto de la pantalla. Los menús se describen en el apartado 7.
 - **Distancia de la cámara — Confirmada:** la cámara no se aleja más de una **distancia máxima**, la que hace falta para ver entero un tablero de 7×9 casillas (el antiguo nivel 4) en el espacio libre de la pantalla. Así el tablero no se ve diminuto aunque el mapa sea grande.
   - Si el tablero entero cabe a esa distancia, la cámara se acerca hasta encuadrarlo justo en el espacio libre entre los elementos de la interfaz y se queda quieta.
   - Si **no cabe**, la cámara **sigue al cubo** con un **pequeño retraso** y un movimiento **suave**: acelera y frena poco a poco, no se para en seco y no rebota cuando el cubo rebota. Al acercarse al borde del tablero deja de avanzar, de modo que no se ve vacío más allá del muro exterior. En la dirección en la que el tablero sí cabe, se queda centrada.
@@ -143,10 +143,11 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 
 ### 6.1. Progresión
 
-- El juego tiene **10 niveles** de **dificultad creciente**, que se juegan en orden.
-- Al llegar a la meta se muestra «¡Nivel completado!» y un botón **«Siguiente nivel»**. Tras el último nivel se indica que se han completado todos y se vuelve al primero.
-- El jugador puede **reiniciar** el nivel en cualquier momento.
-- El **nivel actual se guarda** en el dispositivo, de modo que al volver a abrir el juego se continúa en él.
+- El juego tiene **10 niveles** de **dificultad creciente**.
+- Los niveles se eligen en el **selector de niveles** (apartado 7.2). Solo se puede entrar en los **completados** y en los **desbloqueados**: el nivel 1 está siempre desbloqueado y completar un nivel desbloquea el siguiente.
+- Al llegar a la meta, el nivel queda **completado** y se muestra «¡Nivel completado!» con **Siguiente nivel**, **Repetir** y **Niveles** (vuelve al selector). Tras el último nivel se indica que se han completado todos.
+- El jugador puede **reiniciar** el nivel en cualquier momento desde el menú de pausa.
+- Los **niveles completados se guardan** en el dispositivo.
 
 ### 6.2. Formato de los niveles
 
@@ -162,7 +163,7 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 - La dificultad de un nivel se mide como el **mínimo número de giros** necesario para resolverlo con las reglas del apartado 2 (incluido el rebote, el descarte de giros bloqueados, la ausencia de giro en la casilla de salida, las llaves y puertas y los muros destructibles).
 - Ese mínimo se calcula con un **resolvedor automático** que también comprueba que todos los niveles tienen solución.
 - **Los niveles actuales son de prueba de mecánicas**; los niveles definitivos los proporcionará el diseñador.
-- Los niveles de prueba van de **1 a 19 giros** y crecen de forma progresiva, de **9×5 a 15×17 casillas** (en torno a un 15-20% más de casillas cada uno), alternando mapas apaisados y verticales. Con la distancia máxima de la cámara solo el nivel 2 cabe entero en pantalla; en el resto la cámara sigue al cubo.
+- Los niveles de prueba van de **1 a 19 giros** y crecen de forma progresiva, de **9×5 a 15×17 casillas** (en torno a un 15-20% más de casillas cada uno), alternando mapas apaisados y verticales. Los niveles pequeños caben enteros en pantalla; en los grandes la cámara sigue al cubo.
 - Desde el nivel 3 incluyen parejas llave/puerta, y cada puerta es imprescindible (convertida en muro, el nivel no tendría solución). Los niveles 4 y 7 tienen un power up de velocidad y el 9 tres seguidos, para probar la acumulación. Hay muros destructibles en los niveles 2, 5, 7 y 10 (hay que romperlos para pasar) y en el 8 (un atajo: sin romperlo harían falta 26 giros en vez de 14).
 
 | Nivel | Nombre | Tamaño | Forma | Parejas llave/puerta | Muros destructibles | Power ups | Giros mínimos |
@@ -178,13 +179,34 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 | 9 | Galerías | 17×13 | apaisado | amarilla, roja, verde | — | 3 velocidad | 16 |
 | 10 | La gran travesía | 15×17 | casi cuadrado | naranja, azul, verde | 2 (2 y 5 golpes, seguidos) | — | 19 |
 
-## 7. Controles táctiles en Android — Implementada en el prototipo
+## 7. Menús y controles — Confirmada
+
+### 7.1. Menú principal
+
+- **Jugar:** abre el selector de niveles.
+- **Opciones:** volumen de **efectos de sonido** y de **música** (0-100%; todavía no hay sonidos ni música, pero ya existen los canales de audio «SFX» y «Music»), **antialiasing** (activado/desactivado) e **idioma** (español o inglés). Los cambios se aplican al momento y se guardan en el dispositivo. Por defecto se usa el idioma del sistema si es español o inglés, y si no, inglés.
+- **Créditos:** equipo de desarrollo, gráficos, sonido, tipografía, herramientas y licencia del motor, en una lista que se puede desplazar.
+
+### 7.2. Selector de niveles
+
+- Una rejilla con un botón por nivel, con su número y su nombre.
+- Los niveles **bloqueados** se ven atenuados, con el texto «Bloqueado», y no se pueden pulsar. Los **completados** se marcan en verde.
+
+### 7.3. Pausa
+
+- El botón de **pausa** (arriba a la derecha) detiene el juego y muestra un menú con:
+  - **Continuar:** reanuda la partida.
+  - **Reiniciar:** vuelve a empezar el nivel.
+  - **Salir:** vuelve al selector de niveles.
+- En el móvil, el juego también se pausa al salir de la aplicación (por ejemplo, al recibir una llamada).
+
+### 7.4. Controles
 
 - **Tocar la mitad izquierda de la pantalla** gira a la izquierda y **tocar la mitad derecha** gira a la derecha (relativo al rumbo, como en el apartado 2.3).
-- Toda la mitad de la pantalla es zona de toque, sin botones pequeños; cada toque cuenta como una pulsación.
-- Unas indicaciones discretas en las esquinas inferiores («← Izquierda» y «Derecha →») se resaltan al tocar cada lado.
-- Botón en pantalla para **reiniciar** el nivel (y «Siguiente nivel» al completarlo); tocar los botones no cuenta como giro.
-- En PC se mantienen los controles de teclado (←/A, →/D, R reiniciar, Intro/N siguiente nivel) y el clic del ratón se trata como un toque.
+- Toda la mitad de la pantalla es zona de toque, sin botones pequeños; cada toque cuenta como una pulsación. Tocar el botón de pausa no cuenta como giro.
+- Las indicaciones de las esquinas inferiores («← Izquierda» y «Derecha →») se resaltan al tocar cada lado.
+- El botón **Atrás** de Android pausa y reanuda la partida; en los menús vuelve a la pantalla anterior y, desde el menú principal, cierra el juego.
+- En PC se mantienen los controles de teclado (←/A, →/D, R reiniciar, Esc pausa/atrás, Intro/N siguiente nivel) y el clic del ratón se trata como un toque.
 
 ## 8. Tecnologías — Decididas y propuestas
 

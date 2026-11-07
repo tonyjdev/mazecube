@@ -1,0 +1,226 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/menu.gd" id="1_menu"]
+
+[node name="Menu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_menu")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.235, 0.196, 0.157, 1)
+
+[node name="MainScreen" type="CenterContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="MainScreen"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="Title" type="Label" parent="MainScreen/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.98, 0.85, 0.55, 1)
+theme_override_constants/outline_size = 12
+theme_override_font_sizes/font_size = 88
+text = "Maze Cube"
+horizontal_alignment = 1
+
+[node name="Gap" type="Control" parent="MainScreen/VBox"]
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+
+[node name="PlayButton" type="Button" parent="MainScreen/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(380, 84)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "MENU_PLAY"
+
+[node name="OptionsButton" type="Button" parent="MainScreen/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(380, 84)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "MENU_OPTIONS"
+
+[node name="CreditsButton" type="Button" parent="MainScreen/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(380, 84)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "MENU_CREDITS"
+
+[node name="LevelsScreen" type="CenterContainer" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="LevelsScreen"]
+layout_mode = 2
+theme_override_constants/separation = 28
+
+[node name="Title" type="Label" parent="LevelsScreen/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 52
+text = "LEVELS_TITLE"
+horizontal_alignment = 1
+
+[node name="LevelGrid" type="GridContainer" parent="LevelsScreen/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/h_separation = 18
+theme_override_constants/v_separation = 18
+columns = 5
+
+[node name="LevelsBack" type="Button" parent="LevelsScreen/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(280, 76)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "MENU_BACK"
+
+[node name="OptionsScreen" type="CenterContainer" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="OptionsScreen"]
+layout_mode = 2
+theme_override_constants/separation = 24
+
+[node name="Title" type="Label" parent="OptionsScreen/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 52
+text = "OPTIONS_TITLE"
+horizontal_alignment = 1
+
+[node name="Panel" type="PanelContainer" parent="OptionsScreen/VBox"]
+layout_mode = 2
+
+[node name="Grid" type="GridContainer" parent="OptionsScreen/VBox/Panel"]
+layout_mode = 2
+theme_override_constants/h_separation = 48
+theme_override_constants/v_separation = 26
+columns = 2
+
+[node name="SfxLabel" type="Label" parent="OptionsScreen/VBox/Panel/Grid"]
+layout_mode = 2
+text = "OPT_SFX"
+
+[node name="SfxSlider" type="HSlider" parent="OptionsScreen/VBox/Panel/Grid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(380, 40)
+layout_mode = 2
+size_flags_vertical = 4
+step = 5.0
+value = 100.0
+
+[node name="MusicLabel" type="Label" parent="OptionsScreen/VBox/Panel/Grid"]
+layout_mode = 2
+text = "OPT_MUSIC"
+
+[node name="MusicSlider" type="HSlider" parent="OptionsScreen/VBox/Panel/Grid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(380, 40)
+layout_mode = 2
+size_flags_vertical = 4
+step = 5.0
+value = 100.0
+
+[node name="AaLabel" type="Label" parent="OptionsScreen/VBox/Panel/Grid"]
+layout_mode = 2
+text = "OPT_AA"
+
+[node name="AaToggle" type="CheckButton" parent="OptionsScreen/VBox/Panel/Grid"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(120, 56)
+size_flags_horizontal = 0
+
+[node name="LanguageLabel" type="Label" parent="OptionsScreen/VBox/Panel/Grid"]
+layout_mode = 2
+text = "OPT_LANGUAGE"
+
+[node name="LanguageOption" type="OptionButton" parent="OptionsScreen/VBox/Panel/Grid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(380, 64)
+layout_mode = 2
+
+[node name="OptionsBack" type="Button" parent="OptionsScreen/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(280, 76)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "MENU_BACK"
+
+[node name="CreditsScreen" type="CenterContainer" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="CreditsScreen"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="Title" type="Label" parent="CreditsScreen/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 52
+text = "CREDITS_TITLE"
+horizontal_alignment = 1
+
+[node name="Panel" type="PanelContainer" parent="CreditsScreen/VBox"]
+custom_minimum_size = Vector2(900, 440)
+layout_mode = 2
+
+[node name="Scroll" type="ScrollContainer" parent="CreditsScreen/VBox/Panel"]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="CreditsText" type="RichTextLabel" parent="CreditsScreen/VBox/Panel/Scroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+
+[node name="CreditsBack" type="Button" parent="CreditsScreen/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(280, 76)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "MENU_BACK"

@@ -23,9 +23,6 @@ const ITEM_COLORS := {
 	"u": Color(0.18, 0.42, 0.95),
 	"g": Color(0.18, 0.70, 0.28),
 }
-const COLOR_NAMES := {
-	"y": "amarilla", "o": "naranja", "r": "roja", "u": "azul", "g": "verde",
-}
 ## La puerta es un bloque estrecho que cierra el pasillo de muro a muro.
 const DOOR_THICKNESS := 0.24
 const DOOR_HEIGHT := 0.8

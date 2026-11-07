@@ -1,0 +1,215 @@
+[gd_scene format=3 uid="uid://bxerll24htd0i"]
+
+[ext_resource type="Script" uid="uid://buw7ylyf3lyuk" path="res://scripts/game.gd" id="1_sugp2"]
+[ext_resource type="Script" uid="uid://ccjf1dwf07kqe" path="res://scripts/level.gd" id="2_jyhfs"]
+[ext_resource type="Script" path="res://scripts/follow_camera.gd" id="9_fcam"]
+[ext_resource type="Script" uid="uid://blpc1e23dcvc7" path="res://scripts/rolling_cube.gd" id="3_tbgi4"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sgp6g"]
+
+[sub_resource type="Sky" id="Sky_o5qli"]
+sky_material = SubResource("ProceduralSkyMaterial_sgp6g")
+
+[sub_resource type="Environment" id="Environment_0wfyh"]
+background_mode = 2
+sky = SubResource("Sky_o5qli")
+ambient_light_source = 3
+tonemap_mode = 2
+
+[node name="Game" type="Node3D" unique_id=2002183193]
+script = ExtResource("1_sugp2")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=248275732]
+environment = SubResource("Environment_0wfyh")
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=1675501405]
+transform = Transform3D(0.8660254, 0.38302222, -0.32139382, 0, 0.64278764, 0.76604444, 0.5, -0.66341394, 0.5566704, 0, 0, 0)
+shadow_enabled = true
+shadow_bias = 0.05
+shadow_normal_bias = 1.0
+shadow_blur = 1.5
+directional_shadow_mode = 0
+directional_shadow_max_distance = 40.0
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=510444692]
+transform = Transform3D(0.70710677, -0.40820402, 0.57738155, 0, 0.81654084, 0.5772877, -0.70710677, -0.40820402, 0.57738155, 4, 8, 9)
+current = true
+script = ExtResource("9_fcam")
+
+[node name="Level" type="Node3D" parent="." unique_id=291549142]
+script = ExtResource("2_jyhfs")
+
+[node name="Cube" type="Node3D" parent="." unique_id=469669053]
+script = ExtResource("3_tbgi4")
+
+[node name="Body" type="MeshInstance3D" parent="Cube" unique_id=218793561]
+
+[node name="HeadingArrow" type="MeshInstance3D" parent="Cube" unique_id=954477308]
+
+[node name="UI" type="CanvasLayer" parent="." unique_id=2146793864]
+
+[node name="Margin" type="MarginContainer" parent="UI" unique_id=734526086]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 20
+
+[node name="VBox" type="VBoxContainer" parent="UI/Margin" unique_id=549432227]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="TopBar" type="HBoxContainer" parent="UI/Margin/VBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="LevelLabel" type="Label" parent="UI/Margin/VBox/TopBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 1
+theme_override_font_sizes/font_size = 34
+vertical_alignment = 1
+
+[node name="PauseButton" type="Button" parent="UI/Margin/VBox/TopBar"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+focus_mode = 0
+theme_override_font_sizes/font_size = 32
+text = "II"
+
+[node name="PlayArea" type="Control" parent="UI/Margin/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="BottomBar" type="HBoxContainer" parent="UI/Margin/VBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="LeftHint" type="Label" parent="UI/Margin/VBox/BottomBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 30
+text = "HINT_LEFT"
+
+[node name="RightHint" type="Label" parent="UI/Margin/VBox/BottomBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 30
+text = "HINT_RIGHT"
+horizontal_alignment = 2
+
+[node name="PauseMenu" type="CanvasLayer" parent="."]
+process_mode = 3
+layer = 10
+visible = false
+
+[node name="Dim" type="ColorRect" parent="PauseMenu"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.05, 0.04, 0.03, 0.6)
+
+[node name="Center" type="CenterContainer" parent="PauseMenu"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="PanelContainer" parent="PauseMenu/Center"]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="PauseMenu/Center/Panel"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="Title" type="Label" parent="PauseMenu/Center/Panel/VBox"]
+custom_minimum_size = Vector2(360, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 44
+text = "PAUSE_TITLE"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="ContinueButton" type="Button" parent="PauseMenu/Center/Panel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(360, 80)
+layout_mode = 2
+text = "PAUSE_CONTINUE"
+
+[node name="RestartButton" type="Button" parent="PauseMenu/Center/Panel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(360, 80)
+layout_mode = 2
+text = "PAUSE_RESTART"
+
+[node name="QuitButton" type="Button" parent="PauseMenu/Center/Panel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(360, 80)
+layout_mode = 2
+text = "PAUSE_QUIT"
+
+[node name="CompleteMenu" type="CanvasLayer" parent="."]
+process_mode = 3
+layer = 10
+visible = false
+
+[node name="Dim" type="ColorRect" parent="CompleteMenu"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.05, 0.04, 0.03, 0.6)
+
+[node name="Center" type="CenterContainer" parent="CompleteMenu"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="PanelContainer" parent="CompleteMenu/Center"]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="CompleteMenu/Center/Panel"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="CompleteTitle" type="Label" parent="CompleteMenu/Center/Panel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(360, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 44
+text = "COMPLETE_TITLE"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="NextButton" type="Button" parent="CompleteMenu/Center/Panel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(360, 80)
+layout_mode = 2
+text = "COMPLETE_NEXT"
+
+[node name="RetryButton" type="Button" parent="CompleteMenu/Center/Panel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(360, 80)
+layout_mode = 2
+text = "COMPLETE_RETRY"
+
+[node name="LevelsButton" type="Button" parent="CompleteMenu/Center/Panel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(360, 80)
+layout_mode = 2
+text = "COMPLETE_LEVELS"

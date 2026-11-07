@@ -12,9 +12,8 @@ extends RefCounted
 ## es un atajo (sin romperlo harían falta 26 giros en vez de 14).
 ##
 ## Los niveles crecen de forma progresiva (en torno a un 15-20% más de
-## casillas cada uno) y alternan forma apaisada y vertical. Con la distancia
-## máxima de la cámara solo el nivel 2 (7×9) cabe entero en pantalla; en el
-## resto la cámara sigue al cubo.
+## casillas cada uno) y alternan forma apaisada y vertical. Los pequeños
+## caben enteros en pantalla; en los grandes la cámara sigue al cubo.
 ## "camera_distance" (opcional) fija la distancia de la cámara del nivel; si
 ## no se indica, se usa la máxima (FollowCamera.MAX_DISTANCE).
 ## start_heading es el rumbo inicial en casillas (x, z): (1, 0) derecha,
