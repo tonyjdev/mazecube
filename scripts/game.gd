@@ -5,7 +5,7 @@ extends Node3D
 ## selector de niveles del menú).
 ##
 ## Vibración (si está activada en Opciones): al destruir un muro, al pulsar
-## un botón y, muy suave, al descartarse un giro. La flecha sobre el cubo se puede ocultar
+## un botón, al morir el cubo y, muy suave, al descartarse un giro. La flecha sobre el cubo se puede ocultar
 ## en Opciones.
 ##
 ## Interfaz: número de nivel arriba a la izquierda, botón de pausa arriba a la
@@ -69,6 +69,11 @@ func _ready() -> void:
 		node.process_mode = Node.PROCESS_MODE_PAUSABLE
 
 	cube.reached_goal.connect(_on_reached_goal)
+	level.cube = cube
+	cube.died.connect(func(_cell: Vector2i) -> void:
+		level.notify_cube_died()
+		camera.shake()
+		GameState.vibrate(GameState.VIBRATION_DEATH))
 	cube.show_arrow = GameState.show_arrow
 	cube.turn_rejected.connect(func(_dir: Vector2i) -> void:
 		GameState.vibrate(GameState.VIBRATION_TURN_REJECTED))
@@ -215,9 +220,7 @@ func _load_level(index: int) -> void:
 	current_level = clampi(index, 0, Levels.count() - 1)
 	GameState.current_level = current_level
 	var data := Levels.get_level(current_level)
-	level.layout = PackedStringArray(data["layout"])
-	level.start_heading = data["start_heading"]
-	level.button_links = data.get("buttons", {})
+	level.configure(data)
 	_update_level_label()
 	_restart()
 	camera.frame_level(data.get("camera_distance", 0.0))

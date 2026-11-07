@@ -29,6 +29,14 @@ Simula las reglas de scripts/rolling_cube.gd:
   (campo "buttons" del nivel: {"p": "cd"}). Barrotes cerrados = pared.
 - Power ups (s = velocidad): no cambian qué decisiones hay que tomar, solo
   el ritmo del cubo, así que para el resolvedor son casillas libres.
+- Enemigos (x perseguidor, z obstáculo, i j k m n patrulleros con su ruta en
+  el campo "patrols" del nivel: {"i": "R3 D2 L3 U2"}): se mueven en tiempo
+  real, así que el resolvedor no los simula: las casillas de perseguidores y
+  patrulleros cuentan como libres y la del obstáculo como un muro (es un
+  bloqueo que hay que rodear o encerrar). Los giros calculados son una
+  aproximación sin enemigos en movimiento; "validate"
+  comprueba que las rutas de los patrulleros pasan solo por casillas libres
+  y no tocan la salida ni la meta.
 - Al llegar a la meta B termina el nivel.
 
 La dificultad de un nivel es el mínimo de giros necesarios (búsqueda 0-1 BFS),
@@ -66,8 +74,13 @@ POWERUP_CHARS = "s"
 BREAKABLE_CHARS = "12345"
 BAR_CHARS = "cdefh"
 BUTTON_CHARS = "pqtvw"
+CHASER_CHAR = "x"
+BLOCKER_CHAR = "z"
+PATROL_CHARS = "ijkmn"
+ENEMY_CHARS = CHASER_CHAR + BLOCKER_CHAR + PATROL_CHARS
+ROUTE_DIRS = {"R": (1, 0), "L": (-1, 0), "U": (0, -1), "D": (0, 1)}
 LEVEL_CHARS = ("#.AB" + KEY_CHARS + DOOR_CHARS + POWERUP_CHARS + BREAKABLE_CHARS
-               + BAR_CHARS + BAR_CHARS.upper() + BUTTON_CHARS)
+               + BAR_CHARS + BAR_CHARS.upper() + BUTTON_CHARS + ENEMY_CHARS)
 
 
 def turn_left(h):
@@ -87,7 +100,7 @@ def parse(layout):
     free, start, goal = set(), None, None
     for z, row in enumerate(layout):
         for x, c in enumerate(row):
-            if c != "#" and c not in BUTTON_CHARS:
+            if c != "#" and c not in BUTTON_CHARS and c != BLOCKER_CHAR:
                 free.add((x, z))
             if c == "A":
                 start = (x, z)
@@ -318,8 +331,13 @@ def read_levels(path=LEVELS_GD):
         block = re.search(r'"buttons":\s*\{(.*?)\}', extra, re.S)
         if block:
             buttons = dict(re.findall(r'"(\w)":\s*"(\w*)"', block.group(1)))
+        patrols = {}
+        block = re.search(r'"patrols":\s*\{(.*?)\}', extra, re.S)
+        if block:
+            patrols = dict(re.findall(r'"(\w)":\s*"([^"]*)"', block.group(1)))
         levels.append({"name": name, "turns": int(turns),
-                       "heading": (int(hx), int(hz)), "layout": rows, "buttons": buttons})
+                       "heading": (int(hx), int(hz)), "layout": rows, "buttons": buttons,
+                       "patrols": patrols})
     return levels
 
 
@@ -362,6 +380,42 @@ def check_buttons(rows, buttons):
     return problems
 
 
+def check_enemies(rows, patrols):
+    """Problemas de colocación de enemigos y rutas de patrulla (lista de textos)."""
+    problems = []
+    free, start, goal = parse(rows)
+    found = set()
+    for z, row in enumerate(rows):
+        for x, c in enumerate(row):
+            if c not in PATROL_CHARS:
+                continue
+            if c in found:
+                problems.append(f"el patrullero {c} aparece más de una vez")
+            found.add(c)
+            route = patrols.get(c, "")
+            if not route:
+                problems.append(f"el patrullero {c} no tiene ruta")
+                continue
+            cell = (x, z)
+            for part in route.split():
+                d = ROUTE_DIRS.get(part[:1].upper())
+                if d is None or not part[1:].isdigit() or int(part[1:]) <= 0:
+                    problems.append(f"tramo '{part}' no válido en la ruta de {c}")
+                    break
+                for _ in range(int(part[1:])):
+                    cell = (cell[0] + d[0], cell[1] + d[1])
+                    if cell not in free or cell in (start, goal):
+                        problems.append(f"la ruta de {c} pasa por {cell}, que no es libre o es la salida o la meta")
+                        break
+                else:
+                    continue
+                break
+    for c in patrols:
+        if c not in found:
+            problems.append(f"el patrullero {c} de \"patrols\" no está en el mapa")
+    return problems
+
+
 def cmd_validate(_args):
     levels = read_levels()
     if not levels:
@@ -374,6 +428,7 @@ def cmd_validate(_args):
         if len({len(r) for r in rows}) != 1:
             problems.append("filas de distinta longitud")
         problems += check_buttons(rows, lvl["buttons"])
+        problems += check_enemies(rows, lvl["patrols"])
         result = None if problems else solve(rows, lvl["heading"], buttons=lvl["buttons"])
         if not problems and result is None:
             problems.append("sin solución")

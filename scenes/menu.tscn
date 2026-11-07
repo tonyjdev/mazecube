@@ -66,6 +66,13 @@ layout_mode = 2
 size_flags_horizontal = 4
 text = "MENU_CREDITS"
 
+[node name="QuitButton" type="Button" parent="MainScreen/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(380, 84)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "MENU_QUIT"
+
 [node name="LevelsScreen" type="CenterContainer" parent="."]
 unique_name_in_owner = true
 visible = false

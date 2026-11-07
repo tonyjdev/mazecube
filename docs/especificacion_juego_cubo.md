@@ -137,6 +137,40 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 - Para los power ups cuenta como un rebote contra una **pared** (se pierde la velocidad).
 - El resolvedor de niveles **no la usa**: los niveles se diseñan y miden sin media vuelta, que queda como ayuda extra para el jugador.
 
+### 2.13. Enemigos — Implementada en el prototipo
+
+Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vuelcan) y en tiempo real, independientemente del ritmo del cubo.
+
+- Todos se mueven solo por casillas libres: las **puertas cerradas, los barrotes cerrados y los muros destructibles** también los detienen. **Nunca entran en la casilla de salida ni en la meta.**
+- **Muerte del cubo:** si un **perseguidor** o un **patrullero** toca al cubo, el cubo **explota** en pedazos de los colores de sus caras (con una nube de polvo, temblor de cámara y vibración), desaparece ≈1,1 s y **vuelve a su casilla de salida** con el rumbo inicial. **Conserva la llave** que llevaba, **pierde los power ups**, y el tablero (puertas abiertas, muros rotos, barrotes) y los enemigos se quedan como estaban. Al reaparecer **parpadea** y es **invulnerable** durante 1,5 s.
+
+#### Perseguidor (esfera)
+
+- Esfera roja con ojos, parecida a los fantasmas de un comecocos.
+- **No sabe dónde está el cubo**: mientras no lo detecta, **deambula** al azar por los pasillos (sin dar media vuelta salvo en un callejón sin salida), algo más despacio que el cubo (0,6 s por casilla).
+- Cuando el cubo entra en su **radio de acción** (4 casillas de **recorrido**, no en línea recta: las paredes tapan), **lo persigue** por el camino más corto, se enciende de un rojo más intenso, mira fijamente al cubo y acelera (0,46 s por casilla, algo más lento que el cubo, que tarda 0,4 s).
+- Si el cubo se aleja más de 8 casillas de recorrido, le **pierde la pista** y vuelve a deambular.
+- Al matar al cubo le pierde la pista y **no vuelve a buscarlo durante 3 s**, para que no se quede esperando junto a la salida.
+- Los perseguidores y los patrulleros pueden cruzarse entre sí.
+
+#### Patrullero (octaedro flotante)
+
+- Octaedro morado que flota y gira sobre sí mismo. Recorre siempre **la misma ruta** y **nunca se sale de ella** (0,55 s por casilla).
+- La ruta se define con tramos rectos desde su casilla: dirección (`R` derecha, `L` izquierda, `U` arriba, `D` abajo) y número de casillas, por ejemplo `"R3 D2 L3 U2"`.
+  - **Línea recta:** un solo tramo (`"R4"`), de ida y vuelta.
+  - **Ida y vuelta:** varios tramos que no vuelven al principio (`"R3 D2"`); al llegar al final, la recorre al revés.
+  - **Circular:** los tramos acaban en la casilla de partida (`"R3 D2 L3 U2"`); la repite siempre en el mismo sentido.
+- Si la siguiente casilla de su ruta está cortada (puerta, barrotes cerrados, muro destructible u obstáculo), **espera** a que se libere.
+
+#### Obstáculo (dodecaedro)
+
+- Dodecaedro verde azulado. **No mata**: es **sólido como un muro**. El cubo rebota al chocar con él y los giros hacia él se descartan; los demás enemigos tampoco pueden atravesarlo. Nunca entra en la casilla del cubo (ni en la que está ni en la que va a entrar).
+- **Se anticipa al jugador:** calcula el camino más corto del cubo hasta la meta (como si las puertas y los muros destructibles estuvieran abiertos, pero respetando los barrotes cerrados) y va a la casilla de ese camino a la que puede **llegar antes que el cubo**, la más cercana a él. Si no puede ganar la carrera a ninguna, va a la que menos ventaja le saque el cubo.
+- Si ya está sobre ese camino, **se queda quieto bloqueándolo** (se oscurece). Cuando el cubo cambia de zona y su camino deja de pasar por él, **vuelve a moverse** para cortarle el paso en el nuevo camino.
+- Repiensa su objetivo cada 0,35 s (su tiempo de reacción) y es más lento que el cubo (0,55 s por casilla), así que se le puede ganar una carrera.
+- **Mecanismos para evitarlo:** los **barrotes** lo detienen igual que al cubo; pulsando un botón en el momento justo se le puede **encerrar** o dejar fuera.
+- Si el cubo queda encajonado entre el obstáculo y un muro (bloqueado delante y detrás), rebota en su casilla a ritmo de vuelco hasta que se libere el paso.
+
 ## 3. Escenario y objetivo — Confirmados
 
 - El escenario es un **laberinto**.
@@ -171,7 +205,7 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 
 ### 6.1. Progresión
 
-- El juego tiene **13 niveles** de **dificultad creciente**.
+- El juego tiene **16 niveles** de **dificultad creciente**.
 - Los niveles se eligen en el **selector de niveles** (apartado 7.2). Solo se puede entrar en los **completados** y en los **desbloqueados**: el nivel 1 está siempre desbloqueado y completar un nivel desbloquea el siguiente.
 - Al llegar a la meta, el nivel queda **completado** y se muestra «¡Nivel completado!» con **Siguiente nivel**, **Repetir** y **Niveles** (vuelve al selector). Tras el último nivel se indica que se han completado todos.
 - El jugador puede **reiniciar** el nivel en cualquier momento desde el menú de pausa.
@@ -185,16 +219,18 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 - Muros destructibles: un dígito del `1` al `5` con los golpes que aguantan (`5` pocas grietas, `1` muchas).
 - Barrotes: `c`, `d`, `e`, `f`, `h`, cada letra es un **grupo** (todas las casillas con la misma letra cambian juntas); en **minúscula empiezan abiertos** y en **mayúscula cerrados**. Un mismo grupo puede tener casillas abiertas y cerradas. Debe haber muro justo a ambos lados del pasillo.
 - Botones: `p`, `q`, `t`, `v`, `w` en lugar de un muro; el botón se coloca en la cara que da a su **única casilla libre** contigua. El campo `buttons` indica qué grupos de barrotes cambia cada botón, por ejemplo `"buttons": {"p": "cd", "q": "d"}`.
+- Enemigos (sobre una casilla libre): `x` perseguidor, `z` obstáculo, y `i`, `j`, `k`, `m`, `n` patrulleros. El campo `patrols` da la ruta de cada patrullero (apartado 2.13), por ejemplo `"patrols": {"i": "D6", "j": "R4 D2 L4 U2"}`.
 - Opcional: `camera_distance`, la distancia de la cámara para ese nivel (por defecto, la máxima; ver apartado 5).
 - Los mapas pueden ser más grandes que la pantalla, apaisados o verticales: la cámara sigue al cubo (apartado 5).
 
 ### 6.3. Medida de la dificultad
 
 - La dificultad de un nivel se mide como el **mínimo número de giros** necesario para resolverlo con las reglas del apartado 2 (incluido el rebote, el descarte de giros bloqueados, la ausencia de giro en la casilla de salida, las llaves y puertas y los muros destructibles).
+- Los **enemigos** se mueven en tiempo real y el resolvedor no los simula: los perseguidores y patrulleros no cuentan y el obstáculo cuenta como un **muro fijo** en su casilla de partida. El resolvedor sí comprueba que las rutas de los patrulleros solo pasan por casillas libres y no tocan la salida ni la meta.
 - Ese mínimo se calcula con un **resolvedor automático** que también comprueba que todos los niveles tienen solución.
 - **Los niveles actuales son de prueba de mecánicas**; los niveles definitivos los proporcionará el diseñador.
 - Los niveles de prueba van de **1 a 27 giros** y crecen de forma progresiva, de **9×5 a 23×17 casillas** (en torno a un 15-20% más de casillas cada uno), alternando mapas apaisados y verticales. Los niveles pequeños caben enteros en pantalla; en los grandes la cámara sigue al cubo.
-- Desde el nivel 3 incluyen parejas llave/puerta, y cada puerta es imprescindible (convertida en muro, el nivel no tendría solución). Los niveles 4 y 7 tienen un power up de velocidad y el 9 tres seguidos, para probar la acumulación. Hay muros destructibles en los niveles 2, 5, 7 y 10 (hay que romperlos para pasar) y en el 8 (un atajo: sin romperlo harían falta 26 giros en vez de 14). Los niveles 11 a 13 introducen los botones y barrotes; cada botón es imprescindible (sin él, el nivel no tendría solución).
+- Desde el nivel 3 incluyen parejas llave/puerta, y cada puerta es imprescindible (convertida en muro, el nivel no tendría solución). Los niveles 4 y 7 tienen un power up de velocidad y el 9 tres seguidos, para probar la acumulación. Hay muros destructibles en los niveles 2, 5, 7 y 10 (hay que romperlos para pasar) y en el 8 (un atajo: sin romperlo harían falta 26 giros en vez de 14). Los niveles 11 a 13 introducen los botones y barrotes; cada botón es imprescindible (sin él, el nivel no tendría solución). Los niveles 14 a 16 presentan los enemigos, uno por nivel, en laberintos con bucles para poder esquivarlos; por eso sus giros mínimos no siguen la progresión.
 
 | Nivel | Nombre | Tamaño | Forma | Parejas llave/puerta | Muros destructibles | Power ups | Botones y barrotes | Giros mínimos |
 |---|---|---|---|---|---|---|---|---|
@@ -211,6 +247,9 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 | 11 | El botón | 19×15 | apaisado | amarilla | — | 1 velocidad | 1 botón, 1 barrote cerrado | 21 |
 | 12 | Barrotes | 15×23 | vertical | — | 1 (2 golpes) | — | 2 botones, 4 barrotes (2 cerrados y 2 abiertos); un botón abre unos y cierra otros | 22 |
 | 13 | La fortaleza | 23×17 | apaisado | amarilla | 1 (3 golpes) | 1 velocidad | 2 botones, 4 barrotes (3 cerrados y 1 abierto) | 27 |
+| 14 | La patrulla | 17×13 | apaisado | — | — | — | — | 12 (3 patrulleros: línea recta, ida y vuelta y circular) |
+| 15 | Perseguidos | 15×19 | vertical | — | — | — | — | 14 (2 perseguidores) |
+| 16 | El guardián | 15×6 | apaisado | — | — | — | 1 botón, 2 barrotes abiertos para encerrar al obstáculo | 5 (1 obstáculo) |
 
 ## 7. Menús y controles — Confirmada
 
@@ -219,6 +258,7 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 - **Jugar:** abre el selector de niveles.
 - **Opciones:** volumen de **efectos de sonido** y de **música** (0-100%; todavía no hay sonidos ni música, pero ya existen los canales de audio «SFX» y «Music»), **antialiasing** (activado/desactivado), **vibración** (activada/desactivada; al activarla vibra brevemente como prueba), **flecha de dirección** sobre el cubo (mostrar/ocultar) e **idioma** (español o inglés). Los cambios se aplican al momento y se guardan en el dispositivo. Por defecto se usa el idioma del sistema si es español o inglés, y si no, inglés.
 - **Créditos:** equipo de desarrollo, gráficos, sonido, tipografía, herramientas y licencia del motor, en una lista que se puede desplazar.
+- **Salir:** cierra el juego (igual que pulsar Atrás en la pantalla principal).
 
 ### 7.2. Selector de niveles
 

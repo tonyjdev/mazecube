@@ -14,6 +14,9 @@ extends Node3D
 ##   Botones: p q t v w = muro con un botón en la cara que da a su única
 ##   casilla libre. `button_links` indica qué grupos de barrotes cambia cada
 ##   botón ({"p": "cd"}). Ver WallButton.
+##   Enemigos (sobre una casilla libre): x perseguidor (ver Chaser),
+##   z obstáculo (ver Blocker), i j k m n patrulleros (ver Patroller); la ruta
+##   de cada patrullero se indica en `patrol_routes` ({"i": "R3 D2 L3 U2"}).
 ## Las filas crecen hacia +Z (hacia abajo en pantalla) y las columnas hacia +X.
 
 const CELL_SIZE := 1.0
@@ -23,6 +26,12 @@ const KEY_CHARS := "yorug"
 const BREAKABLE_CHARS := "12345"
 const BAR_CHARS := "cdefh"
 const BUTTON_CHARS := "pqtvw"
+const CHASER_CHAR := "x"
+const BLOCKER_CHAR := "z"
+const PATROL_CHARS := "ijkmn"
+## Distancia (en casillas) entre el centro del cubo y el de un enemigo letal a
+## partir de la cual el cubo muere.
+const ENEMY_HIT_DISTANCE := 0.72
 const ITEM_COLORS := {
 	"y": Color(0.98, 0.80, 0.12),
 	"o": Color(1.00, 0.50, 0.08),
@@ -62,6 +71,15 @@ const NO_CELL := Vector2i(-9999, -9999)
 ## nivel). Pulsar un botón abre los barrotes cerrados de esos grupos y cierra
 ## los abiertos.
 @export var button_links := {}
+## Ruta de cada patrullero (campo "patrols" del nivel): {"i": "R3 D2 L3 U2"}.
+## Ver Patroller.set_route.
+@export var patrol_routes := {}
+## Cubo del jugador: los enemigos lo buscan y lo matan.
+var cube: RollingCube:
+	set(value):
+		cube = value
+		for enemy in _enemies:
+			enemy.cube = value
 
 var start_cell := Vector2i.ZERO
 var goal_cell := Vector2i.ZERO
@@ -78,18 +96,19 @@ var _bars := {}
 ## casilla -> { "symbol": String, "node": WallButton, "front": Vector2i,
 ##             "near": { casilla: casillas de recorrido hasta el botón } }
 var _buttons := {}
+var _enemies: Array[Enemy] = []
 
 
 func _ready() -> void:
 	build()
 
 
-## Sustituye el tablero por el de un nivel de Levels.LIST.
-func load_level(data: Dictionary) -> void:
+## Prepara el tablero de un nivel de Levels.LIST (se construye con build()).
+func configure(data: Dictionary) -> void:
 	layout = PackedStringArray(data["layout"])
 	start_heading = data["start_heading"]
 	button_links = data.get("buttons", {})
-	build()
+	patrol_routes = data.get("patrols", {})
 
 
 func build() -> void:
@@ -102,6 +121,8 @@ func build() -> void:
 	_breakables.clear()
 	_bars.clear()
 	_buttons.clear()
+	_enemies.clear()
+	var enemy_cells := {}
 
 	var floor_a := _make_material(Color(0.86, 0.84, 0.80))
 	var floor_b := _make_material(Color(0.78, 0.76, 0.72))
@@ -139,11 +160,16 @@ func build() -> void:
 				_add_breakable(cell, int(symbol))
 			elif BAR_CHARS.contains(symbol.to_lower()):
 				_add_bars(cell, symbol)
+			elif symbol == CHASER_CHAR or symbol == BLOCKER_CHAR or PATROL_CHARS.contains(symbol):
+				enemy_cells[cell] = symbol
+	for cell: Vector2i in enemy_cells:
+		_add_enemy(cell, enemy_cells[cell])
 	for button in _buttons.values():
 		button["near"] = _cells_within(button["front"], BUTTON_APPROACH_CELLS)
 
 
 func _process(delta: float) -> void:
+	_check_enemy_hits()
 	for item in _keys.values():
 		item["node"].rotate_y(KEY_SPIN_SPEED * delta)
 	for item in _power_ups.values():
@@ -151,11 +177,48 @@ func _process(delta: float) -> void:
 		item["node"].rotate(power_up.pickup_spin_axis, power_up.pickup_spin_speed * delta)
 
 
-## Casilla por la que se puede pasar: libre, sin puerta ni barrotes cerrados
-## y sin muro destructible en pie.
+## Casilla por la que puede pasar el cubo: como is_terrain_walkable() y,
+## además, sin un obstáculo (enemigo sólido) en ella.
 func is_walkable(cell: Vector2i) -> bool:
+	return is_terrain_walkable(cell) and not solid_enemy_at(cell)
+
+
+## Casilla libre, sin puerta ni barrotes cerrados y sin muro destructible en
+## pie (sin tener en cuenta a los enemigos).
+func is_terrain_walkable(cell: Vector2i) -> bool:
 	return _walkable.has(cell) and not _doors.has(cell) and not _breakables.has(cell) \
 		and not bars_closed(cell)
+
+
+## Casilla con suelo (no es pared), haya lo que haya en ella.
+func has_floor(cell: Vector2i) -> bool:
+	return _walkable.has(cell)
+
+
+## Hay un enemigo sólido (obstáculo) ocupando la casilla, sin contar `except`.
+func solid_enemy_at(cell: Vector2i, except: Enemy = null) -> bool:
+	for enemy in _enemies:
+		if enemy.solid and enemy != except and enemy.occupies(cell):
+			return true
+	return false
+
+
+## El cubo ha muerto: los enemigos le pierden la pista.
+func notify_cube_died() -> void:
+	for enemy in _enemies:
+		enemy.on_cube_died()
+
+
+## Si un enemigo letal toca al cubo, el cubo explota.
+func _check_enemy_hits() -> void:
+	if cube == null or not cube.is_vulnerable():
+		return
+	var anchor := to_local(cube.get_trail_anchor())
+	var cube_pos := Vector2(anchor.x, anchor.z) / CELL_SIZE
+	for enemy in _enemies:
+		if enemy.lethal and enemy.board_position().distance_to(cube_pos) < ENEMY_HIT_DISTANCE:
+			cube.die()
+			return
 
 
 ## Hay barrotes cerrados en la casilla.
@@ -363,6 +426,28 @@ func _cells_within(origin: Vector2i, max_steps: int) -> Dictionary:
 				steps[n] = steps[current] + 1
 				queue.append(n)
 	return steps
+
+
+func _add_enemy(cell: Vector2i, symbol: String) -> void:
+	var enemy: Enemy
+	if symbol == CHASER_CHAR:
+		enemy = Chaser.new()
+	elif symbol == BLOCKER_CHAR:
+		enemy = Blocker.new()
+	else:
+		var patroller := Patroller.new()
+		var problem := patroller.set_route(cell, patrol_routes.get(symbol, ""))
+		for route_cell in patroller.route:
+			if problem == "" and not _walkable.has(route_cell):
+				problem = "pasa por la casilla %s, que no es libre" % route_cell
+		if problem != "":
+			push_warning("Ruta del patrullero '%s': %s" % [symbol, problem])
+			patroller.route = [cell]
+		enemy = patroller
+	add_child(enemy)
+	enemy.setup(self, cell)
+	enemy.cube = cube
+	_enemies.append(enemy)
 
 
 func _add_breakable(cell: Vector2i, hits: int) -> void:

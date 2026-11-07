@@ -1,5 +1,5 @@
 extends Control
-## Menú del juego: pantalla principal (Jugar, Opciones, Créditos), selector de
+## Menú del juego: pantalla principal (Jugar, Opciones, Créditos, Salir), selector de
 ## niveles, opciones y créditos. Solo se ve una pantalla a la vez.
 ##
 ## Los textos fijos de la escena son claves de traducción (ver Translations);
@@ -46,6 +46,7 @@ func _ready() -> void:
 	%PlayButton.pressed.connect(_show.bind("levels"))
 	%OptionsButton.pressed.connect(_show.bind("options"))
 	%CreditsButton.pressed.connect(_show.bind("credits"))
+	%QuitButton.pressed.connect(get_tree().quit)
 	for back in [%LevelsBack, %OptionsBack, %CreditsBack]:
 		back.pressed.connect(_show.bind("main"))
 	_setup_options()

@@ -26,6 +26,14 @@ extends Node3D
 ## ups), el cubo se queda parado REVERSE_PAUSE segundos y por sus cuatro
 ## lados sale humo gris.
 ##
+## Enemigos: si un perseguidor o un patrullero lo toca (lo comprueba Level),
+## el cubo explota en pedazos de sus colores, desaparece RESPAWN_DELAY
+## segundos y vuelve a su casilla de salida con el rumbo inicial. Conserva la
+## llave que llevaba, pierde los power ups y el tablero se queda como estaba.
+## Al reaparecer parpadea y es invulnerable durante RESPAWN_GRACE segundos. Un
+## obstáculo es como una pared. Si queda encajonado (bloqueado delante y
+## detrás), rebota en su casilla a ritmo de vuelco hasta que se libere el paso.
+##
 ## Power ups: al llegar a su casilla el cubo lo coge y se activa su efecto.
 ## Las reglas de cada tipo (acumulación, duración, fin al rebotar...) las
 ## define su clase (ver PowerUp); aquí se gestionan de forma genérica.
@@ -43,6 +51,10 @@ signal reversed(cell: Vector2i)
 signal turn_rejected(direction: Vector2i)
 signal power_up_picked(power_up: PowerUp, stacks: int)
 signal power_up_ended(power_up: PowerUp)
+## Un enemigo ha matado al cubo en esa casilla.
+signal died(cell: Vector2i)
+## El cubo ha vuelto a la salida tras morir.
+signal respawned
 
 const TURN_LEFT := -1
 const TURN_RIGHT := 1
@@ -59,6 +71,19 @@ const REVERSE_PAUSE := 0.2
 const REVERSE_SMOKE_COLOR := Color(0.38, 0.39, 0.42)
 const REVERSE_SMOKE_PUFFS := 10
 const REVERSE_SMOKE_LIFETIME := 0.8
+## Muerte: tiempo hasta reaparecer en la salida e invulnerabilidad posterior
+## (con parpadeo de RESPAWN_BLINK segundos por ciclo).
+const RESPAWN_DELAY := 1.1
+const RESPAWN_GRACE := 1.5
+const RESPAWN_BLINK := 0.12
+## Pedazos de la explosión.
+const EXPLOSION_PIECES := 36
+const EXPLOSION_LIFETIME := 0.8
+## Color de cada cara del cubo (derecha, izquierda, arriba, abajo, detrás, delante).
+const FACE_COLORS: Array[Color] = [
+	Color(0.90, 0.30, 0.30), Color(0.30, 0.70, 0.95), Color(0.98, 0.85, 0.30),
+	Color(0.55, 0.40, 0.85), Color(0.35, 0.80, 0.45), Color(0.98, 0.60, 0.25),
+]
 
 ## Material del humo, compartido (bocanada redonda de bordes suaves).
 static var _smoke_material: StandardMaterial3D
@@ -92,6 +117,11 @@ var _pending_turn := 0
 ## sustituye al giro pendiente.
 var _pending_reverse := false
 var _rolling := false
+## Casilla hacia la que está volcando (solo vale mientras _rolling).
+var _roll_target := Vector2i.ZERO
+var _dead := false
+var _respawn_left := 0.0
+var _grace_left := 0.0
 var _cooldown := 0.0
 var _tween: Tween
 ## Dirección del último giro descartado mientras la flecha está en rojo.
@@ -127,6 +157,9 @@ func reset(target_level: Level) -> void:
 	_rolling = false
 	_cooldown = 0.3
 	is_finished = false
+	_dead = false
+	_grace_left = 0.0
+	_body.visible = true
 	global_position = level.cell_to_world(cell)
 	_body.transform = Transform3D(Basis.IDENTITY, Vector3(0, HALF, 0))
 	_update_arrow(Vector3.ZERO)
@@ -153,6 +186,14 @@ func request_reverse() -> void:
 
 
 func _process(delta: float) -> void:
+	if _dead:
+		_respawn_left -= delta
+		if _respawn_left <= 0.0:
+			_respawn()
+		return
+	if _grace_left > 0.0:
+		_grace_left -= delta
+		_body.visible = _grace_left <= 0.0 or fmod(_grace_left, RESPAWN_BLINK * 2.0) > RESPAWN_BLINK
 	_process_power_ups(delta)
 	# La llave que lleva el cubo sigue girando sobre sí misma, como en el mapa.
 	if _held_key_node:
@@ -216,10 +257,15 @@ func _try_advance() -> void:
 	var next := cell + heading
 	if level.is_walkable(next):
 		_roll_to(next)
+	else:
+		# Encajonado (p. ej. entre un obstáculo y un muro): espera lo que
+		# tardaría en volcar antes de volver a rebotar.
+		_cooldown = step_time()
 
 
 func _roll_to(next: Vector2i) -> void:
 	_rolling = true
+	_roll_target = next
 	var dir := Vector3(heading.x, 0, heading.y)
 	var start := _body.transform
 	# Arista inferior en la dirección de avance (coordenadas locales del nodo raíz).
@@ -290,6 +336,65 @@ func _flash_rejected_turn(dir: Vector2i) -> void:
 	_flash_tween.tween_callback(func() -> void:
 		_clear_rejected_flash()
 		_update_arrow(_body_offset()))
+
+
+## Está en el tablero (no ha explotado esperando a reaparecer).
+func is_alive() -> bool:
+	return not _dead
+
+
+## Un enemigo puede matarlo ahora: vivo, sin haber llegado a la meta y sin la
+## invulnerabilidad de después de reaparecer.
+func is_vulnerable() -> bool:
+	return not _dead and not is_finished and _grace_left <= 0.0
+
+
+## Casilla en la que está o hacia la que está volcando.
+func occupies(target: Vector2i) -> bool:
+	return not _dead and (target == cell or (_rolling and target == _roll_target))
+
+
+## Segundos por casilla al ritmo actual (vuelco y pausa).
+func step_time() -> float:
+	return (roll_duration + pause_between_rolls) / speed_multiplier()
+
+
+## Lo ha tocado un enemigo: explota y, al cabo de RESPAWN_DELAY, vuelve a la
+## salida.
+func die() -> void:
+	if not is_vulnerable():
+		return
+	var at := global_position + _body_offset()
+	if _tween and _tween.is_valid():
+		_tween.kill()
+	_dead = true
+	_rolling = false
+	_pending_turn = 0
+	_pending_reverse = false
+	_clear_rejected_flash()
+	_end_all_power_ups()
+	_spawn_explosion(at)
+	_body.visible = false
+	_arrow.visible = false
+	if _held_key_node:
+		_held_key_node.visible = false
+	_respawn_left = RESPAWN_DELAY
+	died.emit(cell)
+
+
+func _respawn() -> void:
+	_dead = false
+	cell = level.start_cell
+	heading = level.start_heading
+	global_position = level.cell_to_world(cell)
+	_body.transform = Transform3D(Basis.IDENTITY, Vector3(0, HALF, 0))
+	_body.visible = true
+	if _held_key_node:
+		_held_key_node.visible = true
+	_grace_left = RESPAWN_GRACE
+	_cooldown = 0.3
+	_update_arrow(Vector3.ZERO)
+	respawned.emit()
 
 
 ## Velocidad actual respecto a la base (producto de los power ups activos).
@@ -407,6 +512,85 @@ func _spawn_reverse_smoke() -> void:
 		smoke.finished.connect(smoke.queue_free)
 
 
+## Explosión: pedazos de los colores de las caras que saltan y caen, y una
+## nube de polvo.
+func _spawn_explosion(at: Vector3) -> void:
+	var debris := CPUParticles3D.new()
+	debris.top_level = true
+	debris.local_coords = false
+	debris.one_shot = true
+	debris.explosiveness = 1.0
+	debris.amount = EXPLOSION_PIECES
+	debris.lifetime = EXPLOSION_LIFETIME
+	debris.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	debris.emission_box_extents = Vector3.ONE * 0.35
+	debris.direction = Vector3.UP
+	debris.spread = 50.0
+	debris.initial_velocity_min = 2.0
+	debris.initial_velocity_max = 3.6
+	debris.gravity = Vector3(0, -16.0, 0)
+	debris.scale_amount_min = 0.6
+	debris.scale_amount_max = 1.3
+	var shrink := Curve.new()
+	shrink.add_point(Vector2(0, 1))
+	shrink.add_point(Vector2(0.7, 1))
+	shrink.add_point(Vector2(1, 0))
+	debris.scale_amount_curve = shrink
+	# Cada pedazo toma al azar uno de los colores de las caras.
+	var colors := Gradient.new()
+	colors.interpolation_mode = Gradient.GRADIENT_INTERPOLATE_CONSTANT
+	var offsets := PackedFloat32Array()
+	for i in FACE_COLORS.size():
+		offsets.append(float(i) / FACE_COLORS.size())
+	colors.offsets = offsets
+	colors.colors = PackedColorArray(FACE_COLORS)
+	debris.color_initial_ramp = colors
+	var piece := BoxMesh.new()
+	piece.size = Vector3.ONE * 0.16
+	var mat := StandardMaterial3D.new()
+	mat.vertex_color_use_as_albedo = true
+	mat.roughness = 0.6
+	piece.material = mat
+	debris.mesh = piece
+	add_child(debris)
+	debris.global_position = at + Vector3(0, HALF, 0)
+	debris.emitting = true
+	debris.finished.connect(debris.queue_free)
+
+	var dust := CPUParticles3D.new()
+	dust.top_level = true
+	dust.local_coords = false
+	dust.one_shot = true
+	dust.explosiveness = 0.9
+	dust.amount = 14
+	dust.lifetime = 0.9
+	dust.direction = Vector3.UP
+	dust.spread = 180.0
+	dust.initial_velocity_min = 0.8
+	dust.initial_velocity_max = 1.6
+	dust.damping_min = 2.0
+	dust.damping_max = 3.0
+	dust.angle_max = 360.0
+	var grow := Curve.new()
+	grow.max_value = 3.0
+	grow.add_point(Vector2(0, 1.0))
+	grow.add_point(Vector2(1, 2.6))
+	dust.scale_amount_curve = grow
+	var fade := Gradient.new()
+	fade.set_color(0, Color(1, 1, 1, 0.7))
+	fade.set_color(1, Color(1, 1, 1, 0.0))
+	dust.color_ramp = fade
+	var quad := QuadMesh.new()
+	quad.size = Vector2.ONE * 0.5
+	quad.material = _get_smoke_material()
+	dust.mesh = quad
+	dust.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(dust)
+	dust.global_position = at + Vector3(0, HALF, 0)
+	dust.emitting = true
+	dust.finished.connect(dust.queue_free)
+
+
 static func _get_smoke_material() -> StandardMaterial3D:
 	if _smoke_material:
 		return _smoke_material
@@ -454,7 +638,7 @@ func _update_arrow(offset: Vector3) -> void:
 	var dir := Vector3(shown.x, 0, shown.y)
 	var base := Basis.looking_at(dir, Vector3.UP) * Basis(Vector3.RIGHT, -PI * 0.5)
 	_arrow.global_transform = Transform3D(base, global_position + offset + dir * 0.1 + Vector3(0, ARROW_HEIGHT, 0))
-	_arrow.visible = show_arrow and not is_finished
+	_arrow.visible = show_arrow and not is_finished and not _dead
 	if _held_key_node:
 		_held_key_node.global_position = global_position + offset + Vector3(0, HELD_KEY_HEIGHT, 0)
 
@@ -469,14 +653,11 @@ static func _snap_basis(b: Basis) -> Basis:
 ## Cubo con un color distinto por cara para que se vea claramente el vuelco.
 static func _build_colored_cube(size: float) -> ArrayMesh:
 	var h := size * 0.5
-	var faces := [
-		[Vector3.RIGHT, Color(0.90, 0.30, 0.30)],
-		[Vector3.LEFT, Color(0.30, 0.70, 0.95)],
-		[Vector3.UP, Color(0.98, 0.85, 0.30)],
-		[Vector3.DOWN, Color(0.55, 0.40, 0.85)],
-		[Vector3.BACK, Color(0.35, 0.80, 0.45)],
-		[Vector3.FORWARD, Color(0.98, 0.60, 0.25)],
-	]
+	var normals: Array[Vector3] = [Vector3.RIGHT, Vector3.LEFT, Vector3.UP, Vector3.DOWN,
+		Vector3.BACK, Vector3.FORWARD]
+	var faces := []
+	for i in normals.size():
+		faces.append([normals[i], FACE_COLORS[i]])
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for face in faces:

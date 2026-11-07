@@ -15,6 +15,11 @@ extends RefCounted
 ## 'v' 'w' (muros con botón en la cara que da a su única casilla libre). El
 ## campo "buttons" indica qué grupos cambia cada botón: {"p": "cd"}. Cada
 ## botón es imprescindible (sin él, el nivel no tendría solución).
+## Enemigos (niveles 14-16): 'x' perseguidor, 'z' obstáculo e 'i' 'j' 'k' 'm'
+## 'n' patrulleros; el campo "patrols" da la ruta de cada patrullero como
+## tramos rectos desde su casilla: {"i": "R3 D2 L3 U2"} (R derecha, L
+## izquierda, U arriba, D abajo; si acaba donde empieza es circular, si no,
+## de ida y vuelta). Ver Chaser, Blocker y Patroller.
 ##
 ## Los niveles crecen de forma progresiva (en torno a un 15-20% más de
 ## casillas cada uno) y alternan forma apaisada y vertical. Los pequeños
@@ -26,7 +31,8 @@ extends RefCounted
 ##
 ## "turns" es el mínimo de giros necesarios para resolver el nivel con las
 ## reglas del juego (rebote, giros descartados hacia muros y puertas, sin giro
-## en la casilla de salida, una sola llave a la vez). Se calcula con
+## en la casilla de salida, una sola llave a la vez), sin contar perseguidores
+## ni patrulleros y con el obstáculo como un muro fijo. Se calcula con
 ## tools/level_solver.py y sirve como medida de dificultad; ejecutar
 ## "python3 tools/level_solver.py validate" tras modificar los niveles.
 ##
@@ -298,6 +304,67 @@ const LIST: Array[Dictionary] = [
 			"###########q###########",
 		],
 		"buttons": {"p": "e", "q": "cd"},
+	},
+	{
+		"name": "La patrulla",
+		"turns": 12,
+		"start_heading": Vector2i(0, 1),
+		"layout": [
+			"#################",
+			"#.....#...#....A#",
+			"#.#.#.#.#.#.#.#.#",
+			"#.#.#.#.#...#...#",
+			"###.#.#.#####.#.#",
+			"#i..#.....#...#.#",
+			"#.#.#.#####.###.#",
+			"#.....#j....#...#",
+			"#.#####.###.#.#.#",
+			"#...#.........#.#",
+			"#.#B#.#.#.#####.#",
+			"#...#....k#.....#",
+			"#################",
+		],
+		"patrols": {"i": "D6", "j": "R4 D2 L4 U2", "k": "L4 U2"},
+	},
+	{
+		"name": "Perseguidos",
+		"turns": 14,
+		"start_heading": Vector2i(1, 0),
+		"layout": [
+			"###############",
+			"#A....#.......#",
+			"###.#.#.#.###.#",
+			"#.....#.#.#...#",
+			"#.#####.#.#.###",
+			"#.....#.#.....#",
+			"#.###.#.#.###.#",
+			"#...#.....#...#",
+			"###.#######.#.#",
+			"#.#.....#..x#.#",
+			"#.#######.#.#.#",
+			"#.....#...#...#",
+			"#####.#.###.###",
+			"#......x#.#.#.#",
+			"#.#####.#.#.#.#",
+			"#.B.#.....#...#",
+			"###.#.#.#.#.#.#",
+			"#.............#",
+			"###############",
+		],
+	},
+	{
+		"name": "El guardián",
+		"turns": 5,
+		"start_heading": Vector2i(1, 0),
+		"layout": [
+			"#p#############",
+			"#.............#",
+			"#.###########.#",
+			"#A..c.z.c.....#",
+			"###########B###",
+			"###############",
+		],
+		"buttons": {"p": "c"},
 	},
 ]
 
