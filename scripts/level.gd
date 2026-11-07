@@ -11,16 +11,18 @@ const WALL_HEIGHT := 0.5
 const FLOOR_THICKNESS := 0.1
 
 @export var layout: PackedStringArray = PackedStringArray([
-	"#########",
-	"#A..#...#",
-	"#.#.#.#.#",
-	"#.#...#.#",
-	"#.#####.#",
-	"#.....#B#",
-	"#########",
+	"#######",
+	"#A....#",
+	"#.###.#",
+	"#...#.#",
+	"###.#.#",
+	"#...#.#",
+	"#.#####",
+	"#....B#",
+	"#######",
 ])
-## Rumbo inicial del cubo en coordenadas de casilla (x, z). (1, 0) = derecha.
-@export var start_heading := Vector2i(1, 0)
+## Rumbo inicial del cubo en coordenadas de casilla (x, z). (0, 1) = abajo.
+@export var start_heading := Vector2i(0, 1)
 
 var start_cell := Vector2i.ZERO
 var goal_cell := Vector2i.ZERO

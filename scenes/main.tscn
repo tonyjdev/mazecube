@@ -24,6 +24,11 @@ environment = SubResource("Environment_0wfyh")
 [node name="Sun" type="DirectionalLight3D" parent="." unique_id=1675501405]
 transform = Transform3D(0.8660254, 0.38302222, -0.32139382, 0, 0.64278764, 0.76604444, 0.5, -0.66341394, 0.5566704, 0, 0, 0)
 shadow_enabled = true
+shadow_bias = 0.05
+shadow_normal_bias = 1.0
+shadow_blur = 1.5
+directional_shadow_mode = 0
+directional_shadow_max_distance = 40.0
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=510444692]
 transform = Transform3D(0.70710677, -0.40820402, 0.57738155, 0, 0.81654084, 0.5772877, -0.70710677, -0.40820402, 0.57738155, 4, 8, 9)
@@ -47,39 +52,43 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 theme_override_constants/margin_left = 16
-theme_override_constants/margin_top = 16
+theme_override_constants/margin_top = 32
 theme_override_constants/margin_right = 16
-theme_override_constants/margin_bottom = 16
+theme_override_constants/margin_bottom = 32
 
 [node name="VBox" type="VBoxContainer" parent="UI/Margin" unique_id=549432227]
 layout_mode = 2
 mouse_filter = 2
 
-[node name="TopBar" type="HBoxContainer" parent="UI/Margin/VBox" unique_id=1796202710]
+[node name="Header" type="VBoxContainer" parent="UI/Margin/VBox" unique_id=1246887751]
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 12
 
-[node name="Status" type="Label" parent="UI/Margin/VBox/TopBar" unique_id=1092812086]
+[node name="Status" type="Label" parent="UI/Margin/VBox/Header" unique_id=737000712]
 layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 34
 horizontal_alignment = 1
-vertical_alignment = 1
 autowrap_mode = 3
 
-[node name="RestartButton" type="Button" parent="UI/Margin/VBox/TopBar" unique_id=169120549]
-custom_minimum_size = Vector2(140, 56)
+[node name="Buttons" type="HBoxContainer" parent="UI/Margin/VBox/Header" unique_id=1513948294]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 16
+alignment = 1
+
+[node name="RestartButton" type="Button" parent="UI/Margin/VBox/Header/Buttons" unique_id=240572283]
+custom_minimum_size = Vector2(200, 72)
 layout_mode = 2
 focus_mode = 0
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 26
 text = "Reiniciar"
 
-[node name="CameraButton" type="Button" parent="UI/Margin/VBox/TopBar" unique_id=980948795]
-custom_minimum_size = Vector2(300, 56)
+[node name="CameraButton" type="Button" parent="UI/Margin/VBox/Header/Buttons" unique_id=128880647]
+custom_minimum_size = Vector2(360, 72)
 layout_mode = 2
 focus_mode = 0
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 26
 text = "Cámara"
 
 [node name="Spacer" type="Control" parent="UI/Margin/VBox" unique_id=1233186935]
@@ -88,22 +97,24 @@ size_flags_vertical = 3
 mouse_filter = 2
 
 [node name="BottomBar" type="HBoxContainer" parent="UI/Margin/VBox" unique_id=534100608]
+custom_minimum_size = Vector2(0, 80)
 layout_mode = 2
 mouse_filter = 2
 
 [node name="LeftHint" type="Label" parent="UI/Margin/VBox/BottomBar" unique_id=1236806875]
 layout_mode = 2
-theme_override_font_sizes/font_size = 26
+theme_override_font_sizes/font_size = 30
 text = "← Izquierda"
 
 [node name="Help" type="Label" parent="UI/Margin/VBox/BottomBar" unique_id=2085000923]
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 20
 horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 3
 
 [node name="RightHint" type="Label" parent="UI/Margin/VBox/BottomBar" unique_id=1640936461]
 layout_mode = 2
-theme_override_font_sizes/font_size = 26
+theme_override_font_sizes/font_size = 30
 text = "Derecha →"
