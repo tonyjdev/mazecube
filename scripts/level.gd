@@ -66,6 +66,9 @@ const DOOR_THICKNESS := 0.24
 const DOOR_HEIGHT := 0.8
 ## Duración de la animación de la puerta hundiéndose al abrirse.
 const DOOR_SINK_TIME := 0.6
+## Al abrir una puerta, lo que tarda la llave en volar hasta ella
+## encogiéndose (la puerta se hunde cuando llega).
+const KEY_TO_DOOR_TIME := 0.4
 ## Altura y velocidad de giro (rad/s) de las llaves que están en el mapa.
 const KEY_FLOAT_HEIGHT := 0.5
 const KEY_SCALE := 1.6
@@ -437,12 +440,29 @@ func take_power_up(cell: Vector2i) -> PowerUp:
 
 ## Abre la puerta: la casilla pasa a ser libre al instante y la puerta se
 ## hunde en el suelo hasta desaparecer.
-func open_door(cell: Vector2i) -> void:
+## Abre la puerta (deja de ser obstáculo al momento). Si se pasa la llave
+## (`key`, el nodo que lleva el cubo), primero vuela desde donde está hasta
+## la puerta encogiéndose hasta desaparecer, y entonces la puerta se hunde.
+func open_door(cell: Vector2i, key: Node3D = null) -> void:
 	if not _doors.has(cell):
 		return
 	var door: Node3D = _doors[cell]["node"]
 	_doors.erase(cell)
 	var tween := door.create_tween()
+	if key:
+		# La llave pasa a ser del tablero: si se reinicia el nivel, se va con él.
+		var from := key.global_transform
+		key.reparent(self)
+		key.top_level = false
+		key.global_transform = from
+		var fly := key.create_tween().set_parallel()
+		fly.tween_property(key, "position", door.position, KEY_TO_DOOR_TIME) \
+			.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		fly.tween_property(key, "scale", Vector3.ONE * 0.01, KEY_TO_DOOR_TIME) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		fly.tween_property(key, "rotation:y", key.rotation.y + TAU, KEY_TO_DOOR_TIME)
+		fly.chain().tween_callback(key.queue_free)
+		tween.tween_interval(KEY_TO_DOOR_TIME)
 	tween.tween_property(door, "position:y", door.position.y - DOOR_HEIGHT - FLOOR_THICKNESS,
 			DOOR_SINK_TIME).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tween.tween_callback(door.queue_free)

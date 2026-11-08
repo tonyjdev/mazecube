@@ -75,11 +75,11 @@ El diseño busca combinar **lógica y planificación** con **controles y reglas 
 - **Puerta:** un bloque más estrecho que el cubo que cierra el pasillo de muro a muro, girado 90° según la dirección de los muros que la rodean.
 - Cada llave está asociada a **su propia puerta**, y ambas tienen el **mismo color**. Una llave no abre puertas de otro color. Colores disponibles: **amarillo, naranja, rojo, azul y verde**.
 - Una puerta cerrada se comporta como una **pared**: el cubo rebota al chocar con ella (apartado 2.4) y los giros hacia ella se descartan (apartado 2.5), **aunque se lleve su llave**.
-- Si el cubo **choca de frente** con una puerta llevando su llave, la **llave desaparece** y la **puerta se hunde en el suelo** (animación de unos 0,6 s); desde que empieza a hundirse, la casilla **ya se puede atravesar**. El cubo **rebota igualmente** en ese movimiento; para pasar por el hueco tiene que volver.
+- Si el cubo **choca de frente** con una puerta llevando su llave, la **llave vuela desde encima del cubo hasta la puerta** girando y **encogiéndose hasta desaparecer** (0,4 s), y entonces la **puerta se hunde en el suelo** (unos 0,6 s). La casilla **ya se puede atravesar** desde el choque. El cubo **rebota igualmente** en ese movimiento; para pasar por el hueco tiene que volver.
 - Como solo se abren de frente, cada puerta debe tener por al menos uno de sus lados un tramo recto por el que el cubo pueda llegar hasta ella.
 - Las puertas abiertas y las llaves cogidas se restauran al reiniciar el nivel.
 
-**Ejemplo:** el cubo avanza hacia una puerta amarilla llevando la llave amarilla; al tocarla, la llave desaparece, la puerta se hunde en el suelo y el cubo rebota. En la siguiente pasada atraviesa la casilla donde estaba la puerta.
+**Ejemplo:** el cubo avanza hacia una puerta amarilla llevando la llave amarilla; al tocarla, la llave vuela hasta la puerta y desaparece, la puerta se hunde en el suelo y el cubo rebota. En la siguiente pasada atraviesa la casilla donde estaba la puerta.
 
 ### 2.9. Muros destructibles — Confirmada
 
@@ -146,7 +146,7 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 
 - Esfera roja con ojos, parecida a los fantasmas de un comecocos.
 - **No sabe dónde está el cubo**: mientras no lo detecta, **deambula** al azar por los pasillos (sin dar media vuelta salvo en un callejón sin salida), algo más despacio que el cubo (0,6 s por casilla).
-- Cuando el cubo entra en su **radio de acción** (4 casillas de **recorrido**, no en línea recta: las paredes tapan), **lo persigue** por el camino más corto, se enciende de un rojo más intenso, mira fijamente al cubo y acelera (0,46 s por casilla, algo más lento que el cubo, que tarda 0,4 s).
+- Cuando el cubo entra en su **radio de acción** (4 casillas de **recorrido**, no en línea recta: las paredes tapan), suena un aviso, se enciende y **tiembla rápido durante 0,5 s sin moverse de su casilla**, para que el jugador vea que va a por él; después **lo persigue** por el camino más corto, se enciende de un rojo más intenso, mira fijamente al cubo y acelera (0,46 s por casilla, algo más lento que el cubo, que tarda 0,4 s).
 - Si el cubo se aleja más de 8 casillas de recorrido, le **pierde la pista** y vuelve a deambular.
 - Al matar al cubo le pierde la pista y **no vuelve a buscarlo durante 3 s**, para que no se quede esperando junto a la salida.
 - Los perseguidores y los patrulleros pueden cruzarse entre sí.

@@ -340,8 +340,11 @@ func _try_advance() -> void:
 		# Para los power ups, los barrotes cuentan como una puerta.
 		var door_like := door != "" or level.bars_closed(ahead)
 		if door != "" and door == held_key:
-			level.open_door(ahead)
-			_drop_held_key()
+			# La llave vuela hasta la puerta (ver Level.open_door).
+			var key := _held_key_node
+			_held_key_node = null
+			held_key = ""
+			level.open_door(ahead, key)
 			door_opened.emit(door)
 		elif level.breakable_hits(ahead) > 0:
 			breakable_hit.emit(ahead, level.hit_breakable(ahead, heading))

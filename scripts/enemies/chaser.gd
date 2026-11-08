@@ -5,7 +5,9 @@ extends Enemy
 ## No sabe dónde está el cubo: mientras no lo ve, deambula al azar por los
 ## pasillos (sin dar media vuelta salvo en un callejón sin salida). Cuando el
 ## cubo entra en su radio de acción (DETECT_RADIUS casillas de recorrido, no en
-## línea recta), lo persigue por el camino más corto, algo más deprisa. Si el
+## línea recta), primero se queda quieto en su casilla ALERT_TIME segundos
+## temblando (aviso de que va a por él) y después lo persigue por el camino
+## más corto, algo más deprisa. Si el
 ## cubo se aleja más de LOSE_RADIUS casillas, le pierde la pista y vuelve a
 ## deambular. Al morir el cubo, también le pierde la pista y no vuelve a
 ## buscarlo hasta pasados FORGET_TIME segundos (así no acampa en la salida).
@@ -23,6 +25,11 @@ const CALM_COLOR := Color(0.78, 0.22, 0.30)
 const ANGRY_COLOR := Color(1.0, 0.12, 0.10)
 const BOUNCE_HEIGHT := 0.05
 const BOUNCE_SPEED := 9.0
+## Aviso al detectar al cubo: tiempo que tiembla sin moverse, amplitud y
+## frecuencia (rad/s) del temblor.
+const ALERT_TIME := 0.5
+const ALERT_SHAKE := 0.05
+const ALERT_SHAKE_SPEED := 70.0
 
 var is_chasing := false
 
@@ -30,6 +37,8 @@ var _body_mat: StandardMaterial3D
 var _eyes: Node3D
 var _time := 0.0
 var _forget_left := 0.0
+## Tiempo que le queda de temblor antes de empezar a perseguir.
+var _alert_left := 0.0
 var _rng := RandomNumberGenerator.new()
 
 
@@ -46,6 +55,8 @@ func on_cube_died() -> void:
 
 func _choose_next() -> Vector2i:
 	_update_awareness()
+	if _alert_left > 0.0:
+		return cell
 	if is_chasing:
 		return _first_step_towards(cube.cell, _can_enter)
 	return _wander()
@@ -65,6 +76,9 @@ func _update_awareness() -> void:
 func _set_chasing(chasing: bool) -> void:
 	if chasing and not is_chasing:
 		Sfx.play("alert")
+		_alert_left = ALERT_TIME
+	elif not chasing:
+		_alert_left = 0.0
 	is_chasing = chasing
 	step_time = CHASE_STEP_TIME if chasing else WANDER_STEP_TIME
 	if _body_mat:
@@ -126,6 +140,11 @@ func _build_visual() -> Node3D:
 func _animate(delta: float) -> void:
 	_time += delta
 	_forget_left -= delta
+	# Temblor rápido de aviso (la esfera, sin mover la casilla).
+	_alert_left = maxf(_alert_left - delta, 0.0)
+	var shake := ALERT_SHAKE if _alert_left > 0.0 else 0.0
+	_visual.position.x = sin(_time * ALERT_SHAKE_SPEED) * shake
+	_visual.position.z = cos(_time * ALERT_SHAKE_SPEED * 1.3) * shake
 	# Botecitos mientras se mueve, más rápidos al perseguir.
 	var speed := BOUNCE_SPEED * (1.4 if is_chasing else 1.0)
 	_visual.position.y = float_height + absf(sin(_time * speed)) * BOUNCE_HEIGHT
