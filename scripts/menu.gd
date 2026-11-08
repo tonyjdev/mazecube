@@ -7,8 +7,8 @@ extends Control
 ## Atrás (Esc o el botón Atrás de Android) vuelve a la pantalla principal y,
 ## desde ella, cierra el juego.
 ##
-## Truco (solo en builds de depuración): tocar 5 veces seguidas el título del
-## selector de niveles desbloquea todos los niveles.
+## Truco (solo en builds de depuración): tocar 5 veces seguidas el rótulo
+## «INICIO» del mapa de niveles desbloquea todos los niveles.
 
 const LANGUAGE_NAMES := {"es": "Español", "en": "English"}
 ## Truco de desbloqueo: toques necesarios y tiempo máximo entre dos toques.
@@ -54,9 +54,7 @@ func _ready() -> void:
 		back.pressed.connect(_show.bind("main"))
 	_setup_options()
 	if OS.is_debug_build():
-		var title: Label = %LevelsScreen.get_node("VBox/Title")
-		title.mouse_filter = Control.MOUSE_FILTER_STOP
-		title.gui_input.connect(_on_levels_title_input)
+		%LevelMap.start_tapped.connect(_on_start_tapped)
 	_show(GameState.menu_screen)
 	GameState.menu_screen = "main"
 
@@ -121,12 +119,7 @@ func _build_level_grid() -> void:
 	%LevelMap.refresh()
 
 
-func _on_levels_title_input(event: InputEvent) -> void:
-	# En el móvil los toques llegan también como clic (emulate_mouse_from_touch),
-	# así que solo se cuentan los clics para no contar cada toque dos veces.
-	var mouse := event as InputEventMouseButton
-	if mouse == null or not mouse.pressed or mouse.button_index != MOUSE_BUTTON_LEFT:
-		return
+func _on_start_tapped() -> void:
 	var now := Time.get_ticks_msec() / 1000.0
 	_unlock_taps = _unlock_taps + 1 if now - _last_unlock_tap <= UNLOCK_TAP_WINDOW else 1
 	_last_unlock_tap = now

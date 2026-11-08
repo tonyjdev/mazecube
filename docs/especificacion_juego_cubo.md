@@ -24,6 +24,7 @@ El diseño busca combinar **lógica y planificación** con **controles y reglas 
 
 - Cada avance de una casilla consiste en **volcar el cubo 90° sobre la arista inferior situada en la dirección de desplazamiento**.
 - El cubo apoya sucesivamente distintas caras sobre el suelo.
+- Por defecto el cubo es **blanco** en todas sus caras, con las **aristas en gris claro**; la iluminación y las sombras bastan para distinguir las caras.
 - **No se desliza, no salta y no rota sobre su propio eje vertical para cambiar de rumbo**.
 - Durante el vuelco, la arista utilizada como pivote permanece en contacto con el suelo.
 
@@ -142,7 +143,7 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vuelcan) y en tiempo real, independientemente del ritmo del cubo.
 
 - Todos se mueven solo por casillas libres: las **puertas cerradas, los barrotes cerrados y los muros destructibles** también los detienen. **Nunca entran en la casilla de salida ni en la meta.**
-- **Muerte del cubo:** si un **perseguidor** o un **patrullero** toca al cubo, el cubo **explota**: se hincha un instante y revienta en 27 pedazos que conservan los colores de sus caras, saltan, rebotan en el suelo girando y se encogen hasta desaparecer (≈1,6 s en total, con una nube de polvo, temblor de cámara y vibración). **Cuando termina la explosión**, el cubo **vuelve a su casilla de salida** con el rumbo inicial. **Conserva la llave** que llevaba, **pierde los power ups**, y el tablero (puertas abiertas, muros rotos, barrotes) y los enemigos se quedan como estaban. Al reaparecer **parpadea** y es **invulnerable** durante 1,5 s.
+- **Muerte del cubo:** si un **perseguidor** o un **patrullero** toca al cubo, el cubo **explota**: se hincha un instante y revienta en 27 pedazos con su mismo aspecto (blancos con aristas grises), saltan, rebotan en el suelo girando y se encogen hasta desaparecer (≈1,6 s en total, con una nube de polvo, temblor de cámara y vibración). **Cuando termina la explosión**, el cubo **vuelve a su casilla de salida** con el rumbo inicial. **Conserva la llave** que llevaba, **pierde los power ups**, y el tablero (puertas abiertas, muros rotos, barrotes) y los enemigos se quedan como estaban. Al reaparecer **parpadea** y es **invulnerable** durante 1,5 s.
 
 #### Perseguidor (esfera)
 
@@ -316,12 +317,12 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 
 ### 7.2. Selector de niveles
 
-- Es una **imagen ilustrada del mapa** (`ui/level_select/map.png`, vertical) que ocupa todo el ancho de la pantalla y se **desplaza en vertical**. Tiene un camino que sube desde la **casilla de inicio** (un cubo azul sobre un pedestal, abajo, con el texto «INICIO»/«START») y un **círculo por nivel** a lo largo del camino: el primero es el nivel 1. El juego tendrá **100 niveles**; la imagen actual tiene 115 círculos (los que no tienen nivel se ven como bloqueados).
+- Es una **imagen ilustrada del mapa** (`ui/level_select/map.png`, vertical) que ocupa **toda la pantalla**, sin título ni bordes (llena el ancho y se **desplaza en vertical**). Arriba a la izquierda, superpuesto al mapa, hay un botón con una **flecha hacia atrás** que vuelve al menú principal. Tiene un camino que sube desde la **casilla de inicio** (un cubo azul sobre un pedestal, abajo, con el texto «INICIO»/«START») y un **círculo por nivel** a lo largo del camino: el primero es el nivel 1. El juego tendrá **100 niveles**; la imagen actual tiene 115 círculos (los que no tienen nivel se ven como bloqueados).
 - El mapa se divide en **cinco zonas**, de abajo arriba, con su nombre en un cartel a la izquierda, alineado a la izquierda y precedido de su número romano en la misma línea («II. LAS TIERRAS SALVAJES»; todos los carteles con el mismo tamaño de letra): **I. El mundo de los cubos**, **II. Las tierras salvajes**, **III. El mundo desconocido**, **IV. Los territorios corrompidos** y **V. El núcleo enemigo** (en inglés: The World of Cubes, The Wildlands, The Unknown World, The Corrupted Territories y The Enemy Core).
 - En cada círculo se ve el **número del nivel**. Los **completados** se tapan con un círculo **verde** y el **activo** (el siguiente por jugar) con uno **dorado** que late. En los **bloqueados**, y en los círculos de niveles que aún no existen, el número se ve **atenuado** sobre el gris de la imagen, y no se pueden pulsar.
 - Se desplaza **arrastrando** con el dedo (con inercia) o con la rueda del ratón. Al entrar, se centra en vertical en el nivel activo (y se vuelve a centrar si cambia el tamaño de la pantalla mientras el jugador no lo haya movido). Tocar un círculo desbloqueado juega ese nivel. Con el teclado, arriba y abajo cambian el nivel elegido (se marca con un anillo blanco) e Intro lo juega.
 - La posición de los círculos, su zona, los huecos de los carteles y el del texto «INICIO» están en `ui/level_select/map.json`, que **se genera a partir de la imagen** con `tools/find_level_circles.py` (detecta los círculos grises, los ordena siguiendo el camino, los carteles y el cubo de inicio). Al cambiar la imagen basta con volver a ejecutarlo y revisar la imagen de control que genera con `--check`. Los círculos verde y dorado (`circle_done.png` y `circle_active.png`) los dibuja `tools/make_circle_sprites.py`.
-- **Truco para pruebas** (solo en las versiones de depuración): tocar **5 veces seguidas** el título «Elige un nivel» desbloquea todos los niveles (sin marcarlos como completados). Se guarda en el dispositivo.
+- **Truco para pruebas** (solo en las versiones de depuración): tocar **5 veces seguidas** el rótulo «INICIO» del mapa desbloquea todos los niveles (sin marcarlos como completados). Se guarda en el dispositivo.
 
 ### 7.3. Pantalla de carga
 

@@ -1,7 +1,7 @@
 class_name CubeExplosion
 extends Node3D
 ## Explosión del cubo al morir: el cubo se hincha un instante y revienta en
-## GRID³ pedazos que conservan los colores de sus caras. Los pedazos saltan
+## GRID³ pedazos con el aspecto del cubo (blancos con aristas grises). Los pedazos saltan
 ## hacia fuera, caen, rebotan en el suelo girando y al final se encogen hasta
 ## desaparecer. Al terminar emite `finished` y se libera sola. Si el cubo
 ## explota en el vacío (sin suelo), los pedazos siguen cayendo sin rebotar.
@@ -41,7 +41,7 @@ var _rng := RandomNumberGenerator.new()
 
 
 ## `body_mesh` es la malla del cubo (para el hinchado), `piece_mesh` la de un
-## pedazo (un cubo con los mismos colores por cara), `basis` la orientación
+## pedazo (un cubo más pequeño con el mismo aspecto), `basis` la orientación
 ## del cubo, `size` su lado y `has_floor` si hay suelo debajo para rebotar.
 static func create(body_mesh: Mesh, piece_mesh: Mesh, basis: Basis, size: float,
 		has_floor := true) -> CubeExplosion:

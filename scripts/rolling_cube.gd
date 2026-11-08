@@ -93,11 +93,12 @@ const FALL_DOWN_SPEED := 0.8
 const FALL_SPIN := 6.5
 ## Lado del cubo.
 const SIZE := 0.98
-## Color de cada cara del cubo (derecha, izquierda, arriba, abajo, detrás, delante).
-const FACE_COLORS: Array[Color] = [
-	Color(0.90, 0.30, 0.30), Color(0.30, 0.70, 0.95), Color(0.98, 0.85, 0.30),
-	Color(0.55, 0.40, 0.85), Color(0.35, 0.80, 0.45), Color(0.98, 0.60, 0.25),
-]
+## Colores del cubo: todas las caras blancas (la iluminación y las sombras
+## distinguen las caras) con las aristas en gris claro.
+const FACE_COLOR := Color(1.0, 1.0, 1.0)
+const EDGE_COLOR := Color(0.74, 0.75, 0.78)
+## Ancho del marco de las aristas en cada cara, como fracción del lado.
+const EDGE_WIDTH := 0.07
 
 ## Material del humo, compartido (bocanada redonda de bordes suaves).
 static var _smoke_material: StandardMaterial3D
@@ -722,33 +723,43 @@ static func _snap_basis(b: Basis) -> Basis:
 	return Basis(cols[0], cols[1], cols[2])
 
 
-## Cubo con un color distinto por cara para que se vea claramente el vuelco.
+## Cubo blanco con las aristas en gris claro: cada cara es un cuadrado
+## blanco rodeado de un marco gris (cuatro trapecios hasta el borde).
 static func _build_colored_cube(size: float) -> ArrayMesh:
 	var h := size * 0.5
+	var inner := 1.0 - EDGE_WIDTH * 2.0
 	var normals: Array[Vector3] = [Vector3.RIGHT, Vector3.LEFT, Vector3.UP, Vector3.DOWN,
 		Vector3.BACK, Vector3.FORWARD]
-	var faces := []
-	for i in normals.size():
-		faces.append([normals[i], FACE_COLORS[i]])
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for face in faces:
-		var n: Vector3 = face[0]
-		var color: Color = face[1]
+	for n in normals:
 		var u := (n.cross(Vector3.UP) if absf(n.y) < 0.5 else n.cross(Vector3.RIGHT)).normalized()
 		var v := n.cross(u)
 		var corner := func(a: float, b: float) -> Vector3: return (n + u * a + v * b) * h
-		# Orden horario visto desde fuera (cara frontal en Godot).
-		for p in [corner.call(-1, -1), corner.call(1, 1), corner.call(1, -1),
-				corner.call(-1, -1), corner.call(-1, 1), corner.call(1, 1)]:
-			st.set_color(color)
-			st.set_normal(n)
-			st.add_vertex(p)
+		# Esquinas exteriores e interiores, en el mismo sentido de giro.
+		var outer_pts: Array[Vector3] = [corner.call(-1, -1), corner.call(1, -1),
+			corner.call(1, 1), corner.call(-1, 1)]
+		var inner_pts: Array[Vector3] = [corner.call(-inner, -inner), corner.call(inner, -inner),
+			corner.call(inner, inner), corner.call(-inner, inner)]
+		_add_quad(st, n, FACE_COLOR, inner_pts[0], inner_pts[1], inner_pts[2], inner_pts[3])
+		for k in 4:
+			var k2 := (k + 1) % 4
+			_add_quad(st, n, EDGE_COLOR, outer_pts[k], outer_pts[k2], inner_pts[k2], inner_pts[k])
 	var mat := StandardMaterial3D.new()
 	mat.vertex_color_use_as_albedo = true
 	mat.roughness = 0.6
 	st.set_material(mat)
 	return st.commit()
+
+
+## Cuadrilátero a-b-c-d (esquinas en orden antihorario visto desde fuera de
+## la cara de normal `n`), en dos triángulos con el orden de Godot.
+static func _add_quad(st: SurfaceTool, n: Vector3, color: Color,
+		a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> void:
+	for p in [a, c, b, a, d, c]:
+		st.set_color(color)
+		st.set_normal(n)
+		st.add_vertex(p)
 
 
 static func _build_arrow_mesh() -> PrismMesh:

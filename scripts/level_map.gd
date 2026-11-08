@@ -1,7 +1,8 @@
 class_name LevelMap
 extends Control
-## Selector de niveles: la imagen del mapa (ui/level_select/map.png) a todo
-## el ancho, con desplazamiento vertical, y encima el estado de cada nivel.
+## Selector de niveles: la imagen del mapa (ui/level_select/map.png) a toda
+## la pantalla (ocupa todo el ancho y se desplaza en vertical), y encima el
+## estado de cada nivel.
 ##
 ## La imagen trae dibujados el camino, los círculos grises de los niveles,
 ## la casilla de inicio y los carteles de las zonas. Dónde está cada cosa lo
@@ -28,6 +29,8 @@ extends Control
 ## como clic (emulate_mouse_from_touch) y en el PC el ratón se emula como toque.
 
 signal level_chosen(index: int)
+## Se ha tocado el rótulo «INICIO» bajo la casilla de salida.
+signal start_tapped
 
 const MAP_TEXTURE := preload("res://ui/level_select/map.png")
 const DONE_TEXTURE := preload("res://ui/level_select/circle_done.png")
@@ -337,9 +340,12 @@ func _wrap(words: Array[String], font: Font, font_size: int, max_width: float) -
 
 # --- Posiciones -----------------------------------------------------------------
 
-## Escala de la imagen: ocupa todo el ancho del mapa.
+## Escala de la imagen: ocupa todo el ancho del mapa y, como mínimo, todo
+## el alto (si sobra anchura se recorta por los lados, centrada).
 func _scale() -> float:
-	return size.x / _image_size.x if _image_size.x > 0.0 else 1.0
+	if _image_size.x <= 0.0 or _image_size.y <= 0.0:
+		return 1.0
+	return maxf(size.x / _image_size.x, size.y / _image_size.y)
 
 
 func _content_height() -> float:
@@ -349,10 +355,8 @@ func _content_height() -> float:
 ## Esquina superior izquierda de la imagen en pantalla. Con _scroll = 0 se ve
 ## la parte de abajo (la salida); al subir, _scroll crece.
 func _image_origin() -> Vector2:
-	var content := _content_height()
-	if content <= size.y:
-		return Vector2(0, (size.y - content) * 0.5)
-	return Vector2(0, size.y - content + _scroll)
+	var x := (size.x - _image_size.x * _scale()) * 0.5
+	return Vector2(x, size.y - _content_height() + _scroll)
 
 
 func _to_screen(point: Vector2) -> Vector2:
@@ -370,6 +374,9 @@ func _circle_center(i: int) -> Vector2:
 # --- Selección y desplazamiento ---------------------------------------------
 
 func _tap(at: Vector2) -> void:
+	if _to_screen_rect(_start_label).grow(12.0).has_point(at):
+		start_tapped.emit()
+		return
 	for i in _circles.size():
 		var half: Vector2 = _circles[i]["size"] * _scale() * (0.5 + TAP_MARGIN)
 		var d := (at - _circle_center(i)) / half

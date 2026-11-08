@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" path="res://scripts/menu.gd" id="1_menu"]
 [ext_resource type="Script" path="res://scripts/level_map.gd" id="2_map"]
+[ext_resource type="Texture2D" path="res://ui/back_arrow.svg" id="3_back"]
 
 [node name="Menu" type="Control"]
 layout_mode = 3
@@ -74,7 +75,7 @@ layout_mode = 2
 size_flags_horizontal = 4
 text = "MENU_QUIT"
 
-[node name="LevelsScreen" type="MarginContainer" parent="."]
+[node name="LevelsScreen" type="Control" parent="."]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
@@ -83,33 +84,28 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 16
-theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 16
 
-[node name="VBox" type="VBoxContainer" parent="LevelsScreen"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Title" type="Label" parent="LevelsScreen/VBox"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 52
-text = "LEVELS_TITLE"
-horizontal_alignment = 1
-
-[node name="LevelMap" type="Control" parent="LevelsScreen/VBox"]
+[node name="LevelMap" type="Control" parent="LevelsScreen"]
 unique_name_in_owner = true
-layout_mode = 2
-size_flags_vertical = 3
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 script = ExtResource("2_map")
 
-[node name="LevelsBack" type="Button" parent="LevelsScreen/VBox"]
+[node name="LevelsBack" type="Button" parent="LevelsScreen"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(280, 76)
-layout_mode = 2
-size_flags_horizontal = 4
-text = "MENU_BACK"
+custom_minimum_size = Vector2(104, 88)
+layout_mode = 0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 124.0
+offset_bottom = 108.0
+focus_mode = 0
+icon = ExtResource("3_back")
+icon_alignment = 1
 
 [node name="OptionsScreen" type="CenterContainer" parent="."]
 unique_name_in_owner = true
