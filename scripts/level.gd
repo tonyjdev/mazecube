@@ -66,6 +66,11 @@ const DEFAULT_THEME := {"floor": "grass", "wall": "stone_bricks"}
 ## debajo que no da al vacío (la del borde se deja con su color).
 const FLOOR_DARK_TINT := Color(0.88, 0.88, 0.88)
 const FOUNDATION_INNER_TINT := Color(0.78, 0.78, 0.78)
+## Color de las casillas de salida y meta y de su luz (ver TileGlow).
+const START_COLOR := Color(0.35, 0.60, 0.95)
+const GOAL_COLOR := Color(0.30, 0.80, 0.45)
+## La luz de la meta es más fuerte que la de la salida (TileGlow.power).
+const GOAL_GLOW_POWER := 2.0
 const ITEM_COLORS := {
 	"y": Color(0.98, 0.80, 0.12),
 	"o": Color(1.00, 0.50, 0.08),
@@ -148,7 +153,7 @@ var _enemies: Array[Enemy] = []
 var _bridges := {}
 ## Aparición en curso: tiempo transcurrido, retraso de cada casilla,
 ## MultiMesh ({ "multimesh", "materials", "cells" }; la opacidad de cada
-## casilla va en el color de su instancia) y nodos sueltos ({ "delay",
+## casilla va en el color de su instancia) y nodos sueltos ({ "delay", "node",
 ## "materials": [...] }, ver _fade_materials).
 var _revealing := false
 var _reveal_time := 0.0
@@ -190,8 +195,8 @@ func build() -> void:
 	var enemy_cells := {}
 	var bridge_cells := {}
 
-	var start_mat := _make_material(Color(0.35, 0.60, 0.95))
-	var goal_mat := _make_material(Color(0.30, 0.80, 0.45))
+	var start_mat := _make_material(START_COLOR)
+	var goal_mat := _make_material(GOAL_COLOR)
 	# Muros y baldosas normales se dibujan con MultiMesh (una llamada de dibujo
 	# por tipo de bloque): los mapas grandes tienen miles de casillas.
 	var wall_cells: Array[Vector2i] = []
@@ -221,9 +226,11 @@ func build() -> void:
 			if symbol == "A":
 				start_cell = cell
 				_add_box(cell, tile, -FLOOR_THICKNESS * 0.5, start_mat)
+				_add_glow(cell, START_COLOR)
 			elif symbol == "B":
 				goal_cell = cell
 				_add_box(cell, tile, -FLOOR_THICKNESS * 0.5, goal_mat)
+				_add_glow(cell, GOAL_COLOR, GOAL_GLOW_POWER)
 			else:
 				_group(floor_groups, "%s|%d" % [_block_at(cell, "floor"), (x + z) % 2], cell)
 			if KEY_CHARS.contains(symbol):
@@ -535,7 +542,7 @@ func start_reveal() -> void:
 			continue
 		var cell := Vector2i(roundi(node.position.x / CELL_SIZE), roundi(node.position.z / CELL_SIZE))
 		_reveal_nodes.append({"delay": _reveal_delays.get(cell, 0.0),
-			"materials": _fade_materials(node)})
+			"materials": _fade_materials(node), "node": node})
 	set_enemies_frozen(true)
 	_revealing = true
 	# Todo empieza transparente.
@@ -572,6 +579,8 @@ func _finish_reveal() -> void:
 			mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
 			mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_OPAQUE_ONLY
 	for entry in _reveal_nodes:
+		if entry["node"] is TileGlow and is_instance_valid(entry["node"]):
+			entry["node"].set_reveal_alpha(1.0)
 		for item: Dictionary in entry["materials"]:
 			var mesh_instance: MeshInstance3D = item["node"]
 			if not is_instance_valid(mesh_instance):
@@ -599,6 +608,8 @@ func _apply_reveal() -> void:
 		for item: Dictionary in entry["materials"]:
 			var mat: BaseMaterial3D = item["material"]
 			mat.albedo_color.a = item["alpha"] * k
+		if entry["node"] is TileGlow and is_instance_valid(entry["node"]):
+			entry["node"].set_reveal_alpha(k)
 
 
 ## Pone a las mallas de `node` (y sus descendientes) copias transparentes
@@ -776,6 +787,13 @@ func _add_bridges(bridge_cells: Dictionary) -> void:
 			add_child(bridge)
 			for cell in run:
 				_bridges[cell] = bridge
+
+
+## Luz que sale del suelo de la casilla (salida y meta).
+func _add_glow(cell: Vector2i, glow_color: Color, power := 1.0) -> void:
+	var glow := TileGlow.create(glow_color, power)
+	glow.position = Vector3(cell.x * CELL_SIZE, 0.0, cell.y * CELL_SIZE)
+	add_child(glow)
 
 
 func _add_box(cell: Vector2i, size: Vector3, y: float, mat: Material) -> MeshInstance3D:

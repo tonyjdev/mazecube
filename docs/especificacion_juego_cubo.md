@@ -197,6 +197,7 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 
 - El escenario es un **laberinto**.
 - El cubo debe llegar desde una **casilla inicial A** hasta una **casilla de destino B**.
+- La salida (azul) y la meta (verde) tienen una **luz que sale del suelo**: varios haces transparentes de distinta altura e intensidad que laten y se desvanecen hacia arriba, un resplandor sobre la baldosa y **partículas** que suben en **zigzag**, se encogen y desaparecen. La de la **meta es más llamativa** para que se vea desde lejos: haces más altos e intensos con un haz central, una luz verde que ilumina las paredes de alrededor y **ondas** que se abren sobre el suelo y por encima de los muros. Aparecen a la vez que su casilla al empezar el nivel.
 - Las decisiones del jugador consisten en elegir los momentos apropiados para girar a izquierda o derecha.
 - El juego está orientado a resolver recorridos mediante lógica y anticipación, sin controles complejos.
 
