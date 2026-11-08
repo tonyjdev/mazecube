@@ -69,7 +69,7 @@ El diseño busca combinar **lógica y planificación** con **controles y reglas 
 
 ### 2.8. Llaves y puertas — Confirmada
 
-- **Llave:** abre una puerta. El cubo la coge al llegar a su casilla; en ese momento la llave **desaparece del mapa** y pasa a mostrarse **encima del cubo**, donde **sigue girando** sobre sí misma.
+- **Llave:** abre una puerta. El cubo la coge al llegar a su casilla; en ese momento la llave **sube desde su sitio en el mapa hasta encima del cubo** (≈0,45 s, frenando al llegar y siguiendo al cubo aunque siga rodando), donde **sigue girando** sobre sí misma.
 - Mientras está en el mapa, la llave **gira despacio sobre sí misma**.
 - El cubo **solo puede llevar una llave** a la vez. Si ya lleva una y pasa por la casilla de otra, no ocurre nada: la otra llave se queda en el mapa.
 - **Puerta:** un bloque más estrecho que el cubo que cierra el pasillo de muro a muro, girado 90° según la dirección de los muros que la rodean.
@@ -325,9 +325,10 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 
 - Al entrar en un nivel (desde el selector o con «Siguiente nivel») aparece al momento una **pantalla de carga**: fondo **negro**, el **cubo** del juego **volcando** sobre sí mismo en el centro, el número y el nombre del nivel y el texto «Cargando…».
 - Debajo se muestra un **consejo** sobre las mecánicas o los movimientos, elegido al azar de una lista (sin repetir el anterior). Los consejos están traducidos a los dos idiomas.
-- El nivel se carga sin bloquear la pantalla (el cubo sigue moviéndose) y se prepara detrás, en pausa. Cuando está listo, «Cargando…» se cambia por el botón **Continuar**; al pulsarlo, la pantalla se desvanece y empieza el nivel.
-- **Reiniciar** y **Repetir** no pasan por la pantalla de carga.
-- **Aparición del nivel** (al entrar en él y al reiniciarlo o repetirlo): el tablero se dibuja **casilla a casilla en orden aleatorio** en 1,3 s (cada casilla, con lo que tiene encima, aparece ya en su sitio y con su tamaño, pasando de **transparente a opaca**). Después llega la **aparición del cubo** (2 s): baja girando y creciendo hasta la salida, se posa con un pequeño aplastamiento, una nube de polvo y un golpe, y entonces empieza a rodar. Los enemigos no se mueven hasta ese momento. Así el jugador tiene tiempo de situarse.
+- El nivel se carga sin bloquear la pantalla (el cubo sigue moviéndose) y se prepara detrás, en pausa. Cuando está listo, «Cargando…» se cambia por el botón **Continuar**; al pulsarlo, la pantalla funde a negro y empieza el nivel.
+- **Fundidos a negro:** antes de mostrar la pantalla de carga (desde el selector o con «Siguiente nivel»), la pantalla actual **funde a negro** (0,35 s) y la pantalla de carga aparece desde negro. Al pulsar Continuar vuelve a fundir a negro y la partida **aparece desde negro absoluto** (0,6 s) a la vez que se dibuja el tablero.
+- **Reiniciar** y **Repetir** no pasan por la pantalla de carga: el juego se detiene, la pantalla **funde a negro**, se reconstruye el nivel y la partida **aparece desde negro** igual que al entrar.
+- **Aparición del nivel** (al entrar en él y al reiniciarlo o repetirlo): el tablero se dibuja **casilla a casilla en diagonal**, de arriba a la izquierda a abajo a la derecha, en 1,3 s (cada casilla, con lo que tiene encima, aparece ya en su sitio y con su tamaño, pasando de **transparente a opaca**). Después llega la **aparición del cubo** (2 s): baja girando y creciendo hasta la salida, se posa con un pequeño aplastamiento, una nube de polvo y un golpe, y entonces empieza a rodar. Los enemigos no se mueven hasta ese momento. Así el jugador tiene tiempo de situarse.
 
 ### 7.4. Pausa
 

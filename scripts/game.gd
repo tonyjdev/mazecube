@@ -21,8 +21,10 @@ extends Node3D
 ## RESUME_RAMP_TIME segundos con una curva ease-in cúbica (empieza muy
 ## despacio y acelera).
 ##
-## Inicio del nivel (al entrar o reiniciar): el tablero aparece casilla a
-## casilla (Level.start_reveal) y después aparece el cubo
+## Inicio del nivel (al entrar o reiniciar): la pantalla funde a negro (al
+## reiniciar; al entrar ya viene en negro de la pantalla de carga), aparece
+## desde negro mientras el tablero aparece en diagonal (Level.start_reveal) y
+## después aparece el cubo
 ## (RollingCube.appear); los enemigos no se mueven hasta que el cubo empieza
 ## a rodar.
 ## Al llegar a la meta se marca el nivel como completado y se muestra otro
@@ -75,6 +77,8 @@ var _drag_last := Vector2.ZERO
 var _speed_tween: Tween
 ## Cuenta de inicios del nivel: un reinicio cancela la secuencia anterior.
 var _intro_id := 0
+## Fundiendo a negro para reiniciar.
+var _restarting := false
 
 @onready var level: Level = $Level
 @onready var cube: RollingCube = $Cube
@@ -137,13 +141,13 @@ func _ready() -> void:
 	pause_button.pressed.connect(_set_paused.bind(true))
 	%ContinueButton.pressed.connect(_set_paused.bind(false))
 	%RestartButton.pressed.connect(func() -> void:
+		# Sigue en pausa mientras la pantalla funde a negro.
 		_close_pause_menu()
-		get_tree().paused = false
-		_restart())
+		_restart_with_fade())
 	%DragArea.gui_input.connect(_on_drag_area_input)
 	%QuitButton.pressed.connect(GameState.go_to_menu.bind("levels"))
 	next_button.pressed.connect(_next_level)
-	%RetryButton.pressed.connect(_restart)
+	%RetryButton.pressed.connect(_restart_with_fade)
 	%LevelsButton.pressed.connect(GameState.go_to_menu.bind("levels"))
 
 	left_hint.modulate.a = HINT_IDLE_ALPHA
@@ -199,7 +203,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_keys_held[RollingCube.TURN_RIGHT] = true
 		_press_side(RollingCube.TURN_RIGHT)
 	elif event.is_action_pressed("restart"):
-		_restart()
+		_restart_with_fade()
 	elif event.is_action_pressed("next_level") and complete_menu.visible:
 		_next_level()
 	elif OS.is_debug_build() and event is InputEventKey and event.pressed and not event.echo:
@@ -249,7 +253,7 @@ func _toggle_pause() -> void:
 ## vuelve a su sitio con el juego aún en pausa y después se reanuda.
 func _set_paused(paused: bool) -> void:
 	if paused:
-		if complete_menu.visible or pause_menu.visible:
+		if complete_menu.visible or pause_menu.visible or _restarting:
 			return
 		_stop_speed_ramp()
 		get_tree().paused = true
@@ -314,6 +318,20 @@ func _on_drag_area_input(event: InputEvent) -> void:
 		_drag_last = motion.position
 
 
+## Reinicio con transición: el juego se detiene, la pantalla funde a negro,
+## se reconstruye el nivel y vuelve a aparecer desde negro (ver _play_intro).
+func _restart_with_fade() -> void:
+	if _restarting or GameState.is_loading:
+		return
+	_restarting = true
+	_stop_speed_ramp()
+	get_tree().paused = true
+	await GameState.fade_to_black()
+	get_tree().paused = false
+	_restarting = false
+	_restart()
+
+
 func _restart() -> void:
 	# Reconstruir el tablero devuelve a su sitio llaves, puertas y muros.
 	level.build()
@@ -332,6 +350,13 @@ func _play_intro() -> void:
 	_intro_id += 1
 	var id := _intro_id
 	level.start_reveal()
+	# Toda la pantalla aparece desde negro a la vez que el tablero (al entrar
+	# desde la pantalla de carga, cuando esta ya se ha quitado).
+	while GameState.is_loading:
+		await get_tree().process_frame
+	if id != _intro_id:
+		return
+	GameState.fade_from_black()
 	await level.reveal_finished
 	if id != _intro_id:
 		return

@@ -29,7 +29,8 @@ extends Node3D
 ## Las filas crecen hacia +Z (hacia abajo en pantalla) y las columnas hacia +X.
 ##
 ## Aparición (start_reveal): al empezar o reiniciar el nivel, el tablero se
-## dibuja casilla a casilla en orden aleatorio en REVEAL_TIME segundos: cada
+## dibuja casilla a casilla en diagonal, de arriba a la izquierda a abajo a
+## la derecha, en REVEAL_TIME segundos: cada
 ## casilla (suelo, pared, roca y lo que haya encima) aparece en su sitio y
 ## con su tamaño, pasando de transparente a opaca. Mientras tanto los enemigos están
 ## quietos (ver set_enemies_frozen). Al acabar emite reveal_finished.
@@ -407,6 +408,11 @@ func key_color(cell: Vector2i) -> String:
 
 
 ## Quita la llave del mapa y devuelve su color.
+## Posición y giro (globales) de la llave de esa casilla en el mapa.
+func key_transform(cell: Vector2i) -> Transform3D:
+	return _keys[cell]["node"].global_transform if _keys.has(cell) else Transform3D()
+
+
 func take_key(cell: Vector2i) -> String:
 	var color := key_color(cell)
 	if color != "":
@@ -460,24 +466,33 @@ func get_grid_size() -> Vector2i:
 
 # --- Aparición del tablero -----------------------------------------------------
 
-## Oculta el tablero y lo hace aparecer casilla a casilla (ver REVEAL_TIME).
+## Oculta el tablero y lo hace aparecer casilla a casilla en diagonal, desde
+## arriba a la izquierda (ver REVEAL_TIME).
 ## Los enemigos se quedan quietos hasta set_enemies_frozen(false).
 func start_reveal() -> void:
 	_reveal_time = 0.0
 	_reveal_delays.clear()
 	var max_delay := REVEAL_TIME - REVEAL_FADE_TIME
+	var grid := get_grid_size()
+	# Cada diagonal (x + z constante) empieza algo después de la anterior.
+	var diagonals := maxf(1.0, grid.x + grid.y - 2)
 	for z in layout.size():
 		for x in layout[z].length():
-			_reveal_delays[Vector2i(x, z)] = randf() * max_delay
+			_reveal_delays[Vector2i(x, z)] = (x + z) / diagonals * max_delay
+	# Los materiales del fundido escriben profundidad: si no, el suelo y las
+	# paredes (un solo objeto transparente cada uno) taparían lo que tienen
+	# encima según el orden en que se dibujen.
 	for entry in _reveal_multimeshes:
-		(entry["material"] as BaseMaterial3D).transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		var mat: BaseMaterial3D = entry["material"]
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
 	_reveal_nodes.clear()
 	for child in get_children():
 		var node := child as Node3D
 		if node == null or node is MultiMeshInstance3D or node.is_queued_for_deletion():
 			continue
 		var cell := Vector2i(roundi(node.position.x / CELL_SIZE), roundi(node.position.z / CELL_SIZE))
-		_reveal_nodes.append({"delay": _reveal_delays.get(cell, randf() * max_delay),
+		_reveal_nodes.append({"delay": _reveal_delays.get(cell, 0.0),
 			"materials": _fade_materials(node)})
 	set_enemies_frozen(true)
 	_revealing = true
@@ -511,7 +526,9 @@ func _finish_reveal() -> void:
 		var multimesh: MultiMesh = entry["multimesh"]
 		for i in multimesh.instance_count:
 			multimesh.set_instance_color(i, Color.WHITE)
-		(entry["material"] as BaseMaterial3D).transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+		var mat: BaseMaterial3D = entry["material"]
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+		mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_OPAQUE_ONLY
 	for entry in _reveal_nodes:
 		for item: Dictionary in entry["materials"]:
 			var mesh_instance: MeshInstance3D = item["node"]
@@ -580,6 +597,7 @@ static func _fade_copy(material: Material) -> BaseMaterial3D:
 	var fade := base.duplicate() as BaseMaterial3D
 	if fade.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED:
 		fade.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		fade.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
 	return fade
 
 

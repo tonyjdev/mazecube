@@ -3,8 +3,8 @@ extends CanvasLayer
 ## Pantalla de carga de un nivel: fondo negro, el cubo del juego volcando en
 ## el centro, el número y nombre del nivel, «Cargando…» y debajo un consejo
 ## elegido al azar de TIPS. Cuando el nivel está listo (mark_loaded), el texto
-## de carga se cambia por el botón Continuar; al pulsarlo se emite continued y
-## la pantalla se desvanece y se libera sola.
+## de carga se cambia por el botón Continuar; al pulsarlo se emite continued
+## (GameState funde a negro y la quita).
 ##
 ## No pertenece a ninguna escena: GameState la añade a la raíz para que siga
 ## visible mientras se cambia de escena (ver GameState.play_level).
@@ -23,7 +23,6 @@ const CUBE_VIEW_SIZE := 240
 ## Vuelco del cubo: duración de cada giro de 90° y pausa entre giros.
 const ROLL_TIME := 0.35
 const ROLL_PAUSE := 0.12
-const FADE_TIME := 0.25
 const TIP_WIDTH := 880.0
 const DIM_TEXT := Color(0.62, 0.62, 0.66)
 
@@ -113,9 +112,6 @@ func _on_continue() -> void:
 		return
 	_continue_button.visible = false
 	continued.emit()
-	var tween := create_tween()
-	tween.tween_property(get_child(0), "modulate:a", 0.0, FADE_TIME)
-	tween.tween_callback(queue_free)
 
 
 ## Vista 3D propia (con su mundo) en la que vuelca el cubo del juego.

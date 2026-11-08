@@ -7,8 +7,8 @@ extends Node3D
 ## suelo, y solo Body se anima durante el vuelco.
 ##
 ## Llaves y puertas: el cubo coge una llave al llegar a su casilla (solo puede
-## llevar una; si ya lleva otra, no pasa nada). La llave que lleva se muestra
-## encima del cubo. Una puerta cerrada es un obstáculo como una pared: los
+## llevar una; si ya lleva otra, no pasa nada). Al cogerla, la llave sube desde
+## su sitio en el mapa hasta encima del cubo (KEY_LIFT_TIME) y ahí se queda. Una puerta cerrada es un obstáculo como una pared: los
 ## giros hacia ella se descartan y al chocar de frente el cubo rebota; si lleva
 ## la llave de su color, la puerta y la llave desaparecen y el cubo rebota.
 ##
@@ -81,6 +81,9 @@ const TURN_RIGHT := 1
 const HALF := 0.5
 ## Altura sobre el suelo de la llave que lleva el cubo.
 const HELD_KEY_HEIGHT := 2.05
+## Al coger una llave, lo que tarda en subir desde su sitio en el mapa hasta
+## encima del cubo.
+const KEY_LIFT_TIME := 0.45
 ## Media vuelta: tiempo que el cubo se queda parado.
 const REVERSE_PAUSE := 0.2
 ## Humo de la media vuelta: bocanadas por cada lado de la base que salen hacia
@@ -161,6 +164,10 @@ var _grace_left := 0.0
 var _cooldown := 0.0
 var _tween: Tween
 var _held_key_node: Node3D
+## Subida de la llave recién cogida: progreso (1 = ya encima del cubo) y
+## posición de la que sale.
+var _key_lift := 1.0
+var _key_lift_from := Vector3.ZERO
 ## Power ups activos: id -> { "power_up": PowerUp, "stacks": int, "time_left": float }
 var _power_ups := {}
 
@@ -286,6 +293,10 @@ func _process(delta: float) -> void:
 	# La llave que lleva el cubo sigue girando sobre sí misma, como en el mapa.
 	if _held_key_node:
 		_held_key_node.rotate_y(Level.KEY_SPIN_SPEED * delta)
+		if _key_lift < 1.0:
+			_key_lift = minf(_key_lift + delta / KEY_LIFT_TIME, 1.0)
+			if not _rolling:
+				_update_held_key(Vector3.ZERO)
 	if level == null or _rolling or is_finished:
 		return
 	if _cooldown > 0.0:
@@ -451,11 +462,16 @@ func _on_roll_finished(next: Vector2i) -> void:
 	if _dead:
 		return
 	if held_key == "" and level.key_color(cell) != "":
+		# La llave sale de donde estaba en el mapa (con el mismo giro) y sube
+		# hasta encima del cubo (ver _update_held_key).
+		var from := level.key_transform(cell)
 		held_key = level.take_key(cell)
 		_held_key_node = KeyVisual.create(Level.ITEM_COLORS[held_key])
 		_held_key_node.top_level = true
-		_held_key_node.scale = Vector3.ONE * Level.KEY_SCALE
 		add_child(_held_key_node)
+		_held_key_node.global_transform = from
+		_key_lift_from = from.origin
+		_key_lift = 0.0
 		key_picked.emit(held_key)
 	var power_up := level.take_power_up(cell)
 	if power_up:
@@ -735,7 +751,11 @@ static func _get_smoke_material() -> StandardMaterial3D:
 ## cuerpo durante el vuelco).
 func _update_held_key(offset: Vector3) -> void:
 	if _held_key_node:
-		_held_key_node.global_position = global_position + offset + Vector3(0, HELD_KEY_HEIGHT, 0)
+		var target := global_position + offset + Vector3(0, HELD_KEY_HEIGHT, 0)
+		if _key_lift < 1.0:
+			var k := 1.0 - pow(1.0 - _key_lift, 3.0)
+			target = _key_lift_from.lerp(target, k)
+		_held_key_node.global_position = target
 
 
 static func _snap_basis(b: Basis) -> Basis:

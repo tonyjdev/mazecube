@@ -10,6 +10,8 @@ extends Node
 ## - Vibración del móvil (vibrate()), que respeta el ajuste.
 ## - Traducciones: se registran al arrancar a partir de Translations.
 ## - Navegación entre el menú y la partida.
+## - Fundido a negro de toda la pantalla (fade_to_black / fade_from_black),
+##   por encima de todo, para las transiciones al cargar o reiniciar un nivel.
 
 const PROGRESS_PATH := "user://progress.cfg"
 const SETTINGS_PATH := "user://settings.cfg"
@@ -19,6 +21,10 @@ const LOCALES := ["es", "en"]
 ## Fotogramas que se deja el nivel construido detrás de la pantalla de carga
 ## antes de mostrar Continuar (para que se compilen sus materiales).
 const LOADING_SETTLE_FRAMES := 4
+## Fundidos: hacia negro (antes de cargar o reiniciar) y desde negro.
+const FADE_OUT_TIME := 0.35
+const FADE_IN_TIME := 0.6
+const FADE_LAYER := 120
 ## Vibraciones: (duración en ms, intensidad de 0 a 1).
 const VIBRATION_WALL_BROKEN := Vector2(90, 0.8)
 const VIBRATION_TURN_REJECTED := Vector2(18, 0.25)
@@ -46,6 +52,9 @@ var vibration := true
 var _completed: Array[int] = []
 ## Truco para pruebas: todos los niveles desbloqueados (ver unlock_all_levels).
 var _all_unlocked := false
+## Capa negra de los fundidos y su animación en curso.
+var _fade_rect: ColorRect
+var _fade_tween: Tween
 
 
 func _ready() -> void:
@@ -53,6 +62,44 @@ func _ready() -> void:
 	_load_settings()
 	_load_progress()
 	apply_settings()
+	_build_fader()
+
+
+# --- Fundidos a negro -------------------------------------------------------
+
+func _build_fader() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = FADE_LAYER
+	layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(layer)
+	_fade_rect = ColorRect.new()
+	_fade_rect.color = Color(0, 0, 0, 0)
+	_fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fade_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(_fade_rect)
+
+
+## Oscurece la pantalla hasta negro absoluto (se puede esperar con await).
+## Mientras está negra no deja pasar toques ni clics.
+func fade_to_black(duration := FADE_OUT_TIME) -> void:
+	_fade_rect.mouse_filter = Control.MOUSE_FILTER_STOP
+	_start_fade(1.0, duration)
+	await _fade_tween.finished
+
+
+## Aclara la pantalla desde negro absoluto (se puede esperar con await).
+func fade_from_black(duration := FADE_IN_TIME) -> void:
+	_fade_rect.color.a = 1.0
+	_fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_start_fade(0.0, duration)
+	await _fade_tween.finished
+
+
+func _start_fade(alpha: float, duration: float) -> void:
+	if _fade_tween and _fade_tween.is_valid():
+		_fade_tween.kill()
+	_fade_tween = _fade_rect.create_tween().set_ignore_time_scale(true)
+	_fade_tween.tween_property(_fade_rect, "color:a", alpha, duration)
 
 
 # --- Progreso ---------------------------------------------------------------
@@ -198,16 +245,21 @@ func _apply_antialiasing() -> void:
 ## 3. Se cambia a la escena del juego, que se construye en pausa detrás de la
 ##    pantalla de carga, y se dejan pasar unos fotogramas para que se preparen
 ##    sus materiales.
-## 4. Aparece el botón Continuar; al pulsarlo, el juego se reanuda.
+## 4. Aparece el botón Continuar; al pulsarlo, la pantalla funde a negro, se
+##    quita la pantalla de carga y el juego se reanuda (la partida aparece
+##    después desde negro, ver Game).
+## Antes de todo, la pantalla actual funde a negro.
 func play_level(index: int) -> void:
 	if is_loading:
 		return
 	current_level = clampi(index, 0, Levels.count() - 1)
 	is_loading = true
 	var tree := get_tree()
+	await fade_to_black()
 	tree.paused = false
 	var screen := LoadingScreen.new(current_level)
 	tree.root.add_child(screen)
+	fade_from_black()
 	# Dos fotogramas para que la pantalla de carga se vea antes de cargar nada.
 	await tree.process_frame
 	await tree.process_frame
@@ -226,6 +278,8 @@ func play_level(index: int) -> void:
 		await tree.process_frame
 	screen.mark_loaded()
 	await screen.continued
+	await fade_to_black()
+	screen.queue_free()
 	tree.paused = false
 	is_loading = false
 
