@@ -70,6 +70,7 @@ const MESSAGES := {
 		"TIP_PATROL": "Los octaedros morados siempre siguen la misma ruta: observa su ritmo y pasa cuando no estén.",
 		"TIP_BLOCKER": "El dodecaedro no hace daño, pero intenta cortarte el paso. Usa los barrotes para encerrarlo.",
 		"TIP_VOID": "Donde no hay paredes ni suelo está el vacío: si no giras a tiempo, el cubo se cae.",
+		"TIP_BRIDGE": "Los puentes colgantes se gastan cada vez que pasas: cuanto más polvo sueltan, menos aguantan. Si una tabla cede, el puente entero se cae.",
 	},
 	"en": {
 		"MENU_PLAY": "Play",
@@ -134,6 +135,7 @@ const MESSAGES := {
 		"TIP_PATROL": "The purple octahedra always follow the same route: watch their rhythm and pass when they're away.",
 		"TIP_BLOCKER": "The dodecahedron doesn't hurt you, but it tries to block your way. Use the bars to lock it in.",
 		"TIP_VOID": "Where there are no walls and no floor lies the void: turn in time or the cube will fall.",
+		"TIP_BRIDGE": "Rope bridges wear out every time you cross them: the more dust they shed, the less they'll hold. If one plank gives way, the whole bridge falls.",
 		"Primer giro": "First Turn",
 		"El muro": "The Wall",
 		"La llave": "The Key",
@@ -166,6 +168,9 @@ const MESSAGES := {
 		"El gran laberinto": "The Great Labyrinth",
 		"Al borde": "On the Edge",
 		"El abismo": "The Abyss",
+		"El puente colgante": "The Rope Bridge",
+		"Tablones gastados": "Worn Planks",
+		"Tres puentes": "Three Bridges",
 	},
 }
 

@@ -21,6 +21,11 @@ extends Node3D
 ##   explota (ver RollingCube). Fuera del mapa también es vacío. En los
 ##   niveles con vacío, bajo cada casilla con suelo o pared se dibuja un
 ##   bloque de roca para que el tablero parezca flotar.
+##   Puente colgante: '=' = casilla de puente sobre el vacío. Las casillas '='
+##   seguidas forman un puente recto, con vacío a ambos lados y suelo en los
+##   dos extremos. Cada casilla aguanta HangingBridge.MAX_STABILITY salidas
+##   del cubo; cuando una llega a 0 el puente entero cae y sus casillas pasan
+##   a ser vacío (ver HangingBridge).
 ## Las filas crecen hacia +Z (hacia abajo en pantalla) y las columnas hacia +X.
 
 const CELL_SIZE := 1.0
@@ -34,6 +39,7 @@ const CHASER_CHAR := "x"
 const BLOCKER_CHAR := "z"
 const PATROL_CHARS := "ijkmn"
 const VOID_CHAR := "~"
+const BRIDGE_CHAR := "="
 ## Profundidad del bloque de roca bajo las casillas en los niveles con vacío.
 const FOUNDATION_DEPTH := 0.9
 ## Distancia (en casillas) entre el centro del cubo y el de un enemigo letal a
@@ -106,6 +112,8 @@ var _bars := {}
 ##             "near": { casilla: casillas de recorrido hasta el botón } }
 var _buttons := {}
 var _enemies: Array[Enemy] = []
+## casilla -> HangingBridge (solo los que siguen en pie)
+var _bridges := {}
 
 
 func _ready() -> void:
@@ -132,7 +140,9 @@ func build() -> void:
 	_bars.clear()
 	_buttons.clear()
 	_enemies.clear()
+	_bridges.clear()
 	var enemy_cells := {}
+	var bridge_cells := {}
 
 	var floor_a := _make_material(Color(0.86, 0.84, 0.80))
 	var floor_b := _make_material(Color(0.78, 0.76, 0.72))
@@ -158,6 +168,9 @@ func build() -> void:
 					_add_button(cell, symbol)
 				continue
 			_walkable[cell] = true
+			if symbol == BRIDGE_CHAR:
+				bridge_cells[cell] = true
+				continue
 			var tile := Vector3(CELL_SIZE * 0.96, FLOOR_THICKNESS, CELL_SIZE * 0.96)
 			if symbol == "A":
 				start_cell = cell
@@ -185,6 +198,7 @@ func build() -> void:
 	_add_multimesh(floor_cells[1], tile_size, -FLOOR_THICKNESS * 0.5, floor_b)
 	if not _void.is_empty():
 		_add_foundations(wall_cells)
+	_add_bridges(bridge_cells)
 	for cell: Vector2i in enemy_cells:
 		_add_enemy(cell, enemy_cells[cell])
 	for button in _buttons.values():
@@ -218,6 +232,40 @@ func is_void(cell: Vector2i) -> bool:
 	if _void.has(cell):
 		return true
 	return cell.y < 0 or cell.y >= layout.size() or cell.x < 0 or cell.x >= layout[cell.y].length()
+
+
+## Casilla de un puente colgante que sigue en pie.
+func is_bridge(cell: Vector2i) -> bool:
+	return _bridges.has(cell)
+
+
+## Estabilidad que le queda a una casilla de puente (0..MAX_STABILITY), o -1
+## si no es un puente en pie.
+func bridge_stability(cell: Vector2i) -> int:
+	return _bridges[cell].stability(cell) if _bridges.has(cell) else -1
+
+
+## El cubo acaba de salir de `cell` (ya está en otra casilla): si era un
+## puente, pierde estabilidad y, si llega a 0, el puente entero cae, con el
+## cubo si sigue encima.
+func cube_left_cell(cell: Vector2i) -> void:
+	if not _bridges.has(cell):
+		return
+	var bridge: HangingBridge = _bridges[cell]
+	if not bridge.wear(cell):
+		Sfx.play("creak", 0.1, -4.0 * bridge.stability(cell))
+		return
+	var cube_cell := NO_CELL
+	if cube and cube.is_alive() and (bridge.has_cell(cube.cell) or bridge.has_cell(cube.roll_target())):
+		cube_cell = cube.cell if bridge.has_cell(cube.cell) else cube.roll_target()
+	for c in bridge.cells:
+		_bridges.erase(c)
+		_walkable.erase(c)
+		_void[c] = true
+	bridge.collapse(cell, cube_cell)
+	Sfx.play("collapse")
+	if cube_cell != NO_CELL:
+		cube.drop()
 
 
 ## Casilla con suelo (no es pared), haya lo que haya en ella.
@@ -414,6 +462,8 @@ func _add_foundations(wall_cells: Array[Vector2i]) -> void:
 	cells.append_array(wall_cells)
 	cells.append_array(_walkable.keys())
 	for cell in cells:
+		if bridge_cell(cell):
+			continue
 		var at_edge := false
 		for dir: Vector2i in [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
 			if is_void(cell + dir):
@@ -424,6 +474,41 @@ func _add_foundations(wall_cells: Array[Vector2i]) -> void:
 	var y := -FLOOR_THICKNESS - FOUNDATION_DEPTH * 0.5
 	_add_multimesh(inner, size, y, _make_material(Color(0.36, 0.31, 0.27)))
 	_add_multimesh(edge, size, y, _make_material(Color(0.47, 0.41, 0.35)))
+
+
+## La casilla es '=' en el mapa (aunque el puente ya se haya caído).
+func bridge_cell(cell: Vector2i) -> bool:
+	return cell.y >= 0 and cell.y < layout.size() and cell.x >= 0 and cell.x < layout[cell.y].length() \
+		and layout[cell.y][cell.x] == BRIDGE_CHAR
+
+
+## Agrupa las casillas '=' en puentes rectos (horizontales o verticales).
+func _add_bridges(bridge_cells: Dictionary) -> void:
+	var pending := bridge_cells.duplicate()
+	for z in layout.size():
+		for x in layout[z].length():
+			var first := Vector2i(x, z)
+			if not pending.has(first):
+				continue
+			var along := Vector2i.RIGHT
+			if not bridge_cells.has(first + Vector2i.RIGHT) and bridge_cells.has(first + Vector2i.DOWN):
+				along = Vector2i.DOWN
+			elif not bridge_cells.has(first + Vector2i.RIGHT):
+				# Puente de una casilla: va de un suelo al otro.
+				if has_floor(first + Vector2i.UP) and has_floor(first + Vector2i.DOWN):
+					along = Vector2i.DOWN
+			var run: Array[Vector2i] = []
+			var c := first
+			while pending.has(c):
+				run.append(c)
+				pending.erase(c)
+				c += along
+			var bridge := HangingBridge.new()
+			bridge.name = "Bridge%d" % get_child_count()
+			bridge.setup(run, along, CELL_SIZE)
+			add_child(bridge)
+			for cell in run:
+				_bridges[cell] = bridge
 
 
 func _add_box(cell: Vector2i, size: Vector3, y: float, mat: Material) -> MeshInstance3D:

@@ -154,6 +154,16 @@ def main():
     # Caída al vacío: silbido que baja de tono con un soplo de aire.
     save("fall", mix(tone(1100, 0.7, "triangle", attack=0.02, decay=0.45, sweep_to=180, vibrato=0.015),
                      noise(0.7, decay=0.4, lowpass=0.12, volume=0.35, attack=0.05)), peak=0.45)
+    # Puente colgante que pierde estabilidad: crujido de madera (tono grave
+    # que tiembla y baja, con roce).
+    save("creak", mix(tone(190, 0.32, "bell", attack=0.03, decay=0.14, sweep_to=150, vibrato=0.06),
+                      noise(0.3, decay=0.1, lowpass=0.2, volume=0.35, attack=0.02)), peak=0.45)
+    # Puente que se cae: chasquido de madera y tablones que se alejan.
+    snap = [noise(0.06, decay=0.015, lowpass=0.9), tone(260, 0.2, decay=0.05, sweep_to=140, volume=0.8)]
+    for i in range(7):
+        snap.append(offset(mix(tone(320 - i * 25, 0.12, "bell", decay=0.04, volume=0.55 - i * 0.06),
+                               noise(0.08, decay=0.02, lowpass=0.4, volume=0.4 - i * 0.04)), 0.08 + i * 0.09))
+    save("collapse", mix(*snap), peak=0.8)
     print("Sonidos generados en", OUT)
 
 

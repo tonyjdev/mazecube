@@ -334,6 +334,35 @@ func _fall_to(next: Vector2i) -> void:
 	fell.emit(cell)
 
 
+## El suelo desaparece bajo el cubo (se cae el puente colgante en el que
+## está): deja de volcar donde esté y cae en vertical, girando despacio.
+func drop() -> void:
+	if _dead:
+		return
+	if _tween and _tween.is_valid():
+		_tween.kill()
+	_dead = true
+	_falling = true
+	_fall_time = 0.0
+	_rolling = false
+	_pending_turn = 0
+	_pending_reverse = false
+	_clear_rejected_flash()
+	_end_all_power_ups()
+	_arrow.visible = false
+	if _held_key_node:
+		_held_key_node.visible = false
+	var dir := Vector3(heading.x, 0, heading.y)
+	_fall_axis = Vector3.UP.cross(dir)
+	_fall_velocity = dir * FALL_FORWARD_SPEED * 0.3 + Vector3.DOWN * FALL_DOWN_SPEED * 0.3
+	fell.emit(cell)
+
+
+## Casilla hacia la que está volcando (o la suya si está quieto).
+func roll_target() -> Vector2i:
+	return _roll_target if _rolling else cell
+
+
 ## Caída libre girando; al acabar FALL_TIME explota en el aire.
 func _process_fall(delta: float) -> void:
 	_fall_time += delta
@@ -352,10 +381,16 @@ func _apply_roll(t: float, start: Transform3D, pivot: Vector3, axis: Vector3, ar
 
 
 func _on_roll_finished(next: Vector2i) -> void:
+	var left := cell
 	cell = next
 	global_position = level.cell_to_world(cell)
 	_body.transform = Transform3D(_snap_basis(_body.transform.basis), Vector3(0, HALF, 0))
 	_rolling = false
+	# Al salir de una casilla de puente colgante, ésta pierde estabilidad; si
+	# el puente se cae con el cubo encima, el cubo cae con él (drop()).
+	level.cube_left_cell(left)
+	if _dead:
+		return
 	if held_key == "" and level.key_color(cell) != "":
 		held_key = level.take_key(cell)
 		_held_key_node = KeyVisual.create(Level.ITEM_COLORS[held_key])

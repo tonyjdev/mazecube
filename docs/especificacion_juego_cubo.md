@@ -180,6 +180,21 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 - Si el cubo entra en el vacío, **vuelca por el borde**, **cae girando** (≈0,6 s, con un silbido que baja de tono) y **explota en el aire**: los pedazos siguen cayendo sin rebotar. Cuando termina la explosión vuelve a la salida igual que al morir por un enemigo (apartado 2.13). Se cae aunque esté en su tiempo de invulnerabilidad.
 - Los enemigos nunca entran en el vacío.
 
+### 2.15. Puentes colgantes — Implementada en el prototipo
+
+- Un **puente colgante** es una fila recta de casillas de tablones sobre el vacío, con cuerdas a los lados y postes en los extremos. Une dos zonas con suelo y **no tiene muros a los lados** (a ambos lados hay vacío). Como en cualquier puente, girar sobre él tira al cubo al vacío.
+- Es **inestable**: cada casilla tiene su propia **estabilidad**, que empieza siempre en el **100 %** y baja un **25 %** cada vez que el cubo **sale** de ella, vaya en la dirección que vaya (también al volver sobre sus pasos o dar media vuelta encima). Al perder estabilidad la casilla cruje y suelta un poco de polvo.
+- El jugador ve el estado de cada casilla por el **polvo** que suelta y cae al vacío:
+  - **100 %:** no suelta polvo.
+  - **75 %:** cada 8-10 s cae alguna partícula (1-2).
+  - **50 %:** cada 4-7 s caen algunas partículas (2-4).
+  - **25 %:** cada 1-2 s caen partículas (4-7). Además, cada 3-5 s la casilla **se balancea** despacio durante ≈1,8 s: se ladea hasta unos 6° hacia un lado y otro, gira un poco sobre sí misma y cabecea (unos 3°), y se hunde y se desplaza de lado unos centímetros. Cada vaivén empieza hacia un lado al azar. Es solo visual: no afecta al cubo.
+  - **0 %:** el puente se cae.
+- En cuanto **una casilla llega al 0 %**, se cae **el puente entero**: las casillas se desprenden **una tras otra** empezando por la que se ha roto, caen girando con una nube de polvo y desaparecen en el abismo. Esas casillas pasan a ser vacío. Si el cubo sigue sobre el puente, **cae con él** (y vuelve a la salida como en una caída normal).
+- Como el cubo sale de la primera casilla mientras aún está sobre la segunda, un puente de dos casillas o más se puede **cruzar 3 veces sin peligro**: en la 4.ª travesía se cae con el cubo encima. Uno de una sola casilla aguanta 4 travesías.
+- El estado de los puentes **se mantiene** al morir el cubo, como el resto del tablero. Si se cae un puente imprescindible, hay que **reiniciar** el nivel desde el menú de pausa.
+- Los enemigos no pisan los puentes colgantes (los patrulleros no pueden tener rutas que pasen por ellos), así que un puente también sirve para escapar de un perseguidor.
+
 ## 3. Escenario y objetivo — Confirmados
 
 - El escenario es un **laberinto**.
@@ -198,7 +213,7 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 
 ## 5. Presentación visual
 
-- **Efectos de sonido:** vuelco del cubo (golpe sordo, con el tono un poco al azar), rebote, giro descartado, llave cogida (campanitas), puerta abierta, golpe y derrumbe de muros destructibles, botón y barrotes, power up, media vuelta (soplido), explosión del cubo, caída al vacío (silbido), meta (fanfarria), alarma cuando un perseguidor ve al cubo y clic en los botones de la interfaz. Son sonidos sintetizados (no hay grabaciones externas) con `tools/make_sfx.py` y suenan por el canal «SFX».
+- **Efectos de sonido:** vuelco del cubo (golpe sordo, con el tono un poco al azar), rebote, giro descartado, llave cogida (campanitas), puerta abierta, golpe y derrumbe de muros destructibles, botón y barrotes, power up, media vuelta (soplido), explosión del cubo, caída al vacío (silbido), crujido de un puente colgante al gastarse y su derrumbe, meta (fanfarria), alarma cuando un perseguidor ve al cubo y clic en los botones de la interfaz. Son sonidos sintetizados (no hay grabaciones externas) con `tools/make_sfx.py` y suenan por el canal «SFX».
 
 - **Icono de la aplicación:** un cubo isométrico con los colores de las caras del cubo del juego (amarillo, azul y rojo) y la flecha de rumbo, sobre el fondo marrón del menú con trozos de muro de laberinto. En Android se usa también como icono adaptativo (primer plano, fondo y versión monocromática). Se genera con `tools/make_icon.py`.
 - Juego en **3D**, con cubo y laberinto visibles desde arriba.
@@ -217,7 +232,7 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 
 ### 6.1. Progresión
 
-- El juego tiene **30 niveles** de **dificultad creciente**.
+- El juego tiene **35 niveles** de **dificultad creciente**.
 - Los niveles se eligen en el **selector de niveles** (apartado 7.2). Solo se puede entrar en los **completados** y en los **desbloqueados**: el nivel 1 está siempre desbloqueado y completar un nivel desbloquea el siguiente.
 - Al llegar a la meta, el nivel queda **completado** y se muestra «¡Nivel completado!» con **Siguiente nivel**, **Repetir** y **Niveles** (vuelve al selector). Tras el último nivel se indica que se han completado todos.
 - El jugador puede **reiniciar** el nivel en cualquier momento desde el menú de pausa.
@@ -233,6 +248,7 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 - Botones: `p`, `q`, `t`, `v`, `w` en lugar de un muro; el botón se coloca en la cara que da a su **única casilla libre** contigua. El campo `buttons` indica qué grupos de barrotes cambia cada botón, por ejemplo `"buttons": {"p": "cd", "q": "d"}`.
 - Enemigos (sobre una casilla libre): `x` perseguidor, `z` obstáculo, y `i`, `j`, `k`, `m`, `n` patrulleros. El campo `patrols` da la ruta de cada patrullero (apartado 2.13), por ejemplo `"patrols": {"i": "D6", "j": "R4 D2 L4 U2"}`.
 - Vacío: `~` (ni suelo ni pared; apartado 2.14).
+- Puente colgante: `=` (apartado 2.15). Las casillas `=` seguidas forman un puente recto; debe tener vacío a ambos lados y suelo en los dos extremos.
 - Opcional: `camera_distance`, la distancia de la cámara para ese nivel (por defecto, la máxima; ver apartado 5).
 - Los mapas pueden ser más grandes que la pantalla, apaisados o verticales: la cámara sigue al cubo (apartado 5).
 
@@ -241,12 +257,14 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 - La dificultad de un nivel se mide como el **mínimo número de giros** necesario para resolverlo con las reglas del apartado 2 (incluido el rebote, el descarte de giros bloqueados, la ausencia de giro en la casilla de salida, las llaves y puertas y los muros destructibles).
 - Los **enemigos** se mueven en tiempo real y el resolvedor no los simula: los perseguidores y patrulleros no cuentan y el obstáculo cuenta como un **muro fijo** en su casilla de partida. El resolvedor sí comprueba que las rutas de los patrulleros solo pasan por casillas libres y no tocan la salida ni la meta y que cumplen la regla de las tres salidas (apartado 2.13).
 - Caer al vacío devuelve el cubo a la salida; el resolvedor descarta esos movimientos (nunca usa una caída como atajo).
+- El resolvedor sí simula el **desgaste de los puentes colgantes** (las salidas que le quedan a cada casilla forman parte del estado): nunca usa un puente más veces de las que aguanta. También comprueba su forma (recta, con vacío a los lados y suelo en los extremos).
 - Ese mínimo se calcula con un **resolvedor automático** que también comprueba que todos los niveles tienen solución.
 - **Los niveles actuales son de prueba de mecánicas**; los niveles definitivos los proporcionará el diseñador.
 - Los niveles de prueba van de **1 a 27 giros** y crecen de forma progresiva, de **9×5 a 23×17 casillas** (en torno a un 15-20% más de casillas cada uno), alternando mapas apaisados y verticales. Los niveles pequeños caben enteros en pantalla; en los grandes la cámara sigue al cubo.
 - Desde el nivel 3 incluyen parejas llave/puerta, y cada puerta es imprescindible (convertida en muro, el nivel no tendría solución). Los niveles 4 y 7 tienen un power up de velocidad y el 9 tres seguidos, para probar la acumulación. Hay muros destructibles en los niveles 2, 5, 7 y 10 (hay que romperlos para pasar) y en el 8 (un atajo: sin romperlo harían falta 26 giros en vez de 14). Los niveles 11 a 13 introducen los botones y barrotes; cada botón es imprescindible (sin él, el nivel no tendría solución). Los niveles 14 a 16 presentan los enemigos, uno por nivel, en laberintos con bucles para poder esquivarlos; por eso sus giros mínimos no siguen la progresión.
 - Los niveles **17 a 30** son **mapas grandes** (de 27×19 a 64×34 casillas) que combinan todos los mecanismos y enemigos, con dificultad creciente de **27 a 64 giros**. Se alternan dos tipos de mapa: **salas y pasillos** (salas rectangulares, algunas con pilares, unidas por pasillos de una casilla, rectos o en zigzag) y **laberintos** con pocos bucles. Las puertas, los barrotes cerrados y los muros destructibles están siempre en pasillos de paso obligado (son imprescindibles), cada llave está entre su puerta y la anterior (a ser posible en un rincón apartado) y cada **botón está a 6 casillas o menos de sus barrotes**, para que se vean juntos. Los patrulleros rodean salas o recorren pasillos rectos con salida lateral, lejos de la salida y los perseguidores empiezan a 12 casillas o más de ella.
 - Los niveles **31** («Al borde», 33×26, 23 giros) y **32** («El abismo», 39×27, 33 giros) presentan el **vacío**: islas y mesetas unidas por puentes, con puentes sin salida como trampa. El 31 tiene dos parejas llave/puerta y un power up de velocidad en un puente; el 32 añade un patrullero que rodea una meseta, un perseguidor en otra, un botón con barrotes que guardan una llave y un muro destructible, todos imprescindibles.
+- Los niveles **33** («El puente colgante», 22×9, 8 giros), **34** («Tablones gastados», 27×9, 13 giros) y **35** («Tres puentes», 31×23, 23 giros) presentan los **puentes colgantes**. En el 33 se cruza el puente dos veces (ida a por la llave y vuelta) y queda al 50 %. En el 34 hay que cruzarlo exactamente las 3 veces que aguanta (queda al 25 %), y si el cubo no gira nada más llegar a la isla de la derecha rebota y gasta una travesía. En el 35 hay tres islas y tres puentes: la ruta corta exigiría cruzar 4 veces el puente principal, así que hay que dar al menos una vez la vuelta por la isla del sur, donde ronda un perseguidor que no puede seguir al cubo a los puentes.
 - Los niveles 17 a 30 los crea el **generador de niveles** `tools/build_levels.py` (determinista: con las mismas semillas sale siempre lo mismo), que los valida con el resolvedor y elige, para cada nivel, el candidato cuyo mínimo de giros se acerca más al objetivo.
 
 | Nivel | Nombre | Tamaño | Forma | Parejas llave/puerta | Muros destructibles | Power ups | Botones y barrotes | Giros mínimos |
@@ -281,6 +299,11 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 | 28 | El bastión | 37×27 | laberinto | amarilla, naranja, azul | 1 (2 golpes) | 1 velocidad | 1 botón, 1 barrote cerrado | 59 (1 perseguidor, 2 patrulleros, 1 obstáculo) |
 | 29 | El palacio | 53×34 | salas y pasillos | amarilla, naranja, azul | — | 1 velocidad | 2 botones, 2 barrotes cerrados | 59 (1 perseguidor, 3 patrulleros, 1 obstáculo) |
 | 30 | El gran laberinto | 64×34 | salas y pasillos | amarilla, naranja, azul | 1 (3 golpes) | 2 velocidad | 2 botones, 2 barrotes cerrados | 64 (2 perseguidores, 3 patrulleros, 1 obstáculo) |
+| 31 | Al borde | 33×26 | islas y vacío | amarilla, naranja | — | 1 velocidad | — | 23 |
+| 32 | El abismo | 39×27 | islas y vacío | amarilla, azul | 1 (3 golpes) | — | 1 botón, 1 barrote cerrado | 33 (1 perseguidor, 1 patrullero) |
+| 33 | El puente colgante | 22×9 | islas y vacío, 1 puente colgante | amarilla | — | — | — | 8 |
+| 34 | Tablones gastados | 27×9 | islas y vacío, 1 puente colgante | amarilla, naranja | — | — | — | 13 |
+| 35 | Tres puentes | 31×23 | islas y vacío, 3 puentes colgantes | amarilla, naranja, roja | — | — | — | 23 (1 perseguidor) |
 
 ## 7. Menús y controles — Confirmada
 

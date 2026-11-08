@@ -43,6 +43,12 @@ Simula las reglas de scripts/rolling_cube.gd:
   obstáculo: el cubo no rebota y los giros hacia el vacío se aplican. Si el
   cubo entra en el vacío se cae y vuelve a la salida; el resolvedor descarta
   esos movimientos (nunca usa la caída como atajo).
+- Puentes colgantes ('='): casillas libres sobre el vacío, en fila recta,
+  con vacío a ambos lados y suelo en los dos extremos. Cada casilla aguanta
+  BRIDGE_STABILITY salidas del cubo (cuenta cada vez que el cubo la deja,
+  también al rebotar sobre el puente); cuando una llega a 0 cae el puente
+  entero y todas sus casillas pasan a ser vacío. Si el cubo sigue encima, cae
+  con él (el resolvedor descarta ese movimiento).
 - Al llegar a la meta B termina el nivel.
 
 La dificultad de un nivel es el mínimo de giros necesarios (búsqueda 0-1 BFS),
@@ -84,12 +90,15 @@ CHASER_CHAR = "x"
 BLOCKER_CHAR = "z"
 PATROL_CHARS = "ijkmn"
 VOID_CHAR = "~"
+BRIDGE_CHAR = "="
+# Salidas del cubo que aguanta cada casilla de puente colgante.
+BRIDGE_STABILITY = 4
 ENEMY_CHARS = CHASER_CHAR + BLOCKER_CHAR + PATROL_CHARS
 ROUTE_DIRS = {"R": (1, 0), "L": (-1, 0), "U": (0, -1), "D": (0, 1)}
 # Salidas mínimas de la ruta de un patrullero (ver patrol_exits).
 PATROL_MIN_EXITS = 3
 LEVEL_CHARS = ("#.AB" + KEY_CHARS + DOOR_CHARS + POWERUP_CHARS + BREAKABLE_CHARS
-               + BAR_CHARS + BAR_CHARS.upper() + BUTTON_CHARS + ENEMY_CHARS + VOID_CHAR)
+               + BAR_CHARS + BAR_CHARS.upper() + BUTTON_CHARS + ENEMY_CHARS + VOID_CHAR + BRIDGE_CHAR)
 
 
 def turn_left(h):
@@ -162,12 +171,29 @@ class Board:
         self.initial_hits = tuple(hits for _, hits in breakables)
         self.unbreakable = False
         self.no_buttons = False
+        # Puentes colgantes: casilla -> índice de casilla de puente, y para
+        # cada índice los índices de todo su puente.
+        self.bridges = find_bridges(layout)
+        self.bridge_at = {}
+        self.bridge_group = []
+        for bridge in self.bridges:
+            first = len(self.bridge_at)
+            group = tuple(range(first, first + len(bridge)))
+            for cell in bridge:
+                self.bridge_at[cell] = len(self.bridge_at)
+                self.bridge_group.append(group)
+        self.initial_wear = (BRIDGE_STABILITY,) * len(self.bridge_at)
 
     def is_void(self, cell):
         """Casilla de vacío ('~' o fuera del mapa)."""
         x, z = cell
         return z < 0 or z >= len(self.rows) or x < 0 or x >= len(self.rows[z]) \
             or self.rows[z][x] == VOID_CHAR
+
+    def fallen(self, cell, wear):
+        """Casilla de un puente colgante que ya se ha caído (ahora es vacío)."""
+        b = self.bridge_at.get(cell)
+        return b is not None and wear[b] == 0
 
     def passable(self, cell, opened, hits, flipped=0):
         """Casilla libre, sin puerta ni barrotes cerrados y sin muro en pie."""
@@ -187,19 +213,24 @@ def step(board, state, turn):
     """Aplica una decisión (0, -1 izquierda, 1 derecha) y avanza una casilla.
 
     state = (casilla, rumbo, llave_llevada o None, puertas_abiertas, llaves_cogidas,
-             golpes_restantes, barrotes_conmutados)
+             golpes_restantes, barrotes_conmutados, desgaste_de_puentes)
     (puertas_abiertas, llaves_cogidas y barrotes_conmutados son máscaras de
     bits; golpes_restantes es una tupla con los golpes que le quedan a cada
-    muro destructible). Devuelve None si el cubo cae al vacío.
+    muro destructible; desgaste_de_puentes, las salidas que le quedan a cada
+    casilla de puente colgante). Devuelve None si el cubo cae al vacío.
     """
-    cell, heading, held, opened, taken, hits, flipped = state
+    cell, heading, held, opened, taken, hits, flipped, wear = state
+
+    def void(c):
+        return board.is_void(c) or board.fallen(c, wear)
+
     if turn:
         candidate = turn_left(heading) if turn < 0 else turn_right(heading)
         side = (cell[0] + candidate[0], cell[1] + candidate[1])
-        if board.passable(side, opened, hits, flipped) or board.is_void(side):
+        if board.passable(side, opened, hits, flipped) or void(side):
             heading = candidate
     nxt = (cell[0] + heading[0], cell[1] + heading[1])
-    if board.is_void(nxt):
+    if void(nxt):
         return None
     if not board.passable(nxt, opened, hits, flipped):
         door = board.door_at.get(nxt)
@@ -214,15 +245,25 @@ def step(board, state, turn):
             flipped ^= button
         heading = (-heading[0], -heading[1])
         nxt = (cell[0] + heading[0], cell[1] + heading[1])
-        if board.is_void(nxt):
+        if void(nxt):
             return None
         if not board.passable(nxt, opened, hits, flipped):
-            return cell, heading, held, opened, taken, hits, flipped
+            return cell, heading, held, opened, taken, hits, flipped, wear
+    # Sale de una casilla de puente: pierde una salida y, si llega a 0, cae el
+    # puente entero (y el cubo con él si la siguiente casilla es del puente).
+    b = board.bridge_at.get(cell)
+    if b is not None:
+        wear = wear[:b] + (wear[b] - 1,) + wear[b + 1:]
+        if wear[b] == 0:
+            group = board.bridge_group[b]
+            wear = tuple(0 if i in group else w for i, w in enumerate(wear))
+            if board.bridge_at.get(nxt) in group:
+                return None
     key = board.key_at.get(nxt)
     if key is not None and held is None and not taken >> key[0] & 1:
         held = key[1]
         taken |= 1 << key[0]
-    return nxt, heading, held, opened, taken, hits, flipped
+    return nxt, heading, held, opened, taken, hits, flipped, wear
 
 
 def solve(layout, start_heading, doors_as_walls=False, breakables_as_walls=False,
@@ -243,7 +284,7 @@ def solve(layout, start_heading, doors_as_walls=False, breakables_as_walls=False
         board.key_at = {}
     if breakables_as_walls:
         board.unbreakable = True
-    start = (board.start, start_heading, None, 0, 0, board.initial_hits, 0)
+    start = (board.start, start_heading, None, 0, 0, board.initial_hits, 0, board.initial_wear)
     best = {start: (0, 0)}
     prev = {}
     queue = deque([(0, 0, start)])
@@ -437,6 +478,55 @@ def patrol_exits(free, cells):
     return len(exits), len(lateral)
 
 
+def find_bridges(rows):
+    """Puentes colgantes: listas de casillas '=' seguidas en fila recta, en
+    orden de lectura. Una casilla suelta cuenta como un puente de una casilla."""
+    cells = {(x, z) for z, row in enumerate(rows) for x, c in enumerate(row) if c == BRIDGE_CHAR}
+    bridges, seen = [], set()
+    for z, row in enumerate(rows):
+        for x, c in enumerate(row):
+            if c != BRIDGE_CHAR or (x, z) in seen:
+                continue
+            step_dir = (1, 0) if (x + 1, z) in cells else (0, 1)
+            run, cell = [], (x, z)
+            while cell in cells and cell not in seen:
+                run.append(cell)
+                seen.add(cell)
+                cell = (cell[0] + step_dir[0], cell[1] + step_dir[1])
+            bridges.append(run)
+    return bridges
+
+
+def check_bridges(rows):
+    """Problemas de forma de los puentes colgantes (lista de textos)."""
+    problems = []
+
+    def at(x, z):
+        if z < 0 or z >= len(rows) or x < 0 or x >= len(rows[z]):
+            return VOID_CHAR
+        return rows[z][x]
+
+    for bridge in find_bridges(rows):
+        first, last = bridge[0], bridge[-1]
+        if len(bridge) > 1:
+            along = (bridge[1][0] - first[0], bridge[1][1] - first[1])
+        else:
+            x, z = first
+            along = (0, 1) if at(x, z - 1) not in "#" + VOID_CHAR and at(x, z + 1) not in "#" + VOID_CHAR \
+                else (1, 0)
+        side = (along[1], along[0])
+        for x, z in bridge:
+            for sx, sz in (side, (-side[0], -side[1])):
+                if at(x + sx, z + sz) != VOID_CHAR:
+                    problems.append(f"el puente de {first} tiene en {(x + sx, z + sz)} algo que no es vacío "
+                                    f"a un lado (debe tener vacío a ambos lados)")
+        for end in ((first[0] - along[0], first[1] - along[1]), (last[0] + along[0], last[1] + along[1])):
+            c = at(*end)
+            if c in "#" + VOID_CHAR + BRIDGE_CHAR or c in BUTTON_CHARS or c in BREAKABLE_CHARS:
+                problems.append(f"el puente de {first} no acaba en suelo en {end}")
+    return problems
+
+
 def check_enemies(rows, patrols):
     """Problemas de colocación de enemigos y rutas de patrulla (lista de textos)."""
     problems = []
@@ -461,8 +551,9 @@ def check_enemies(rows, patrols):
                     break
                 for _ in range(int(part[1:])):
                     cell = (cell[0] + d[0], cell[1] + d[1])
-                    if cell not in free or cell in (start, goal):
-                        problems.append(f"la ruta de {c} pasa por {cell}, que no es libre o es la salida o la meta")
+                    if cell not in free or cell in (start, goal) or rows[cell[1]][cell[0]] == BRIDGE_CHAR:
+                        problems.append(f"la ruta de {c} pasa por {cell}, que no es libre o es la salida, "
+                                        f"la meta o un puente colgante")
                         break
                 else:
                     continue
@@ -492,6 +583,7 @@ def cmd_validate(_args):
             problems.append("filas de distinta longitud")
         problems += check_buttons(rows, lvl["buttons"])
         problems += check_enemies(rows, lvl["patrols"])
+        problems += check_bridges(rows)
         result = None if problems else solve(rows, lvl["heading"], buttons=lvl["buttons"])
         if not problems and result is None:
             problems.append("sin solución")

@@ -8,8 +8,8 @@ extends Node3D
 ##
 ## Reglas comunes:
 ## - Solo pisan casillas libres sin puerta, barrotes cerrados ni muro
-##   destructible en pie (Level.is_terrain_walkable), y nunca la salida ni la
-##   meta.
+##   destructible en pie (Level.is_terrain_walkable), y nunca la salida, la
+##   meta ni los puentes colgantes (no los desgastan).
 ## - El obstáculo es sólido para todos: los demás enemigos no entran en sus
 ##   casillas. Perseguidores y patrulleros sí pueden cruzarse entre ellos.
 ## - `lethal`: si toca al cubo, el cubo explota (lo comprueba Level).
@@ -137,7 +137,7 @@ func _animate(_delta: float) -> void:
 ## Casilla por la que puede pasar (sin contar a los demás enemigos).
 func _passable(target: Vector2i) -> bool:
 	return level.is_terrain_walkable(target) and target != level.start_cell \
-		and target != level.goal_cell
+		and target != level.goal_cell and not level.is_bridge(target)
 
 
 func _can_enter(target: Vector2i) -> bool:

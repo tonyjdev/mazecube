@@ -26,6 +26,11 @@ extends RefCounted
 ## Vacío (niveles 31-32): '~' = ni suelo ni pared; si el cubo entra en el
 ## vacío se cae y vuelve a la salida. Son islas con paredes y mesetas sin
 ## paredes unidas por puentes sobre el abismo.
+## Puentes colgantes (niveles 33-35): '=' = casilla de puente sobre el vacío,
+## en fila recta, con vacío a ambos lados y suelo en los dos extremos. Cada
+## casilla aguanta 4 salidas del cubo; cuando una llega a 0 cae el puente
+## entero (con el cubo si sigue encima), así que un puente de dos casillas o
+## más se puede cruzar 3 veces sin peligro. Ver HangingBridge.
 ##
 ## Los niveles crecen de forma progresiva (en torno a un 15-20% más de
 ## casillas cada uno) y alternan forma apaisada y vertical. Los pequeños
@@ -927,6 +932,68 @@ const LIST: Array[Dictionary] = [
 		],
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R6 D4 L6 U4"},
+	},
+	{
+		"name": "El puente colgante",
+		"turns": 8,
+		"start_heading": Vector2i(1, 0),
+		"layout": [
+			"~~~~~~~~~~~~~~~~~~~~~~",
+			"~#######~~~~~~~~#####~",
+			"~#A....#~~~~~~~~#..y#~",
+			"~#####.#~~~~~~~~#.###~",
+			"~#......========..#~~~",
+			"~#####.#~~~~~~~~#.#~~~",
+			"~#BY...#~~~~~~~~#.#~~~",
+			"~#######~~~~~~~~###~~~",
+			"~~~~~~~~~~~~~~~~~~~~~~",
+		],
+	},
+	{
+		"name": "Tablones gastados",
+		"turns": 13,
+		"start_heading": Vector2i(1, 0),
+		"layout": [
+			"~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+			"~########~~~~~~~~#########~",
+			"~#A.....#~~~~~~~~#y......#~",
+			"~#.####.#~~~~~~~~#.#####.#~",
+			"~#Y####..========..#####.#~",
+			"~#.####.#~~~~~~~~#.#####O#~",
+			"~#o####.#~~~~~~~~#.....#B#~",
+			"~########~~~~~~~~#########~",
+			"~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+		],
+	},
+	{
+		"name": "Tres puentes",
+		"turns": 23,
+		"start_heading": Vector2i(1, 0),
+		"layout": [
+			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+			"~###########~~~~~~~~~#########~",
+			"~#A........#~~~~~~~~~#.....#y#~",
+			"~#.###.###.#~~~~~~~~~#.###.#.#~",
+			"~#.#o#.#B#.#~~~~~~~~~#.#r#.#.#~",
+			"~#.#Y#.#R#..=========..#O#...#~",
+			"~#.#.#.#.#.#~~~~~~~~~#.#.#.#.#~",
+			"~#.........#~~~~~~~~~#.......#~",
+			"~#.###.###.#~~~~~~~~~####.####~",
+			"~#####.#####~~~~~~~~~####.####~",
+			"~~~~~~=~~~~~~~~~~~~~~~~~~=~~~~~",
+			"~~~~~~=~~~~~~~~~~~~~~~~~~=~~~~~",
+			"~~~~~~=~~~~~~~~~~~~~~~~~~=~~~~~",
+			"~~~~~~=~~~~~~~~~~~~~~~~~~=~~~~~",
+			"~~~~~~=~~~~~~~~~~~~~~~~~~=~~~~~",
+			"~~~~##.##################.#~~~~",
+			"~~~~#.....................#~~~~",
+			"~~~~#.#...#...#...#...#...#~~~~",
+			"~~~~#..........x..........#~~~~",
+			"~~~~#..#...#...#...#...#..#~~~~",
+			"~~~~#.....................#~~~~",
+			"~~~~#######################~~~~",
+			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+		],
 	},
 ]
 
