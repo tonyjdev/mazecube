@@ -232,7 +232,7 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 
 ### 6.1. Progresión
 
-- El juego tiene **35 niveles** de **dificultad creciente**.
+- El juego tiene **60 niveles** de **dificultad creciente**, repartidos por las zonas del mapa de niveles (apartado 7.2): los niveles **1 a 34** son la zona I (*El mundo de los cubos*) y los **35 a 60** la zona II (*Las tierras salvajes*).
 - Los niveles se eligen en el **selector de niveles** (apartado 7.2). Solo se puede entrar en los **completados** y en los **desbloqueados**: el nivel 1 está siempre desbloqueado y completar un nivel desbloquea el siguiente.
 - Al llegar a la meta, el nivel queda **completado** y se muestra «¡Nivel completado!» con **Siguiente nivel**, **Repetir** y **Niveles** (vuelve al selector). Tras el último nivel se indica que se han completado todos.
 - El jugador puede **reiniciar** el nivel en cualquier momento desde el menú de pausa.
@@ -249,7 +249,7 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 - Enemigos (sobre una casilla libre): `x` perseguidor, `z` obstáculo, y `i`, `j`, `k`, `m`, `n` patrulleros. El campo `patrols` da la ruta de cada patrullero (apartado 2.13), por ejemplo `"patrols": {"i": "D6", "j": "R4 D2 L4 U2"}`.
 - Vacío: `~` (ni suelo ni pared; apartado 2.14).
 - Puente colgante: `=` (apartado 2.15). Las casillas `=` seguidas forman un puente recto; debe tener vacío a ambos lados y suelo en los dos extremos.
-- Opcional: `theme`, los bloques del catálogo (apartado 5) del suelo, los muros y la roca de debajo, p. ej. `"theme": {"floor": "snow", "wall": "ice"}` (la roca, si no se indica, es la que corresponde al suelo). Y `theme_regions`, zonas rectangulares del mapa con otros bloques, para transiciones: `[{"rect": Rect2i(x, z, ancho, alto), "floor": "grass"}]`. Mientras no haya zonas definitivas, los niveles sin `theme` toman uno provisional según su tramo.
+- Opcional: `theme`, los bloques del catálogo (apartado 5) del suelo, los muros y la roca de debajo, p. ej. `"theme": {"floor": "snow", "wall": "ice"}` (la roca, si no se indica, es la que corresponde al suelo). Y `theme_regions`, zonas rectangulares del mapa con otros bloques, para transiciones: `[{"rect": Rect2i(x, z, ancho, alto), "floor": "grass"}]`. Los niveles sin `theme` toman el de su tramo de `Levels.THEMES`, que sigue las zonas del mapa: en la zona I praderas, aldeas y ruinas (hierba, tierra, sillería, tronco, ladrillo) y en la zona II islas que suben desde los prados en flor (hierba con flores y piedra con musgo) por la hierba seca y el granito hasta la nieve y el hielo de las cumbres.
 - Opcional: `camera_distance`, la distancia de la cámara para ese nivel (por defecto, la máxima; ver apartado 5).
 - Los mapas pueden ser más grandes que la pantalla, apaisados o verticales: la cámara sigue al cubo (apartado 5).
 
@@ -267,6 +267,7 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 - Los niveles **31** («Al borde», 33×26, 23 giros) y **32** («El abismo», 39×27, 33 giros) presentan el **vacío**: islas y mesetas unidas por puentes, con puentes sin salida como trampa. El 31 tiene dos parejas llave/puerta y un power up de velocidad en un puente; el 32 añade un patrullero que rodea una meseta, un perseguidor en otra, un botón con barrotes que guardan una llave y un muro destructible, todos imprescindibles.
 - Los niveles **33** («El puente colgante», 22×9, 8 giros), **34** («Tablones gastados», 27×9, 13 giros) y **35** («Tres puentes», 31×23, 23 giros) presentan los **puentes colgantes**. En el 33 se cruza el puente dos veces (ida a por la llave y vuelta) y queda al 50 %. En el 34 hay que cruzarlo exactamente las 3 veces que aguanta (queda al 25 %), y si el cubo no gira nada más llegar a la isla de la derecha rebota y gasta una travesía. En el 35 hay tres islas y tres puentes: la ruta corta exigiría cruzar 4 veces el puente principal, así que hay que dar al menos una vez la vuelta por la isla del sur, donde ronda un perseguidor que no puede seguir al cubo a los puentes.
 - Los niveles 17 a 30 los crea el **generador de niveles** `tools/build_levels.py` (determinista: con las mismas semillas sale siempre lo mismo), que los valida con el resolvedor y elige, para cada nivel, el candidato cuyo mínimo de giros se acerca más al objetivo.
+- Los niveles **36 a 60** (zona II, *Las tierras salvajes*) son **archipiélagos de islas flotantes** que combinan el vacío, los puentes colgantes y todos los mecanismos y enemigos, con dificultad creciente de **23 a 73 giros** (de 37×20 a 89×42 casillas). Hay cuatro tipos de isla: **ruinas** amuralladas (una sala con algún pilar o tabique), **pequeños laberintos** amurallados, **mesetas** sin muros (esquinas recortadas, pilares y **grietas** de vacío dentro que obligan a girar a tiempo) e **islotes** de 2×2 o 3×3, normalmente fondos de saco donde se esconde una llave. Las islas se unen con **puentes de tierra** de una casilla, rectos o en **zigzag** sobre el vacío (hay que girar en el aire en el momento justo), y algunos puentes rectos son **colgantes**. Las puertas y los barrotes están en casillas de paso obligado con muro a ambos lados (las entradas de las islas amuralladas y los pasillos de los laberintos); los power ups de velocidad, a ser posible sobre los puentes. El suelo cambia de los prados en flor (36-40) a la hierba (41-44), la hierba seca (45-48), la piedra y el granito de la montaña (49-52) y la nieve y el hielo de las cumbres (53-60); las islas amuralladas y los puentes de tierra llevan su propio suelo (`theme_regions`). Los crea `tools/build_islands.py` (determinista, como el generador anterior, cuyas funciones de colocación reutiliza).
 
 | Nivel | Nombre | Tamaño | Forma | Parejas llave/puerta | Muros destructibles | Power ups | Botones y barrotes | Giros mínimos |
 |---|---|---|---|---|---|---|---|---|
@@ -305,6 +306,31 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 | 33 | El puente colgante | 22×9 | islas y vacío, 1 puente colgante | amarilla | — | — | — | 8 |
 | 34 | Tablones gastados | 27×9 | islas y vacío, 1 puente colgante | amarilla, naranja | — | — | — | 13 |
 | 35 | Tres puentes | 31×23 | islas y vacío, 3 puentes colgantes | amarilla, naranja, roja | — | — | — | 23 (1 perseguidor) |
+| 36 | Islas flotantes | 37×20 | islas flotantes | amarilla, naranja | — | 1 velocidad | — | 23 |
+| 37 | El salto | 34×31 | islas flotantes, 1 puente colgante | amarilla | 1 (3 golpes) | 1 velocidad | — | 27 |
+| 38 | Tierra agrietada | 50×22 | islas flotantes | amarilla, naranja | 1 (2 golpes) | 1 velocidad | — | 27 |
+| 39 | El cerezo | 37×31 | islas flotantes, 1 puente colgante | amarilla, naranja | — | 1 velocidad | 1 botón, 1 barrote cerrado | 33 (1 patrullero) |
+| 40 | Cascadas | 46×30 | islas flotantes, 2 puentes colgantes | amarilla, naranja | 1 (4 golpes) | 2 velocidad | — | 32 (1 perseguidor) |
+| 41 | Ruinas en el aire | 50×31 | islas flotantes, 1 puente colgante | amarilla, naranja | — | 1 velocidad | 1 botón, 1 barrote cerrado | 34 (1 patrullero) |
+| 42 | Puentes rotos | 49×36 | islas flotantes, 3 puentes colgantes | amarilla, naranja | 1 (4 golpes) | 1 velocidad | — | 37 (1 perseguidor, 1 patrullero) |
+| 43 | El valle perdido | 58×31 | islas flotantes, 1 puente colgante | amarilla, naranja | 1 (4 golpes) | 2 velocidad | 1 botón, 1 barrote cerrado | 38 (1 perseguidor, 1 patrullero) |
+| 44 | Matorrales | 50×42 | islas flotantes, 1 puente colgante | amarilla, naranja, azul | — | 1 velocidad | 1 botón, 1 barrote cerrado | 40 (1 perseguidor, 1 patrullero, 1 obstáculo) |
+| 45 | El templo del bosque | 63×34 | islas flotantes, 2 puentes colgantes | amarilla, naranja | — | 1 velocidad | 2 botones, 2 barrotes cerrados | 40 (2 patrulleros, 1 obstáculo) |
+| 46 | Hierba seca | 62×36 | islas flotantes, 2 puentes colgantes | amarilla, naranja, azul | 1 (4 golpes) | 2 velocidad | — | 44 (2 perseguidores, 1 patrullero) |
+| 47 | Las colinas | 50×46 | islas flotantes, 2 puentes colgantes | amarilla, naranja, azul | 1 (3 golpes) | 1 velocidad | 1 botón, 1 barrote cerrado | 47 (1 perseguidor, 2 patrulleros) |
+| 48 | Desfiladero | 69×31 | islas flotantes, 3 puentes colgantes | amarilla, naranja, azul | — | 2 velocidad | 1 botón, 1 barrote cerrado | 48 (1 perseguidor, 1 patrullero, 1 obstáculo) |
+| 49 | Al pie de la montaña | 58×42 | islas flotantes, 2 puentes colgantes | amarilla, naranja, azul | 1 (4 golpes) | 1 velocidad | 1 botón, 1 barrote cerrado | 48 (1 perseguidor, 2 patrulleros, 1 obstáculo) |
+| 50 | Paso de montaña | 67×44 | islas flotantes, 3 puentes colgantes | amarilla, naranja, azul | 1 (3 golpes) | 2 velocidad | 1 botón, 1 barrote cerrado | 53 (2 perseguidores, 2 patrulleros) |
+| 51 | Granito | 63×46 | islas flotantes, 2 puentes colgantes | amarilla, naranja, azul | — | 1 velocidad | 2 botones, 2 barrotes cerrados | 55 (1 perseguidor, 2 patrulleros, 1 obstáculo) |
+| 52 | La cornisa | 70×42 | islas flotantes, 3 puentes colgantes | amarilla, naranja, azul | 1 (3 golpes) | 2 velocidad | 1 botón, 1 barrote cerrado | 56 (2 perseguidores, 2 patrulleros, 1 obstáculo) |
+| 53 | Primeras nieves | 67×49 | islas flotantes, 2 puentes colgantes | amarilla, naranja, azul | 1 (4 golpes) | 1 velocidad | 1 botón, 1 barrote cerrado | 59 (2 perseguidores, 2 patrulleros, 1 obstáculo) |
+| 54 | El refugio | 76×42 | islas flotantes, 3 puentes colgantes | amarilla, naranja, azul | — | 2 velocidad | 2 botones, 2 barrotes cerrados | 60 (1 perseguidor, 3 patrulleros, 1 obstáculo) |
+| 55 | Ventisca | 70×42 | islas flotantes, 3 puentes colgantes | amarilla, naranja, roja, azul | 1 (3 golpes) | 2 velocidad | 1 botón, 1 barrote cerrado | 62 (2 perseguidores, 2 patrulleros, 1 obstáculo) |
+| 56 | Lago helado | 74×42 | islas flotantes, 3 puentes colgantes | amarilla, naranja, azul | — | 2 velocidad | 2 botones, 2 barrotes cerrados | 66 (2 perseguidores, 3 patrulleros, 1 obstáculo) |
+| 57 | Las cumbres | 70×42 | islas flotantes, 3 puentes colgantes | amarilla, naranja, roja, azul | 1 (4 golpes) | 2 velocidad | 1 botón, 1 barrote cerrado | 67 (2 perseguidores, 3 patrulleros, 1 obstáculo) |
+| 58 | Glaciar | 76×42 | islas flotantes, 3 puentes colgantes | amarilla, naranja, roja, azul | — | 2 velocidad | 2 botones, 2 barrotes cerrados | 68 (2 perseguidores, 3 patrulleros, 1 obstáculo) |
+| 59 | El paso helado | 82×42 | islas flotantes, 4 puentes colgantes | amarilla, naranja, roja, azul | 1 (3 golpes) | 2 velocidad | 2 botones, 2 barrotes cerrados | 73 (2 perseguidores, 3 patrulleros, 1 obstáculo) |
+| 60 | El techo del mundo | 89×42 | islas flotantes, 4 puentes colgantes | amarilla, naranja, roja, azul | 1 (3 golpes) | 3 velocidad | 2 botones, 2 barrotes cerrados | 71 (3 perseguidores, 4 patrulleros, 1 obstáculo) |
 
 ## 7. Menús y controles — Confirmada
 
