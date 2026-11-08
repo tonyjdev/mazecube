@@ -4,6 +4,9 @@
 [ext_resource type="Script" uid="uid://ccjf1dwf07kqe" path="res://scripts/level.gd" id="2_jyhfs"]
 [ext_resource type="Script" path="res://scripts/follow_camera.gd" id="9_fcam"]
 [ext_resource type="Script" uid="uid://blpc1e23dcvc7" path="res://scripts/rolling_cube.gd" id="3_tbgi4"]
+[ext_resource type="Texture2D" path="res://ui/pause_play.svg" id="10_play"]
+[ext_resource type="Texture2D" path="res://ui/pause_restart.svg" id="11_restart"]
+[ext_resource type="Texture2D" path="res://ui/pause_exit.svg" id="12_exit"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sgp6g"]
 
@@ -112,53 +115,68 @@ process_mode = 3
 layer = 10
 visible = false
 
-[node name="Dim" type="ColorRect" parent="PauseMenu"]
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0.05, 0.04, 0.03, 0.6)
-
-[node name="Center" type="CenterContainer" parent="PauseMenu"]
+[node name="DragArea" type="Control" parent="PauseMenu"]
+unique_name_in_owner = true
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Panel" type="PanelContainer" parent="PauseMenu/Center"]
-layout_mode = 2
-
-[node name="VBox" type="VBoxContainer" parent="PauseMenu/Center/Panel"]
-layout_mode = 2
+[node name="Buttons" type="VBoxContainer" parent="PauseMenu"]
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 28.0
+offset_top = -180.0
+offset_right = 132.0
+offset_bottom = 180.0
+grow_vertical = 2
+alignment = 1
 theme_override_constants/separation = 18
 
-[node name="Title" type="Label" parent="PauseMenu/Center/Panel/VBox"]
-custom_minimum_size = Vector2(360, 0)
+[node name="ContinueButton" type="Button" parent="PauseMenu/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(104, 104)
 layout_mode = 2
-theme_override_font_sizes/font_size = 44
-text = "PAUSE_TITLE"
+tooltip_text = "PAUSE_CONTINUE"
+icon = ExtResource("10_play")
+icon_alignment = 1
+
+[node name="RestartButton" type="Button" parent="PauseMenu/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(104, 104)
+layout_mode = 2
+tooltip_text = "PAUSE_RESTART"
+icon = ExtResource("11_restart")
+icon_alignment = 1
+
+[node name="QuitButton" type="Button" parent="PauseMenu/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(104, 104)
+layout_mode = 2
+tooltip_text = "PAUSE_QUIT"
+icon = ExtResource("12_exit")
+icon_alignment = 1
+
+[node name="ExploreHint" type="Label" parent="PauseMenu"]
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 160.0
+offset_top = -72.0
+offset_right = -160.0
+offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_override_font_sizes/font_size = 30
+theme_override_constants/outline_size = 10
+text = "PAUSE_EXPLORE_HINT"
 horizontal_alignment = 1
+vertical_alignment = 1
 autowrap_mode = 3
-
-[node name="ContinueButton" type="Button" parent="PauseMenu/Center/Panel/VBox"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(360, 80)
-layout_mode = 2
-text = "PAUSE_CONTINUE"
-
-[node name="RestartButton" type="Button" parent="PauseMenu/Center/Panel/VBox"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(360, 80)
-layout_mode = 2
-text = "PAUSE_RESTART"
-
-[node name="QuitButton" type="Button" parent="PauseMenu/Center/Panel/VBox"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(360, 80)
-layout_mode = 2
-text = "PAUSE_QUIT"
 
 [node name="CompleteMenu" type="CanvasLayer" parent="."]
 process_mode = 3

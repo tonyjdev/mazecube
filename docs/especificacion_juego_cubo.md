@@ -333,10 +333,12 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 
 ### 7.4. Pausa
 
-- El botón de **pausa** (arriba a la derecha) detiene el juego y muestra un menú con:
-  - **Continuar:** reanuda la partida.
-  - **Reiniciar:** vuelve a empezar el nivel.
-  - **Salir:** vuelve al selector de niveles.
+- El botón de **pausa** (arriba a la derecha) detiene el juego. Se oculta la interfaz de juego (número de nivel, botón de pausa e indicaciones) y, sin título ni recuadro, se ven tres **botones con iconos** en columna, pegados a la **izquierda** y centrados en vertical:
+  - **Continuar** (icono de «play»): reanuda la partida.
+  - **Reiniciar** (flecha circular): vuelve a empezar el nivel.
+  - **Salir** (flecha que sale de una puerta): vuelve al selector de niveles.
+- **Explorar el mapa:** al pausar, la cámara se **aleja** (≈1,7 veces, sin pasar de lo necesario para ver el tablero entero) y se **inclina casi en vertical** (82°) con una transición suave. **Arrastrando el dedo** (o el ratón) se desplaza la vista por el mapa, sin enseñar más allá de sus bordes. Al pie de la pantalla, centrado, se lee «Desliza el dedo sobre la pantalla para navegar por el mapa».
+- Al **continuar**, la cámara vuelve suavemente a su posición e inclinación de juego y, al llegar, se reanuda la partida. Al **reiniciar**, vuelve al momento.
 - En el móvil, el juego también se pausa al salir de la aplicación (por ejemplo, al recibir una llamada).
 
 ### 7.5. Controles

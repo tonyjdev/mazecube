@@ -25,12 +25,21 @@ extends Camera3D
 ##   tras pulsarlo espera un momento (ATTENTION_HOLD) para que se vea cómo
 ##   cambian los barrotes. Si al llegar ya se ven todos, no cambia nada.
 ## - shake() hace temblar la cámara un momento (media vuelta del cubo).
+## - Exploración (menú de pausa): start_explore() aleja la cámara y la pone
+##   casi vertical (EXPLORE_PITCH) para ver más mapa, y explore_drag() la
+##   desplaza al arrastrar el dedo, sin enseñar más allá del borde del
+##   tablero. end_explore() la devuelve a donde estaba y emite
+##   explore_finished al llegar. La cámara se procesa siempre (para animarse
+##   en la pausa), pero fuera de la exploración se queda quieta si el juego
+##   está en pausa.
 ## - Tanto el foco como la distancia se mueven con un amortiguamiento crítico:
 ##   arrancan y frenan con suavidad, van con un pequeño retraso respecto al
 ##   cubo y nunca se pasan del objetivo (no rebotan cuando el cubo rebota).
 
 ## Distancia máxima de la cámara al foco: la del antiguo nivel 4 (7×9 casillas)
 ## encuadrado entero en la pantalla apaisada de referencia (1280×720).
+signal explore_finished
+
 const MAX_DISTANCE := 13.5
 const MIN_DISTANCE := 3.0
 ## Alejamiento por velocidad: fracción de distancia que se añade por cada
@@ -46,6 +55,12 @@ const ATTENTION_HOLD := 0.8
 const SHAKE_STRENGTH := 0.06
 const SHAKE_TIME := 0.25
 const SHAKE_FREQ := Vector2(71.0, 53.0)
+## Exploración: inclinación (casi vertical), alejamiento respecto a la
+## distancia normal (nunca más que lo necesario para ver el tablero entero
+## en toda la pantalla) y duración de la transición de ida y de vuelta.
+const EXPLORE_PITCH := 82.0
+const EXPLORE_ZOOM := 1.7
+const EXPLORE_TIME := 0.45
 
 ## Inclinación de la vista cenital (90 = totalmente desde arriba).
 @export_range(45.0, 90.0) var pitch_degrees := 65.0
@@ -80,11 +95,24 @@ var _attention_frame_cell := Level.NO_CELL
 ## Hasta cuándo (Time.get_ticks_msec) se mantiene el encuadre tras pulsar.
 var _attention_hold_until := 0
 var _shake_left := 0.0
+## Inclinación con la que se colocan la cámara y los cálculos de encuadre.
+var _pitch := 65.0
+## Exploración: si está activa, progreso de la transición (0 = vista normal,
+## 1 = vista de exploración), distancia y foco de la vista de exploración.
+## Mientras se explora, _focus y _distance conservan la vista normal.
+var _explore := false
+var _explore_blend := 0.0
+var _explore_distance := MAX_DISTANCE
+var _explore_focus := Vector3.ZERO
+## Los cálculos de encuadre usan toda la pantalla en lugar del hueco libre.
+var _full_area := false
 
 
 func _ready() -> void:
 	projection = PROJECTION_PERSPECTIVE
 	fov = 45.0
+	_pitch = pitch_degrees
+	process_mode = Node.PROCESS_MODE_ALWAYS
 
 
 func setup(target_level: Level, followed: Node3D, area: Control) -> void:
@@ -124,6 +152,10 @@ func refresh_layout() -> void:
 
 ## Coloca la cámara directamente en su posición final, sin transición.
 func snap() -> void:
+	var was_exploring := _explore or _explore_blend > 0.0
+	_explore = false
+	_explore_blend = 0.0
+	_pitch = pitch_degrees
 	_attention_button = Level.NO_CELL
 	_attention_active = false
 	_attention_frame_cell = Level.NO_CELL
@@ -137,10 +169,80 @@ func snap() -> void:
 	_focus = _desired_focus()
 	_focus_vel = Vector3.ZERO
 	_place(_distance, _focus)
+	if was_exploring:
+		explore_finished.emit()
+
+
+# --- Exploración (pausa) --------------------------------------------------------
+
+## Pasa suavemente a la vista de exploración: más lejos y casi vertical,
+## mirando a donde miraba la cámara.
+func start_explore() -> void:
+	if level == null:
+		return
+	if not _explore and _explore_blend <= 0.0:
+		_shake_left = 0.0
+		h_offset = 0.0
+		v_offset = 0.0
+		var fit: float = _with_explore_view(_compute_fit_distance)
+		_explore_distance = minf(_distance * EXPLORE_ZOOM, fit)
+		_explore_focus = _clamp_explore_focus(_focus)
+	_explore = true
+
+
+## Vuelve suavemente a la vista normal; al llegar emite explore_finished.
+func end_explore() -> void:
+	_explore = false
+
+
+func is_exploring() -> bool:
+	return _explore
+
+
+## Desplaza la vista de exploración al arrastrar de `from` a `to` (puntos de
+## pantalla): el punto del suelo que estaba bajo el dedo sigue bajo el dedo.
+func explore_drag(from: Vector2, to: Vector2) -> void:
+	if not _explore:
+		return
+	_explore_focus = _clamp_explore_focus(_explore_focus + _ground_hit(from) - _ground_hit(to))
+
+
+func _clamp_explore_focus(anchor: Vector3) -> Vector3:
+	return _with_explore_view(func() -> Vector3: return _clamped_focus(anchor, _explore_distance))
+
+
+## Ejecuta un cálculo de encuadre con la inclinación de exploración y toda
+## la pantalla, y deja la cámara como estaba.
+func _with_explore_view(calc: Callable) -> Variant:
+	var saved_pitch := _pitch
+	_pitch = EXPLORE_PITCH
+	_full_area = true
+	var result: Variant = calc.call()
+	_pitch = saved_pitch
+	_full_area = false
+	return result
+
+
+## Transición entre la vista normal y la de exploración. Devuelve false si
+## no hay exploración en curso.
+func _update_explore(delta: float) -> bool:
+	if not _explore and _explore_blend <= 0.0:
+		return false
+	_explore_blend = move_toward(_explore_blend, 1.0 if _explore else 0.0, delta / EXPLORE_TIME)
+	var k := smoothstep(0.0, 1.0, _explore_blend)
+	_pitch = lerpf(pitch_degrees, EXPLORE_PITCH, k)
+	_place(lerpf(_distance, _explore_distance, k), _focus.lerp(_explore_focus, k))
+	if not _explore and _explore_blend <= 0.0:
+		_pitch = pitch_degrees
+		_place(_distance, _focus)
+		explore_finished.emit()
+	return true
 
 
 func _process(delta: float) -> void:
 	if level == null:
+		return
+	if _update_explore(delta) or get_tree().paused:
 		return
 	_update_attention()
 	var goal_distance := _target_distance()
@@ -190,7 +292,7 @@ func _target_speed() -> float:
 
 
 func _view_dir() -> Vector3:
-	var pitch := deg_to_rad(pitch_degrees)
+	var pitch := deg_to_rad(_pitch)
 	return Vector3(0, sin(pitch), cos(pitch))
 
 
@@ -352,6 +454,8 @@ func _ground_hit(screen_point: Vector2, height := 0.0) -> Vector3:
 
 
 func _area_rect() -> Rect2:
+	if _full_area:
+		return get_viewport().get_visible_rect()
 	var area := play_area.get_global_rect() if play_area else Rect2()
 	if area.size.x < 1.0 or area.size.y < 1.0:
 		area = get_viewport().get_visible_rect()

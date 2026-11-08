@@ -13,9 +13,13 @@ extends Node3D
 ## en Opciones.
 ##
 ## Interfaz: número de nivel arriba a la izquierda, botón de pausa arriba a la
-## derecha e indicaciones de giro abajo. La pausa muestra un menú (Continuar,
-## Reiniciar, Salir al selector de niveles); al llegar a la meta se marca el
-## nivel como completado y se muestra otro (Siguiente nivel, Repetir, Niveles).
+## derecha e indicaciones de giro abajo. La pausa oculta esa interfaz y
+## muestra a la izquierda tres botones con iconos (Continuar, Reiniciar,
+## Salir al selector de niveles); la cámara se aleja y se pone casi vertical,
+## y arrastrando el dedo se recorre el mapa (ver FollowCamera.start_explore).
+## Al continuar, la cámara vuelve a su sitio y después se reanuda el juego.
+## Al llegar a la meta se marca el nivel como completado y se muestra otro
+## menú (Siguiente nivel, Repetir, Niveles).
 ##
 ## Controles:
 ##   Media vuelta: pulsar izquierda y derecha a la vez (con el otro lado aún
@@ -34,7 +38,8 @@ extends Node3D
 ## distancia de cámara con "camera_distance" (limitada al máximo).
 ##
 ## La raíz de la escena se procesa siempre (para poder reanudar con el
-## teclado), pero el tablero, el cubo y la cámara se detienen en la pausa.
+## teclado), pero el tablero y el cubo se detienen en la pausa; la cámara
+## solo se mueve en ella para explorar el mapa.
 
 const HINT_IDLE_ALPHA := 0.45
 ## Pausa entre llegar a la meta y mostrar el menú de nivel completado.
@@ -51,6 +56,10 @@ var _side_pressed_at := {RollingCube.TURN_LEFT: -100000, RollingCube.TURN_RIGHT:
 var _keys_held := {RollingCube.TURN_LEFT: false, RollingCube.TURN_RIGHT: false}
 ## Dedo (índice del toque) -> lado de la pantalla en que se apoyó.
 var _touches := {}
+## Arrastre del mapa en la pausa: si hay un dedo (o el ratón) pulsado y
+## dónde estaba en el último movimiento.
+var _dragging := false
+var _drag_last := Vector2.ZERO
 
 @onready var level: Level = $Level
 @onready var cube: RollingCube = $Cube
@@ -69,7 +78,8 @@ var _touches := {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	for node: Node in [level, cube, camera, $UI]:
+	# La cámara se procesa siempre (ver FollowCamera) para explorar en la pausa.
+	for node: Node in [level, cube, $UI]:
 		node.process_mode = Node.PROCESS_MODE_PAUSABLE
 
 	cube.reached_goal.connect(_on_reached_goal)
@@ -111,8 +121,10 @@ func _ready() -> void:
 	pause_button.pressed.connect(_set_paused.bind(true))
 	%ContinueButton.pressed.connect(_set_paused.bind(false))
 	%RestartButton.pressed.connect(func() -> void:
-		_set_paused(false)
+		_close_pause_menu()
+		get_tree().paused = false
 		_restart())
+	%DragArea.gui_input.connect(_on_drag_area_input)
 	%QuitButton.pressed.connect(GameState.go_to_menu.bind("levels"))
 	next_button.pressed.connect(_next_level)
 	%RetryButton.pressed.connect(_restart)
@@ -214,18 +226,53 @@ func _is_side_held(side: int) -> bool:
 func _toggle_pause() -> void:
 	if complete_menu.visible:
 		return
-	_set_paused(not get_tree().paused)
+	_set_paused(not pause_menu.visible)
 
 
+## Pausa: menú de pausa y cámara de exploración. Al reanudar, la cámara
+## vuelve a su sitio con el juego aún en pausa y después se reanuda.
 func _set_paused(paused: bool) -> void:
-	if complete_menu.visible and paused:
-		return
-	get_tree().paused = paused
-	pause_menu.visible = paused
-	# En la pausa no llegan las sueltas de teclas y dedos.
-	_clear_held_sides()
 	if paused:
+		if complete_menu.visible or pause_menu.visible:
+			return
+		get_tree().paused = true
+		pause_menu.visible = true
+		$UI.visible = false
+		_dragging = false
+		# En la pausa no llegan las sueltas de teclas y dedos.
+		_clear_held_sides()
+		camera.start_explore()
 		_focus_first(pause_menu)
+		return
+	if not pause_menu.visible:
+		return
+	_close_pause_menu()
+	camera.end_explore()
+	await camera.explore_finished
+	# Se ha vuelto a pausar mientras la cámara volvía.
+	if pause_menu.visible or complete_menu.visible:
+		return
+	get_tree().paused = false
+
+
+func _close_pause_menu() -> void:
+	pause_menu.visible = false
+	$UI.visible = true
+	_dragging = false
+	_clear_held_sides()
+
+
+## Arrastre del mapa en la pausa (los toques llegan también como clic).
+func _on_drag_area_input(event: InputEvent) -> void:
+	var button := event as InputEventMouseButton
+	if button and button.button_index == MOUSE_BUTTON_LEFT:
+		_dragging = button.pressed
+		_drag_last = button.position
+		return
+	var motion := event as InputEventMouseMotion
+	if motion and _dragging:
+		camera.explore_drag(_drag_last, motion.position)
+		_drag_last = motion.position
 
 
 func _restart() -> void:
@@ -275,6 +322,8 @@ func _on_reached_goal() -> void:
 func _on_play_area_resized() -> void:
 	camera.refresh_layout()
 	camera.snap()
+	if pause_menu.visible:
+		camera.start_explore()
 
 
 ## Los toques sobre los botones no cuentan como giro.
