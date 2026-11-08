@@ -30,7 +30,8 @@ extends Node3D
 ## el cubo explota en pedazos de sus colores (ver CubeExplosion) y, cuando
 ## termina la explosión, vuelve a su casilla de salida con el rumbo inicial. Conserva la
 ## llave que llevaba, pierde los power ups y el tablero se queda como estaba.
-## Al reaparecer parpadea y es invulnerable durante RESPAWN_GRACE segundos. Un
+## Al reaparecer hace la animación de aparición (ver más abajo) y después
+## parpadea y es invulnerable durante RESPAWN_GRACE segundos. Un
 ## obstáculo es como una pared. Si queda encajonado (bloqueado delante y
 ## detrás), rebota en su casilla a ritmo de vuelco hasta que se libere el paso.
 ##
@@ -39,6 +40,12 @@ extends Node3D
 ## borde, cae girando y, tras FALL_TIME segundos, explota en el aire; cuando
 ## termina la explosión vuelve a la salida como si lo hubiera matado un
 ## enemigo. Se cae aunque esté en el tiempo de invulnerabilidad.
+##
+## Aparición: tras reset() el cubo espera oculto en la salida (mientras
+## aparece el tablero) hasta que se llama a appear(). Durante APPEAR_TIME
+## segundos baja girando y creciendo hasta su casilla, se posa con un
+## pequeño aplastamiento y una nube de polvo, y entonces empieza a rodar
+## (emite appeared). Mientras espera o aparece no se le puede matar.
 ##
 ## Power ups: al llegar a su casilla el cubo lo coge y se activa su efecto.
 ## Las reglas de cada tipo (acumulación, duración, fin al rebotar...) las
@@ -64,6 +71,10 @@ signal died(cell: Vector2i)
 signal fell(cell: Vector2i)
 ## El cubo ha vuelto a la salida tras morir.
 signal respawned
+## Se ha posado en la salida durante la aparición.
+signal landed
+## Ha terminado la aparición y empieza a rodar.
+signal appeared
 
 const TURN_LEFT := -1
 const TURN_RIGHT := 1
@@ -83,6 +94,14 @@ const REVERSE_SMOKE_LIFETIME := 0.8
 ## Muerte: invulnerabilidad al reaparecer en la salida
 ## (con parpadeo de RESPAWN_BLINK segundos por ciclo).
 const RESPAWN_GRACE := 1.5
+## Aparición: duración, altura desde la que baja, vueltas que da al bajar,
+## fracción del tiempo que tarda en posarse (el resto es el aplastamiento) y
+## cuánto se aplasta.
+const APPEAR_TIME := 2.0
+const APPEAR_HEIGHT := 2.5
+const APPEAR_SPINS := 1.5
+const APPEAR_LAND := 0.75
+const APPEAR_SQUASH := 0.18
 const RESPAWN_BLINK := 0.12
 ## Caída al vacío: tiempo de caída libre hasta explotar, gravedad, velocidad
 ## inicial (hacia delante y hacia abajo) y giro (rad/s) al salir del borde.
@@ -135,6 +154,13 @@ var _rolling := false
 ## Casilla hacia la que está volcando (solo vale mientras _rolling).
 var _roll_target := Vector2i.ZERO
 var _dead := false
+## Esperando oculto en la salida a que se llame a appear().
+var _waiting := false
+## Tiempo de la aparición en curso (negativo si no está apareciendo), si ya
+## se ha posado y si al acabar empieza el parpadeo de invulnerabilidad.
+var _appear_time := -1.0
+var _appear_landed := false
+var _grace_after_appear := false
 ## Cayendo al vacío: vuelco por el borde (_rolling) y caída libre después.
 var _falling := false
 var _fall_time := 0.0
@@ -188,8 +214,64 @@ func reset(target_level: Level) -> void:
 	_explosion = null
 	_falling = false
 	global_position = level.cell_to_world(cell)
-	_body.transform = Transform3D(Basis.IDENTITY, Vector3(0, HALF, 0))
+	# Oculto (diminuto) hasta que se llame a appear().
+	_waiting = true
+	_appear_time = -1.0
+	_grace_after_appear = false
+	_body.transform = Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * 0.001), Vector3(0, HALF, 0))
 	_update_arrow(Vector3.ZERO)
+
+
+## Empieza la animación de aparición en la salida; al acabar, el cubo rueda.
+func appear() -> void:
+	_waiting = false
+	_appear_time = 0.0
+	_appear_landed = false
+	_body.visible = true
+	_apply_appear(0.0)
+	_update_arrow(Vector3.ZERO)
+
+
+func is_appearing() -> bool:
+	return _waiting or _appear_time >= 0.0
+
+
+func _process_appear(delta: float) -> void:
+	_appear_time += delta
+	var t := minf(_appear_time / APPEAR_TIME, 1.0)
+	if not _appear_landed and t >= APPEAR_LAND:
+		_appear_landed = true
+		_spawn_dust(global_position + Vector3(0, 0.1, 0))
+		landed.emit()
+	_apply_appear(t)
+	if t < 1.0:
+		return
+	_appear_time = -1.0
+	_body.transform = Transform3D(Basis.IDENTITY, Vector3(0, HALF, 0))
+	if _grace_after_appear:
+		_grace_after_appear = false
+		_grace_left = RESPAWN_GRACE
+	if _held_key_node:
+		_held_key_node.visible = true
+	_update_arrow(Vector3.ZERO)
+	appeared.emit()
+
+
+## Baja girando y creciendo (con frenada suave) hasta posarse y, después, un
+## aplastamiento que se recupera. t va de 0 a 1.
+func _apply_appear(t: float) -> void:
+	var d := clampf(t / APPEAR_LAND, 0.0, 1.0)
+	var eased := 1.0 - pow(1.0 - d, 3.0)
+	var height := APPEAR_HEIGHT * (1.0 - eased)
+	var angle := (1.0 - eased) * TAU * APPEAR_SPINS
+	var grow := lerpf(0.15, 1.0, eased)
+	var squash := 0.0
+	if t > APPEAR_LAND:
+		var s := (t - APPEAR_LAND) / (1.0 - APPEAR_LAND)
+		squash = sin(s * PI) * APPEAR_SQUASH * (1.0 - s * 0.5)
+	var size := Vector3(grow * (1.0 + squash * 0.5), grow * (1.0 - squash), grow * (1.0 + squash * 0.5))
+	_body.transform = Transform3D(Basis(Vector3.UP, angle).scaled(size),
+		Vector3(0, HALF * size.y + height, 0))
 
 
 ## Registra un giro relativo al rumbo actual (izquierda o derecha).
@@ -215,7 +297,10 @@ func request_reverse() -> void:
 func _process(delta: float) -> void:
 	if _falling and not _rolling:
 		_process_fall(delta)
-	if _dead:
+	if _dead or _waiting:
+		return
+	if _appear_time >= 0.0:
+		_process_appear(delta)
 		return
 	if _grace_left > 0.0:
 		_grace_left -= delta
@@ -448,7 +533,7 @@ func is_alive() -> bool:
 ## Un enemigo puede matarlo ahora: vivo, sin haber llegado a la meta y sin la
 ## invulnerabilidad de después de reaparecer.
 func is_vulnerable() -> bool:
-	return not _dead and not is_finished and _grace_left <= 0.0
+	return not _dead and not is_finished and _grace_left <= 0.0 and not is_appearing()
 
 
 ## Casilla en la que está o hacia la que está volcando.
@@ -503,13 +588,10 @@ func _respawn() -> void:
 	cell = level.start_cell
 	heading = level.start_heading
 	global_position = level.cell_to_world(cell)
-	_body.transform = Transform3D(Basis.IDENTITY, Vector3(0, HALF, 0))
-	_body.visible = true
-	if _held_key_node:
-		_held_key_node.visible = true
-	_grace_left = RESPAWN_GRACE
 	_cooldown = 0.3
-	_update_arrow(Vector3.ZERO)
+	# La llave que lleva se vuelve a ver al acabar la aparición.
+	appear()
+	_grace_after_appear = true
 	respawned.emit()
 
 
@@ -711,7 +793,7 @@ func _update_arrow(offset: Vector3) -> void:
 	var dir := Vector3(shown.x, 0, shown.y)
 	var base := Basis.looking_at(dir, Vector3.UP) * Basis(Vector3.RIGHT, -PI * 0.5)
 	_arrow.global_transform = Transform3D(base, global_position + offset + dir * 0.1 + Vector3(0, ARROW_HEIGHT, 0))
-	_arrow.visible = show_arrow and not is_finished and not _dead
+	_arrow.visible = show_arrow and not is_finished and not _dead and not is_appearing()
 	if _held_key_node:
 		_held_key_node.global_position = global_position + offset + Vector3(0, HELD_KEY_HEIGHT, 0)
 

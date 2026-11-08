@@ -27,6 +27,14 @@ extends Node3D
 ##   del cubo; cuando una llega a 0 el puente entero cae y sus casillas pasan
 ##   a ser vacío (ver HangingBridge).
 ## Las filas crecen hacia +Z (hacia abajo en pantalla) y las columnas hacia +X.
+##
+## Aparición (start_reveal): al empezar o reiniciar el nivel, el tablero se
+## dibuja casilla a casilla en orden aleatorio en REVEAL_TIME segundos: cada
+## casilla (suelo, pared, roca y lo que haya encima) baja desde arriba
+## creciendo con un pequeño rebote. Mientras tanto los enemigos están
+## quietos (ver set_enemies_frozen). Al acabar emite reveal_finished.
+
+signal reveal_finished
 
 const CELL_SIZE := 1.0
 const WALL_HEIGHT := 0.5
@@ -66,6 +74,11 @@ const POWER_UP_FLOAT_HEIGHT := 0.5
 ## se considera cerca de un botón. Ver button_near().
 const BUTTON_APPROACH_CELLS := 4
 const NO_CELL := Vector2i(-9999, -9999)
+## Aparición del tablero: duración total, lo que tarda en aparecer cada
+## casilla y altura desde la que baja.
+const REVEAL_TIME := 1.3
+const REVEAL_POP_TIME := 0.3
+const REVEAL_DROP := 1.2
 
 @export var layout: PackedStringArray = PackedStringArray([
 	"#######",
@@ -114,6 +127,14 @@ var _buttons := {}
 var _enemies: Array[Enemy] = []
 ## casilla -> HangingBridge (solo los que siguen en pie)
 var _bridges := {}
+## Aparición en curso: tiempo transcurrido, retraso de cada casilla,
+## instancias de los MultiMesh ({ "multimesh", "cells", "transforms" }) y
+## nodos sueltos ({ "node", "delay", "position", "scale" }).
+var _revealing := false
+var _reveal_time := 0.0
+var _reveal_delays := {}
+var _reveal_multimeshes: Array[Dictionary] = []
+var _reveal_nodes: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -131,6 +152,9 @@ func configure(data: Dictionary) -> void:
 func build() -> void:
 	for child in get_children():
 		child.queue_free()
+	_revealing = false
+	_reveal_multimeshes.clear()
+	_reveal_nodes.clear()
 	_walkable.clear()
 	_void.clear()
 	_keys.clear()
@@ -206,6 +230,8 @@ func build() -> void:
 
 
 func _process(delta: float) -> void:
+	if _revealing:
+		_update_reveal(delta)
 	_check_enemy_hits()
 	for item in _keys.values():
 		item["node"].rotate_y(KEY_SPIN_SPEED * delta)
@@ -432,6 +458,124 @@ func get_grid_size() -> Vector2i:
 	return Vector2i(width, layout.size())
 
 
+# --- Aparición del tablero -----------------------------------------------------
+
+## Oculta el tablero y lo hace aparecer casilla a casilla (ver REVEAL_TIME).
+## Los enemigos se quedan quietos hasta set_enemies_frozen(false).
+func start_reveal() -> void:
+	_reveal_time = 0.0
+	_reveal_delays.clear()
+	var max_delay := REVEAL_TIME - REVEAL_POP_TIME
+	for z in layout.size():
+		for x in layout[z].length():
+			_reveal_delays[Vector2i(x, z)] = randf() * max_delay
+	for entry in _reveal_multimeshes:
+		var multimesh: MultiMesh = entry["multimesh"]
+		var transforms: Array[Transform3D] = []
+		for i in multimesh.instance_count:
+			transforms.append(multimesh.get_instance_transform(i))
+		entry["transforms"] = transforms
+	_reveal_nodes.clear()
+	for child in get_children():
+		var node := child as Node3D
+		if node == null or node is MultiMeshInstance3D or node.is_queued_for_deletion():
+			continue
+		var cell := Vector2i(roundi(node.position.x / CELL_SIZE), roundi(node.position.z / CELL_SIZE))
+		_reveal_nodes.append({"node": node, "delay": _reveal_delays.get(cell, randf() * max_delay),
+			"position": node.position, "scale": node.scale})
+	set_enemies_frozen(true)
+	_revealing = true
+	# Todo empieza oculto (diminuto, no invisible: así sus materiales ya se
+	# preparan detrás de la pantalla de carga).
+	_apply_reveal()
+
+
+func is_revealing() -> bool:
+	return _revealing
+
+
+## Detiene o reanuda a los enemigos (durante la aparición del nivel).
+func set_enemies_frozen(frozen: bool) -> void:
+	for enemy in _enemies:
+		if is_instance_valid(enemy):
+			enemy.process_mode = Node.PROCESS_MODE_DISABLED if frozen else Node.PROCESS_MODE_INHERIT
+
+
+func _update_reveal(delta: float) -> void:
+	_reveal_time += delta
+	_apply_reveal()
+	if _reveal_time >= REVEAL_TIME:
+		_finish_reveal()
+		reveal_finished.emit()
+
+
+## Deja todo exactamente en su sitio.
+func _finish_reveal() -> void:
+	_revealing = false
+	for entry in _reveal_multimeshes:
+		var multimesh: MultiMesh = entry["multimesh"]
+		var transforms: Array[Transform3D] = entry["transforms"]
+		for i in transforms.size():
+			multimesh.set_instance_transform(i, transforms[i])
+	for entry in _reveal_nodes:
+		var node: Node3D = entry["node"]
+		if is_instance_valid(node):
+			node.scale = entry["scale"]
+			node.position = entry["position"]
+	_reveal_nodes.clear()
+
+
+## Coloca cada elemento según el progreso de su casilla: baja desde
+## REVEAL_DROP y crece con un pequeño rebote; al acabar, exactamente en su sitio.
+func _apply_reveal() -> void:
+	for entry in _reveal_multimeshes:
+		var multimesh: MultiMesh = entry["multimesh"]
+		var cells: Array = entry["cells"]
+		var transforms: Array[Transform3D] = entry["transforms"]
+		for i in cells.size():
+			var k := _reveal_progress(_reveal_delays.get(cells[i], 0.0))
+			if k < 0.0:
+				continue
+			multimesh.set_instance_transform(i, _revealed(transforms[i], k))
+	for entry in _reveal_nodes:
+		var node: Node3D = entry["node"]
+		if not is_instance_valid(node):
+			continue
+		var k := _reveal_progress(entry["delay"])
+		if k < 0.0:
+			continue
+		var grow := _reveal_scale(k)
+		node.scale = entry["scale"] * grow
+		node.position = entry["position"] + Vector3(0, REVEAL_DROP * (1.0 - _reveal_ease(k)), 0)
+
+
+## Progreso (0-1) de una casilla con ese retraso; -1 si ya ha terminado y no
+## hay que tocarla (para no recolocar miles de casillas en cada fotograma).
+func _reveal_progress(delay: float) -> float:
+	if _reveal_time - delay > REVEAL_POP_TIME + 0.1:
+		return -1.0
+	return clampf((_reveal_time - delay) / REVEAL_POP_TIME, 0.0, 1.0)
+
+
+func _revealed(base: Transform3D, k: float) -> Transform3D:
+	var t := base
+	t.basis = base.basis.scaled(Vector3.ONE * _reveal_scale(k))
+	t.origin = base.origin + Vector3(0, REVEAL_DROP * (1.0 - _reveal_ease(k)), 0)
+	return t
+
+
+static func _reveal_ease(k: float) -> float:
+	return 1.0 - pow(1.0 - k, 3.0)
+
+
+## Tamaño: de casi nada a algo más de 1 y vuelta a 1 (rebote).
+static func _reveal_scale(k: float) -> float:
+	if k <= 0.0:
+		return 0.001
+	var c := 1.70158
+	return maxf(0.001, 1.0 + (c + 1.0) * pow(k - 1.0, 3.0) + c * pow(k - 1.0, 2.0))
+
+
 ## Un mismo bloque repetido en varias casillas, en un solo MultiMesh.
 func _add_multimesh(cells: Array, size: Vector3, y: float, mat: Material) -> void:
 	if cells.is_empty():
@@ -450,6 +594,7 @@ func _add_multimesh(cells: Array, size: Vector3, y: float, mat: Material) -> voi
 	var instance := MultiMeshInstance3D.new()
 	instance.multimesh = multimesh
 	add_child(instance)
+	_reveal_multimeshes.append({"multimesh": multimesh, "cells": cells.duplicate()})
 
 
 ## Bloques de roca bajo el suelo y las paredes (niveles con vacío): el

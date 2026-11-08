@@ -143,7 +143,7 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vuelcan) y en tiempo real, independientemente del ritmo del cubo.
 
 - Todos se mueven solo por casillas libres: las **puertas cerradas, los barrotes cerrados y los muros destructibles** también los detienen. **Nunca entran en la casilla de salida ni en la meta.**
-- **Muerte del cubo:** si un **perseguidor** o un **patrullero** toca al cubo, el cubo **explota**: se hincha un instante y revienta en 27 pedazos con su mismo aspecto (blancos con aristas grises), saltan, rebotan en el suelo girando y se encogen hasta desaparecer (≈1,6 s en total, con una nube de polvo, temblor de cámara y vibración). **Cuando termina la explosión**, el cubo **vuelve a su casilla de salida** con el rumbo inicial. **Conserva la llave** que llevaba, **pierde los power ups**, y el tablero (puertas abiertas, muros rotos, barrotes) y los enemigos se quedan como estaban. Al reaparecer **parpadea** y es **invulnerable** durante 1,5 s.
+- **Muerte del cubo:** si un **perseguidor** o un **patrullero** toca al cubo, el cubo **explota**: se hincha un instante y revienta en 27 pedazos con su mismo aspecto (blancos con aristas grises), saltan, rebotan en el suelo girando y se encogen hasta desaparecer (≈1,6 s en total, con una nube de polvo, temblor de cámara y vibración). **Cuando termina la explosión**, el cubo **vuelve a su casilla de salida** con el rumbo inicial. **Conserva la llave** que llevaba, **pierde los power ups**, y el tablero (puertas abiertas, muros rotos, barrotes) y los enemigos se quedan como estaban. Al reaparecer hace la **animación de aparición** (2 s, ver apartado 7.3; los enemigos siguen moviéndose pero no le pueden matar) y, ya rodando, **parpadea** y es **invulnerable** durante 1,5 s más.
 
 #### Perseguidor (esfera)
 
@@ -330,6 +330,7 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 - Debajo se muestra un **consejo** sobre las mecánicas o los movimientos, elegido al azar de una lista (sin repetir el anterior). Los consejos están traducidos a los dos idiomas.
 - El nivel se carga sin bloquear la pantalla (el cubo sigue moviéndose) y se prepara detrás, en pausa. Cuando está listo, «Cargando…» se cambia por el botón **Continuar**; al pulsarlo, la pantalla se desvanece y empieza el nivel.
 - **Reiniciar** y **Repetir** no pasan por la pantalla de carga.
+- **Aparición del nivel** (al entrar en él y al reiniciarlo o repetirlo): el tablero se dibuja **casilla a casilla en orden aleatorio** en 1,3 s (cada casilla, con lo que tiene encima, baja desde arriba creciendo con un pequeño rebote). Después llega la **aparición del cubo** (2 s): baja girando y creciendo hasta la salida, se posa con un pequeño aplastamiento, una nube de polvo y un golpe, y entonces empieza a rodar. Los enemigos no se mueven hasta ese momento. Así el jugador tiene tiempo de situarse.
 
 ### 7.4. Pausa
 
@@ -338,7 +339,7 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
   - **Reiniciar** (flecha circular): vuelve a empezar el nivel.
   - **Salir** (flecha que sale de una puerta): vuelve al selector de niveles.
 - **Explorar el mapa:** al pausar, la cámara se **aleja** (≈1,7 veces, sin pasar de lo necesario para ver el tablero entero) y se **inclina casi en vertical** (82°) con una transición suave. **Arrastrando el dedo** (o el ratón) se desplaza la vista por el mapa, sin enseñar más allá de sus bordes. Al pie de la pantalla, centrado, se lee «Desliza el dedo sobre la pantalla para navegar por el mapa».
-- Al **continuar**, la cámara vuelve suavemente a su posición e inclinación de juego y, al llegar, se reanuda la partida. Al **reiniciar**, vuelve al momento.
+- Al **continuar**, la cámara vuelve suavemente a su posición e inclinación de juego y, al llegar, se reanuda la partida: la velocidad del juego sube de forma uniforme de 0 a la normal en 1 s. Al **reiniciar**, vuelve al momento.
 - En el móvil, el juego también se pausa al salir de la aplicación (por ejemplo, al recibir una llamada).
 
 ### 7.5. Controles

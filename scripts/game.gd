@@ -17,7 +17,14 @@ extends Node3D
 ## muestra a la izquierda tres botones con iconos (Continuar, Reiniciar,
 ## Salir al selector de niveles); la cámara se aleja y se pone casi vertical,
 ## y arrastrando el dedo se recorre el mapa (ver FollowCamera.start_explore).
-## Al continuar, la cámara vuelve a su sitio y después se reanuda el juego.
+## Al continuar, la cámara vuelve a su sitio y después se reanuda el juego:
+## la velocidad del juego (Engine.time_scale) sube de 0 a la normal de forma
+## uniforme en RESUME_RAMP_TIME segundos.
+##
+## Inicio del nivel (al entrar o reiniciar): el tablero aparece casilla a
+## casilla (Level.start_reveal) y después aparece el cubo
+## (RollingCube.appear); los enemigos no se mueven hasta que el cubo empieza
+## a rodar.
 ## Al llegar a la meta se marca el nivel como completado y se muestra otro
 ## menú (Siguiente nivel, Repetir, Niveles).
 ##
@@ -47,6 +54,8 @@ const COMPLETE_MENU_DELAY := 0.5
 ## Diferencia máxima entre pulsar izquierda y derecha para que cuente como a
 ## la vez (media vuelta).
 const SIMULTANEOUS_WINDOW := 0.15
+## Tiempo que tarda el juego en recuperar su velocidad al salir de la pausa.
+const RESUME_RAMP_TIME := 1.0
 
 var current_level := 0
 var _hint_tweens := {}
@@ -60,6 +69,10 @@ var _touches := {}
 ## dónde estaba en el último movimiento.
 var _dragging := false
 var _drag_last := Vector2.ZERO
+## Aceleración tras la pausa (anima Engine.time_scale).
+var _speed_tween: Tween
+## Cuenta de inicios del nivel: un reinicio cancela la secuencia anterior.
+var _intro_id := 0
 
 @onready var level: Level = $Level
 @onready var cube: RollingCube = $Cube
@@ -112,6 +125,7 @@ func _ready() -> void:
 		GameState.vibrate(GameState.VIBRATION_BUTTON))
 	cube.rolled.connect(func(_cell: Vector2i) -> void: Sfx.play("roll", 0.12))
 	cube.bounced.connect(func(_cell: Vector2i) -> void: Sfx.play("bounce", 0.1))
+	cube.landed.connect(func() -> void: Sfx.play("bounce", 0.1))
 	cube.key_picked.connect(func(_color: String) -> void: Sfx.play("key"))
 	cube.door_opened.connect(func(_color: String) -> void: Sfx.play("door"))
 	cube.power_up_picked.connect(func(_power_up: PowerUp, _stacks: int) -> void:
@@ -235,6 +249,7 @@ func _set_paused(paused: bool) -> void:
 	if paused:
 		if complete_menu.visible or pause_menu.visible:
 			return
+		_stop_speed_ramp()
 		get_tree().paused = true
 		pause_menu.visible = true
 		$UI.visible = false
@@ -253,6 +268,27 @@ func _set_paused(paused: bool) -> void:
 	if pause_menu.visible or complete_menu.visible:
 		return
 	get_tree().paused = false
+	_start_speed_ramp()
+
+
+## La velocidad del juego sube de 0 a la normal de forma uniforme.
+func _start_speed_ramp() -> void:
+	_stop_speed_ramp()
+	Engine.time_scale = 0.0
+	_speed_tween = create_tween().set_ignore_time_scale(true)
+	_speed_tween.tween_property(Engine, "time_scale", 1.0, RESUME_RAMP_TIME)
+
+
+func _stop_speed_ramp() -> void:
+	if _speed_tween and _speed_tween.is_valid():
+		_speed_tween.kill()
+	_speed_tween = null
+	Engine.time_scale = 1.0
+
+
+func _exit_tree() -> void:
+	# time_scale es global: no debe quedarse a medias al salir de la partida.
+	_stop_speed_ramp()
 
 
 func _close_pause_menu() -> void:
@@ -283,6 +319,24 @@ func _restart() -> void:
 	_clear_held_sides()
 	complete_menu.visible = false
 	pause_button.visible = true
+	_stop_speed_ramp()
+	_play_intro()
+
+
+## Aparición del tablero y, después, la del cubo; al acabar, los enemigos
+## empiezan a moverse. Un reinicio a mitad cancela la secuencia anterior.
+func _play_intro() -> void:
+	_intro_id += 1
+	var id := _intro_id
+	level.start_reveal()
+	await level.reveal_finished
+	if id != _intro_id:
+		return
+	cube.appear()
+	await cube.appeared
+	if id != _intro_id:
+		return
+	level.set_enemies_frozen(false)
 
 
 func _load_level(index: int) -> void:
