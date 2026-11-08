@@ -26,6 +26,12 @@ extends Node3D
 ##   dos extremos. Cada casilla aguanta HangingBridge.MAX_STABILITY salidas
 ##   del cubo; cuando una llega a 0 el puente entero cae y sus casillas pasan
 ##   a ser vacío (ver HangingBridge).
+## Materiales (ver BlockCatalog): el campo "theme" del nivel elige el bloque
+## del suelo ("floor"), de los muros ("wall") y, opcionalmente, de la roca de
+## debajo ("foundation"; si no se da, la que va bajo el suelo). Lo que falte
+## sale de DEFAULT_THEME. "theme_regions" cambia los bloques en zonas del mapa
+## (para transiciones): lista de { "rect": Rect2i(x, z, ancho, alto), y las
+## mismas claves que "theme" }; si se solapan, gana la última.
 ## Las filas crecen hacia +Z (hacia abajo en pantalla) y las columnas hacia +X.
 ##
 ## Aparición (start_reveal): al empezar o reiniciar el nivel, el tablero se
@@ -54,6 +60,12 @@ const FOUNDATION_DEPTH := 0.9
 ## Distancia (en casillas) entre el centro del cubo y el de un enemigo letal a
 ## partir de la cual el cubo muere.
 const ENEMY_HIT_DISTANCE := 0.72
+## Bloques por defecto de los niveles sin "theme" (ver BlockCatalog).
+const DEFAULT_THEME := {"floor": "grass", "wall": "stone_bricks"}
+## Tono de las baldosas oscuras del ajedrezado del suelo y de la roca de
+## debajo que no da al vacío (la del borde se deja con su color).
+const FLOOR_DARK_TINT := Color(0.88, 0.88, 0.88)
+const FOUNDATION_INNER_TINT := Color(0.78, 0.78, 0.78)
 const ITEM_COLORS := {
 	"y": Color(0.98, 0.80, 0.12),
 	"o": Color(1.00, 0.50, 0.08),
@@ -103,6 +115,10 @@ const REVEAL_FADE_TIME := 0.45
 ## Ruta de cada patrullero (campo "patrols" del nivel): {"i": "R3 D2 L3 U2"}.
 ## Ver Patroller.set_route.
 @export var patrol_routes := {}
+## Bloques del nivel (campo "theme") y por zonas ("theme_regions"). Ver la
+## leyenda del principio.
+@export var block_theme := {}
+@export var block_regions: Array = []
 ## Cubo del jugador: los enemigos lo buscan y lo matan.
 var cube: RollingCube:
 	set(value):
@@ -131,7 +147,7 @@ var _enemies: Array[Enemy] = []
 ## casilla -> HangingBridge (solo los que siguen en pie)
 var _bridges := {}
 ## Aparición en curso: tiempo transcurrido, retraso de cada casilla,
-## MultiMesh ({ "multimesh", "material", "cells" }; la opacidad de cada
+## MultiMesh ({ "multimesh", "materials", "cells" }; la opacidad de cada
 ## casilla va en el color de su instancia) y nodos sueltos ({ "delay",
 ## "materials": [...] }, ver _fade_materials).
 var _revealing := false
@@ -151,6 +167,8 @@ func configure(data: Dictionary) -> void:
 	start_heading = data["start_heading"]
 	button_links = data.get("buttons", {})
 	patrol_routes = data.get("patrols", {})
+	block_theme = data.get("theme", {})
+	block_regions = data.get("theme_regions", [])
 
 
 func build() -> void:
@@ -172,15 +190,14 @@ func build() -> void:
 	var enemy_cells := {}
 	var bridge_cells := {}
 
-	var floor_a := _make_material(Color(0.86, 0.84, 0.80))
-	var floor_b := _make_material(Color(0.78, 0.76, 0.72))
-	var wall_mat := _make_material(Color(0.32, 0.36, 0.45))
 	var start_mat := _make_material(Color(0.35, 0.60, 0.95))
 	var goal_mat := _make_material(Color(0.30, 0.80, 0.45))
 	# Muros y baldosas normales se dibujan con MultiMesh (una llamada de dibujo
-	# por tipo): los mapas grandes tienen miles de casillas.
+	# por tipo de bloque): los mapas grandes tienen miles de casillas.
 	var wall_cells: Array[Vector2i] = []
-	var floor_cells := [[], []]
+	## "bloque" -> casillas; las del suelo, "bloque|0" y "bloque|1" (ajedrezado).
+	var wall_groups := {}
+	var floor_groups := {}
 
 	for z in layout.size():
 		var row: String = layout[z]
@@ -192,6 +209,7 @@ func build() -> void:
 				continue
 			if symbol == "#" or BUTTON_CHARS.contains(symbol):
 				wall_cells.append(cell)
+				_group(wall_groups, _block_at(cell, "wall"), cell)
 				if symbol != "#":
 					_add_button(cell, symbol)
 				continue
@@ -207,7 +225,7 @@ func build() -> void:
 				goal_cell = cell
 				_add_box(cell, tile, -FLOOR_THICKNESS * 0.5, goal_mat)
 			else:
-				floor_cells[(x + z) % 2].append(cell)
+				_group(floor_groups, "%s|%d" % [_block_at(cell, "floor"), (x + z) % 2], cell)
 			if KEY_CHARS.contains(symbol):
 				_add_key(cell, symbol)
 			elif KEY_CHARS.to_upper().contains(symbol):
@@ -220,10 +238,14 @@ func build() -> void:
 				_add_bars(cell, symbol)
 			elif symbol == CHASER_CHAR or symbol == BLOCKER_CHAR or PATROL_CHARS.contains(symbol):
 				enemy_cells[cell] = symbol
-	_add_multimesh(wall_cells, Vector3(CELL_SIZE, WALL_HEIGHT, CELL_SIZE), WALL_HEIGHT * 0.5, wall_mat)
+	for id: String in wall_groups:
+		_add_multimesh(wall_groups[id], id, Vector3(CELL_SIZE, WALL_HEIGHT, CELL_SIZE),
+			WALL_HEIGHT * 0.5, Color.WHITE)
 	var tile_size := Vector3(CELL_SIZE * 0.96, FLOOR_THICKNESS, CELL_SIZE * 0.96)
-	_add_multimesh(floor_cells[0], tile_size, -FLOOR_THICKNESS * 0.5, floor_a)
-	_add_multimesh(floor_cells[1], tile_size, -FLOOR_THICKNESS * 0.5, floor_b)
+	for key: String in floor_groups:
+		var parts := key.split("|")
+		_add_multimesh(floor_groups[key], parts[0], tile_size, -FLOOR_THICKNESS * 0.5,
+			FLOOR_DARK_TINT if parts[1] == "1" else Color.WHITE)
 	if not _void.is_empty():
 		_add_foundations(wall_cells)
 	_add_bridges(bridge_cells)
@@ -503,9 +525,9 @@ func start_reveal() -> void:
 	# paredes (un solo objeto transparente cada uno) taparían lo que tienen
 	# encima según el orden en que se dibujen.
 	for entry in _reveal_multimeshes:
-		var mat: BaseMaterial3D = entry["material"]
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
+		for mat: BaseMaterial3D in entry["materials"]:
+			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
 	_reveal_nodes.clear()
 	for child in get_children():
 		var node := child as Node3D
@@ -546,9 +568,9 @@ func _finish_reveal() -> void:
 		var multimesh: MultiMesh = entry["multimesh"]
 		for i in multimesh.instance_count:
 			multimesh.set_instance_color(i, Color.WHITE)
-		var mat: BaseMaterial3D = entry["material"]
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
-		mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_OPAQUE_ONLY
+		for mat: BaseMaterial3D in entry["materials"]:
+			mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+			mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_OPAQUE_ONLY
 	for entry in _reveal_nodes:
 		for item: Dictionary in entry["materials"]:
 			var mesh_instance: MeshInstance3D = item["node"]
@@ -630,37 +652,77 @@ func _reveal_progress(delay: float) -> float:
 	return smoothstep(0.0, 1.0, (_reveal_time - delay) / REVEAL_FADE_TIME)
 
 
-## Un mismo bloque repetido en varias casillas, en un solo MultiMesh.
-func _add_multimesh(cells: Array, size: Vector3, y: float, mat: Material) -> void:
+## Un mismo bloque del catálogo (BlockCatalog) repetido en varias casillas,
+## en un solo MultiMesh. La cara de arriba de cada casilla va girada al azar
+## (siempre igual en la misma casilla) para que no se note la repetición.
+func _add_multimesh(cells: Array, block: String, size: Vector3, y: float, tint: Color) -> void:
 	if cells.is_empty():
 		return
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	mesh.material = mat
-	# El color de cada instancia (blanco) lleva su opacidad en la aparición.
-	(mat as BaseMaterial3D).vertex_color_use_as_albedo = true
+	var mesh := BlockCatalog.make_mesh(block, size, tint)
+	var materials: Array[BaseMaterial3D] = []
+	for i in mesh.get_surface_count():
+		materials.append(mesh.surface_get_material(i))
+	var spin := BlockCatalog.spin(block)
 	var multimesh := MultiMesh.new()
 	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	# El color de cada instancia (blanco) lleva su opacidad en la aparición.
 	multimesh.use_colors = true
 	multimesh.mesh = mesh
 	multimesh.instance_count = cells.size()
 	for i in cells.size():
 		var cell: Vector2i = cells[i]
-		multimesh.set_instance_transform(i,
-			Transform3D(Basis.IDENTITY, Vector3(cell.x * CELL_SIZE, y, cell.y * CELL_SIZE)))
+		var turns := 0
+		if spin > 1:
+			turns = (_cell_hash(cell) % spin) * (4 / spin)
+		multimesh.set_instance_transform(i, Transform3D(Basis(Vector3.UP, turns * PI * 0.5),
+			Vector3(cell.x * CELL_SIZE, y, cell.y * CELL_SIZE)))
 		multimesh.set_instance_color(i, Color.WHITE)
 	var instance := MultiMeshInstance3D.new()
 	instance.multimesh = multimesh
 	add_child(instance)
-	_reveal_multimeshes.append({"multimesh": multimesh, "material": mat, "cells": cells.duplicate()})
+	_reveal_multimeshes.append({"multimesh": multimesh, "materials": materials, "cells": cells.duplicate()})
+
+
+static func _cell_hash(cell: Vector2i) -> int:
+	return absi((cell.x * 73856093) ^ (cell.y * 19349663)) >> 3
+
+
+static func _group(groups: Dictionary, key: String, cell: Vector2i) -> void:
+	if not groups.has(key):
+		groups[key] = []
+	groups[key].append(cell)
+
+
+## Bloque del catálogo de una casilla para `part` ("floor", "wall" o
+## "foundation"): el de la última zona de block_regions que la contiene, si
+## no el del nivel y si no el de DEFAULT_THEME. La roca, si no se indica, es
+## la que va bajo el bloque del suelo.
+func _block_at(cell: Vector2i, part: String) -> String:
+	var found := ""
+	for i in range(block_regions.size() - 1, -1, -1):
+		var region: Dictionary = block_regions[i]
+		if region.has(part) and (region["rect"] as Rect2i).has_point(cell):
+			found = region[part]
+			break
+	if found == "":
+		found = block_theme.get(part, "")
+	if found == "":
+		if part == "foundation":
+			return BlockCatalog.under(_block_at(cell, "floor"))
+		found = DEFAULT_THEME[part]
+	if not BlockCatalog.has(found):
+		push_error("Bloque desconocido '%s' en el tema del nivel" % found)
+		return DEFAULT_THEME.get(part, "stone")
+	return found
 
 
 ## Bloques de roca bajo el suelo y las paredes (niveles con vacío): el
 ## tablero parece una isla flotando sobre el abismo. Las casillas que dan al
 ## vacío llevan un bloque algo más claro para que se vea el borde.
 func _add_foundations(wall_cells: Array[Vector2i]) -> void:
-	var inner := []
-	var edge := []
+	## "bloque" -> casillas, por separado las que dan al vacío.
+	var inner := {}
+	var edge := {}
 	var cells: Array[Vector2i] = []
 	cells.append_array(wall_cells)
 	cells.append_array(_walkable.keys())
@@ -672,11 +734,13 @@ func _add_foundations(wall_cells: Array[Vector2i]) -> void:
 			if is_void(cell + dir):
 				at_edge = true
 				break
-		(edge if at_edge else inner).append(cell)
+		_group(edge if at_edge else inner, _block_at(cell, "foundation"), cell)
 	var size := Vector3(CELL_SIZE, FOUNDATION_DEPTH, CELL_SIZE)
 	var y := -FLOOR_THICKNESS - FOUNDATION_DEPTH * 0.5
-	_add_multimesh(inner, size, y, _make_material(Color(0.36, 0.31, 0.27)))
-	_add_multimesh(edge, size, y, _make_material(Color(0.47, 0.41, 0.35)))
+	for id: String in inner:
+		_add_multimesh(inner[id], id, size, y, FOUNDATION_INNER_TINT)
+	for id: String in edge:
+		_add_multimesh(edge[id], id, size, y, Color.WHITE)
 
 
 ## La casilla es '=' en el mapa (aunque el puente ya se haya caído).

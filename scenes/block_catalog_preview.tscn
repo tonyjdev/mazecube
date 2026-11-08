@@ -1,0 +1,31 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/blocks/block_catalog_preview.gd" id="1_prev"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_prev"]
+
+[sub_resource type="Sky" id="Sky_prev"]
+sky_material = SubResource("ProceduralSkyMaterial_prev")
+
+[sub_resource type="Environment" id="Environment_prev"]
+background_mode = 2
+sky = SubResource("Sky_prev")
+ambient_light_source = 3
+tonemap_mode = 2
+
+[node name="BlockCatalogPreview" type="Node3D"]
+script = ExtResource("1_prev")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_prev")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.8660254, 0.38302222, -0.32139382, 0, 0.64278764, 0.76604444, 0.5, -0.66341394, 0.5566704, 0, 0, 0)
+shadow_enabled = true
+shadow_bias = 0.05
+shadow_normal_bias = 1.0
+shadow_blur = 1.5
+directional_shadow_max_distance = 60.0
+
+[node name="Camera3D" type="Camera3D" parent="."]
+current = true

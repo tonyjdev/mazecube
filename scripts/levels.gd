@@ -400,6 +400,12 @@ const LIST: Array[Dictionary] = [
 			"##########################################",
 		],
 		"patrols": {"i": "D4"},
+		# Transición de la pradera (izquierda) a la nieve (derecha).
+		"theme": {"floor": "snow", "wall": "ice"},
+		"theme_regions": [
+			{"rect": Rect2i(0, 0, 14, 16), "floor": "grass", "wall": "stone_bricks"},
+			{"rect": Rect2i(14, 0, 10, 16), "floor": "grass_dry", "wall": "stone"},
+		],
 	},
 	{
 		"name": "Laberinto de piedra",
@@ -998,9 +1004,35 @@ const LIST: Array[Dictionary] = [
 ]
 
 
+## Bloques (ver BlockCatalog y Level) de los niveles que no traen "theme",
+## por tramos: [primer nivel (desde 0), tema]. Provisional, para ver el
+## catálogo en juego hasta que se diseñen las zonas definitivas.
+const THEMES := [
+	[0, {"floor": "grass", "wall": "stone_bricks"}],
+	[5, {"floor": "grass_flowers", "wall": "wood_log"}],
+	[10, {"floor": "sand", "wall": "sandstone"}],
+	[13, {"floor": "dirt", "wall": "mossy_stone"}],
+	[17, {"floor": "stone", "wall": "granite"}],
+	[21, {"floor": "wood_planks", "wall": "brick"}],
+	[24, {"floor": "metal", "wall": "obsidian"}],
+	[27, {"floor": "grass_dry", "wall": "stone"}],
+	[30, {"floor": "magma", "wall": "lava"}],
+	[32, {"floor": "corrupted", "wall": "crystal", "foundation": "obsidian"}],
+]
+
+
 static func count() -> int:
 	return LIST.size()
 
 
+## Datos del nivel. Si no trae "theme", lleva el de su tramo en THEMES.
 static func get_level(index: int) -> Dictionary:
-	return LIST[clampi(index, 0, LIST.size() - 1)]
+	index = clampi(index, 0, LIST.size() - 1)
+	var data: Dictionary = LIST[index]
+	if data.has("theme"):
+		return data
+	data = data.duplicate()
+	for entry: Array in THEMES:
+		if index >= entry[0]:
+			data["theme"] = entry[1]
+	return data
