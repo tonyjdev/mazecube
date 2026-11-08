@@ -35,8 +35,10 @@ Simula las reglas de scripts/rolling_cube.gd:
   patrulleros cuentan como libres y la del obstáculo como un muro (es un
   bloqueo que hay que rodear o encerrar). Los giros calculados son una
   aproximación sin enemigos en movimiento; "validate"
-  comprueba que las rutas de los patrulleros pasan solo por casillas libres
-  y no tocan la salida ni la meta.
+  comprueba que las rutas de los patrulleros pasan solo por casillas libres,
+  no tocan la salida ni la meta y tienen al menos tres salidas, una de ellas
+  lateral (desde una casilla intermedia de la ruta), para que el cubo
+  siempre pueda esquivarlos y ningún pasillo quede intransitable.
 - Vacío ('~', y también fuera del mapa): ni suelo ni pared. No es un
   obstáculo: el cubo no rebota y los giros hacia el vacío se aplican. Si el
   cubo entra en el vacío se cae y vuelve a la salida; el resolvedor descarta
@@ -84,6 +86,8 @@ PATROL_CHARS = "ijkmn"
 VOID_CHAR = "~"
 ENEMY_CHARS = CHASER_CHAR + BLOCKER_CHAR + PATROL_CHARS
 ROUTE_DIRS = {"R": (1, 0), "L": (-1, 0), "U": (0, -1), "D": (0, 1)}
+# Salidas mínimas de la ruta de un patrullero (ver patrol_exits).
+PATROL_MIN_EXITS = 3
 LEVEL_CHARS = ("#.AB" + KEY_CHARS + DOOR_CHARS + POWERUP_CHARS + BREAKABLE_CHARS
                + BAR_CHARS + BAR_CHARS.upper() + BUTTON_CHARS + ENEMY_CHARS + VOID_CHAR)
 
@@ -399,6 +403,40 @@ def check_buttons(rows, buttons):
     return problems
 
 
+def route_cells(origin, route):
+    """Casillas de una ruta de patrulla desde su casilla de partida (incluida)."""
+    cells, cell = [origin], origin
+    for part in route.split():
+        d = ROUTE_DIRS[part[0].upper()]
+        for _ in range(int(part[1:])):
+            cell = (cell[0] + d[0], cell[1] + d[1])
+            cells.append(cell)
+    return cells
+
+
+def patrol_exits(free, cells):
+    """Salidas de una ruta de patrulla: (total, laterales).
+
+    Una salida es una casilla libre junto a la ruta que no forma parte de
+    ella. Las laterales salen de una casilla intermedia (no de un extremo de
+    una ruta de ida y vuelta): son las únicas que sirven para esquivar al
+    patrullero, porque los extremos los ocupa él mismo al dar la vuelta. En
+    una ruta circular todas las casillas son intermedias.
+    """
+    loop = len(cells) > 2 and cells[-1] == cells[0]
+    on_route = set(cells)
+    exits, lateral = set(), set()
+    for k, (x, z) in enumerate(cells):
+        inner = loop or 0 < k < len(cells) - 1
+        for dx, dz in DIRS:
+            n = (x + dx, z + dz)
+            if n in free and n not in on_route:
+                exits.add(n)
+                if inner:
+                    lateral.add(n)
+    return len(exits), len(lateral)
+
+
 def check_enemies(rows, patrols):
     """Problemas de colocación de enemigos y rutas de patrulla (lista de textos)."""
     problems = []
@@ -429,6 +467,12 @@ def check_enemies(rows, patrols):
                 else:
                     continue
                 break
+            else:
+                total, lateral = patrol_exits(free, route_cells((x, z), route))
+                if total < PATROL_MIN_EXITS or lateral < 1:
+                    problems.append(
+                        f"la ruta de {c} tiene {total} salidas ({lateral} laterales): necesita "
+                        f"{PATROL_MIN_EXITS} o más y al menos una lateral para poder esquivarlo")
     for c in patrols:
         if c not in found:
             problems.append(f"el patrullero {c} de \"patrols\" no está en el mapa")

@@ -17,7 +17,8 @@ destructible es imprescindible:
   lado de la salida, para que se vean juntos.
 - muro destructible: un dígito de 2 a 4 golpes.
 Después añade power ups y enemigos (patrulleros que rodean salas o recorren
-pasillos rectos, perseguidores lejos de la salida y obstáculos) y valida el
+pasillos rectos con al menos tres salidas, una de ellas lateral, para
+que el cubo siempre pueda esquivarlos; perseguidores lejos de la salida y obstáculos) y valida el
 nivel con level_solver (solución, botones y rutas de patrulla).
 
 Para cada nivel prueba varias semillas y se queda con el candidato cuyo
@@ -437,8 +438,11 @@ def _place_patrols(rng, grid, free, rooms, count, start, goal, taken, path):
     for origin, route in candidates:
         if len(patrols) >= count:
             break
-        cells = _route_cells(origin, route)
+        cells = ls.route_cells(origin, route)
         if used & set(cells) or any(near_start.get(c, 99) < 6 for c in cells):
+            continue
+        total, lateral = ls.patrol_exits(free, cells)
+        if total < ls.PATROL_MIN_EXITS or lateral < 1:
             continue
         symbol = PATROLS[len(patrols)]
         patrols[symbol] = route
@@ -452,17 +456,6 @@ def _place_patrols(rng, grid, free, rooms, count, start, goal, taken, path):
     if len(patrols) < count:
         raise Fail("sin sitio para patrulleros")
     return patrols
-
-
-def _route_cells(origin, route):
-    cells = [origin]
-    c = origin
-    for part in route.split():
-        d = ls.ROUTE_DIRS[part[0]]
-        for _ in range(int(part[1:])):
-            c = (c[0] + d[0], c[1] + d[1])
-            cells.append(c)
-    return cells
 
 
 # --- Salida -------------------------------------------------------------------

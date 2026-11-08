@@ -9,6 +9,8 @@ extends Enemy
 ##   el mismo sentido sin parar ("R3 D2 L3 U2").
 ## - Si no, es de ida y vuelta: al llegar al final la recorre al revés
 ##   ("R4" es una línea recta; "R3 D2" un trayecto con una esquina).
+## Su ruta debe tener al menos tres salidas, una de ellas lateral (lo comprueba
+## tools/level_solver.py validate), para que el cubo siempre pueda esquivarlo.
 ## Nunca se sale de la ruta: si la siguiente casilla está cortada (puerta,
 ## barrotes cerrados, muro destructible u obstáculo), espera a que se libere.
 
