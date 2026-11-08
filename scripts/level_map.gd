@@ -1,53 +1,66 @@
 class_name LevelMap
 extends Control
-## Mapa de niveles con desplazamiento vertical: un camino de baldosas que
-## serpentea de abajo (nivel 1) hacia arriba, con una parada por nivel.
+## Selector de niveles: la imagen del mapa (ui/level_select/map.png) a todo
+## el ancho, con desplazamiento vertical, y encima el estado de cada nivel.
 ##
-## Cada parada es una baldosa redondeada con el número del nivel y su nombre
-## debajo: verde si está completado, dorada (latiendo) si es el siguiente por
-## jugar y gris con candado si está bloqueado. Un cubito de colores flota
-## sobre el nivel siguiente por jugar. A los lados del camino hay bloques de
-## muro decorativos, como en los laberintos.
+## La imagen trae dibujados el camino, los círculos grises de los niveles,
+## la casilla de inicio y los carteles de las zonas. Dónde está cada cosa lo
+## dice ui/level_select/map.json, que genera tools/find_level_circles.py a
+## partir de la imagen: los círculos en el orden del camino (el primero es
+## el nivel 1), su tamaño y su zona, los huecos de los carteles y el de
+## «INICIO» bajo la casilla de salida.
+##
+## Encima de la imagen se dibuja:
+## - En cada círculo, el número del nivel. Si el nivel está completado se
+##   tapa el gris con circle_done.png (verde) y si es el activo (el
+##   siguiente por jugar) con circle_active.png (dorado, latiendo). En los
+##   bloqueados, y en los círculos de niveles que aún no existen, el número
+##   se ve atenuado sobre el gris de la imagen.
+## - El nombre de cada zona en su cartel y «INICIO» bajo la salida.
 ##
 ## Se arrastra con el dedo (o el ratón) para desplazarse, con inercia, y la
-## rueda del ratón también desplaza. Tocar una parada desbloqueada la juega
-## (un toque es una pulsación que no se ha movido más de TAP_SLOP píxeles).
-## Con el teclado, arriba/abajo cambian el nivel elegido e Intro lo juega.
+## rueda del ratón también desplaza. Tocar un círculo desbloqueado juega ese
+## nivel (un toque es una pulsación que no se ha movido más de TAP_SLOP
+## píxeles). Con el teclado, arriba/abajo cambian el nivel elegido e Intro
+## lo juega.
 ##
 ## Solo se usan los eventos de ratón: en el móvil los toques llegan también
 ## como clic (emulate_mouse_from_touch) y en el PC el ratón se emula como toque.
 
 signal level_chosen(index: int)
 
-const SPACING := 150.0
-## Hueco bajo la primera parada y sobre la última (incluye el nombre y el
-## cubito que flota encima).
-const BOTTOM_MARGIN := 110.0
-const TOP_MARGIN := 120.0
-const NODE_RADIUS := 44.0
-## Lado de cada bloque de los muros decorativos.
-const BLOCK := 30.0
-## Amplitud de la curva del camino (fracción del ancho, con un máximo).
-const WAVE_FRACTION := 0.24
-const WAVE_MAX := 300.0
-const WAVE_STEP := 1.1
-const PATH_WIDTH := 34.0
+const MAP_TEXTURE := preload("res://ui/level_select/map.png")
+const DONE_TEXTURE := preload("res://ui/level_select/circle_done.png")
+const ACTIVE_TEXTURE := preload("res://ui/level_select/circle_active.png")
+const LAYOUT_PATH := "res://ui/level_select/map.json"
+## Medidas de circle_*.png (ver tools/make_circle_sprites.py): ancho de la
+## cara coloreada y altura de su centro dentro de la imagen.
+const SPRITE_INNER_W := 168.0
+const SPRITE_FACE_Y := 96.0
+
+## Claves de traducción del nombre de cada zona, de abajo arriba.
+const ZONE_KEYS: Array[String] = ["ZONE_1", "ZONE_2", "ZONE_3", "ZONE_4", "ZONE_5"]
+const ROMAN: Array[String] = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]
+
 const TAP_SLOP := 14.0
+## Margen extra (fracción del tamaño del círculo) para acertar al tocar.
+const TAP_MARGIN := 0.35
 ## Frenado de la inercia (fracción de velocidad que se pierde por segundo).
 const FRICTION := 4.0
 const WHEEL_STEP := 90.0
+## Latido del círculo activo: amplitud y velocidad.
+const PULSE_AMOUNT := 0.06
+const PULSE_SPEED := 4.0
+## Tamaño del número respecto a la altura del círculo.
+const NUMBER_SCALE := 0.78
 
-const PATH_COLOR := Color(0.86, 0.84, 0.80)
-const PATH_EDGE := Color(0.55, 0.50, 0.44)
-const PATH_DONE := Color(0.62, 0.86, 0.55)
-const WALL_COLOR := Color(0.32, 0.36, 0.45)
-const WALL_TOP := Color(0.42, 0.47, 0.58)
-const DONE_COLOR := Color(0.30, 0.72, 0.40)
-const NEXT_COLOR := Color(0.98, 0.78, 0.30)
-const LOCKED_COLOR := Color(0.45, 0.43, 0.40)
-const SELECTED_RING := Color(1, 1, 1, 0.9)
-const TEXT_COLOR := Color(0.98, 0.95, 0.88)
-const SHADOW := Color(0, 0, 0, 0.3)
+const TEXT_COLOR := Color(1.0, 0.98, 0.92)
+const DONE_OUTLINE := Color(0.08, 0.30, 0.08)
+const ACTIVE_OUTLINE := Color(0.45, 0.25, 0.02)
+const LOCKED_TEXT := Color(0.95, 0.95, 0.97, 0.55)
+const LOCKED_OUTLINE := Color(0.18, 0.18, 0.2, 0.45)
+const LABEL_OUTLINE := Color(0.06, 0.05, 0.1, 0.85)
+const SELECTED_RING := Color(1, 1, 1, 0.95)
 
 var _scroll := 0.0
 var _velocity := 0.0
@@ -59,27 +72,64 @@ var _last_time := 0.0
 var _selected := 0
 var _time := 0.0
 var _center_pending := false
-## Muros decorativos: (posición en niveles, lado, separación del camino,
-## forma). Cada uno es una pieza de 2 o 3 bloques en línea o en L.
-var _decor: Array[Vector4] = []
+## Mientras el jugador no mueva el mapa, se vuelve a centrar en el nivel
+## activo cada vez que cambia de tamaño (al abrir la pantalla en el móvil el
+## tamaño definitivo puede llegar unos fotogramas después).
+var _follow_selected := false
+## Datos de map.json.
+var _image_size := Vector2.ONE
+var _circles: Array[Dictionary] = []
+var _zones: Array[Rect2] = []
+var _start_label := Rect2()
 
 
 func _ready() -> void:
 	clip_contents = true
 	focus_mode = Control.FOCUS_ALL
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	resized.connect(_clamp_scroll)
-	_build_decor()
+	resized.connect(_on_resized)
+	_load_layout()
 
 
-## Rehace el mapa (progreso o idioma cambiados) y centra el nivel siguiente
-## por jugar.
+## Rehace el mapa (progreso o idioma cambiados) y centra el nivel activo.
 func refresh() -> void:
 	_selected = _next_level()
 	_velocity = 0.0
 	# Se centra en el siguiente fotograma, cuando el mapa ya tiene su tamaño.
 	_center_pending = true
+	_follow_selected = true
 	queue_redraw()
+
+
+func _on_resized() -> void:
+	if _follow_selected and size.y > 0.0:
+		_center_on(_selected)
+	_clamp_scroll()
+
+
+func _load_layout() -> void:
+	var data: Variant = null
+	var resource := load(LAYOUT_PATH)
+	if resource is JSON:
+		data = (resource as JSON).data
+	else:
+		var file := FileAccess.open(LAYOUT_PATH, FileAccess.READ)
+		if file:
+			data = JSON.parse_string(file.get_as_text())
+	if not data is Dictionary:
+		push_error("No se puede leer %s" % LAYOUT_PATH)
+		return
+	_image_size = Vector2(data["size"][0], data["size"][1])
+	_circles.clear()
+	for c: Dictionary in data["circles"]:
+		_circles.append({"pos": Vector2(c["x"], c["y"]), "size": Vector2(c["w"], c["h"]), "zone": int(c["zone"])})
+	_zones.clear()
+	for z: Dictionary in data["zones"]:
+		_zones.append(Rect2(z["x"], z["y"], z["w"], z["h"]))
+	var label: Dictionary = data["start"]["label"]
+	_start_label = Rect2(label["x"], label["y"], label["w"], label["h"])
+	if Levels.count() > _circles.size():
+		push_warning("Hay %d niveles pero el mapa solo tiene %d círculos" % [Levels.count(), _circles.size()])
 
 
 func _process(delta: float) -> void:
@@ -97,6 +147,8 @@ func _process(delta: float) -> void:
 func _gui_input(event: InputEvent) -> void:
 	var button := event as InputEventMouseButton
 	if button:
+		if button.pressed:
+			_follow_selected = false
 		if button.button_index == MOUSE_BUTTON_WHEEL_UP and button.pressed:
 			_scroll_by(WHEEL_STEP)
 		elif button.button_index == MOUSE_BUTTON_WHEEL_DOWN and button.pressed:
@@ -131,206 +183,230 @@ func _gui_input(event: InputEvent) -> void:
 		accept_event()
 		return
 	if event.is_action_pressed("ui_up"):
+		_follow_selected = false
 		_select(_selected + 1)
 		accept_event()
 	elif event.is_action_pressed("ui_down"):
+		_follow_selected = false
 		_select(_selected - 1)
 		accept_event()
 	elif event.is_action_pressed("ui_accept"):
-		if GameState.is_unlocked(_selected):
+		if _selected < Levels.count() and GameState.is_unlocked(_selected):
 			level_chosen.emit(_selected)
 		accept_event()
 
 
+# --- Dibujo -------------------------------------------------------------------
+
 func _draw() -> void:
-	var count := Levels.count()
-	var first := maxi(0, int(floor((_scroll - BOTTOM_MARGIN - size.y) / SPACING)) - 1)
-	var last := mini(count - 1, int(ceil((_scroll + size.y) / SPACING)) + 1)
-	_draw_decor()
-	# Camino: tramos entre paradas consecutivas, en verde los ya recorridos.
-	for i in range(maxi(first - 1, 0), mini(last + 1, count - 1)):
-		var a := _node_pos(i)
-		var b := _node_pos(i + 1)
-		var done := GameState.is_completed(i)
-		_draw_segment(a, b, PATH_DONE if done else PATH_COLOR)
+	var scale := _scale()
+	var origin := _image_origin()
+	draw_texture_rect(MAP_TEXTURE, Rect2(origin, _image_size * scale), false)
 	var font := get_theme_default_font()
-	for i in range(first, last + 1):
-		_draw_stop(i, font)
-	_draw_player_marker()
-
-
-func _draw_segment(a: Vector2, b: Vector2, color: Color) -> void:
-	# Curva suave entre las dos paradas (puntos de control en vertical).
-	var points := PackedVector2Array()
-	var c1 := a + Vector2(0, -SPACING * 0.5)
-	var c2 := b + Vector2(0, SPACING * 0.5)
-	for s in 17:
-		var t := s / 16.0
-		var u := 1.0 - t
-		points.append(a * u * u * u + c1 * 3 * u * u * t + c2 * 3 * u * t * t + b * t * t * t)
-	draw_polyline(points, PATH_EDGE, PATH_WIDTH + 8.0, true)
-	draw_polyline(points, color, PATH_WIDTH, true)
-	# Juntas de las baldosas.
-	for s in range(2, 16, 3):
-		var p := points[s]
-		var dir := (points[s + 1] - points[s - 1]).normalized()
-		var side := Vector2(-dir.y, dir.x) * PATH_WIDTH * 0.5
-		draw_line(p - side, p + side, PATH_EDGE.lerp(color, 0.4), 2.0, true)
-
-
-func _draw_stop(i: int, font: Font) -> void:
-	var pos := _node_pos(i)
-	var unlocked := GameState.is_unlocked(i)
-	var completed := GameState.is_completed(i)
-	var is_next := unlocked and not completed
-	var color := DONE_COLOR if completed else (NEXT_COLOR if is_next else LOCKED_COLOR)
-	var radius := NODE_RADIUS
-	if is_next:
-		radius *= 1.0 + 0.06 * sin(_time * 4.0)
-	var rect := Rect2(pos - Vector2.ONE * radius, Vector2.ONE * radius * 2.0)
-	_draw_rounded(rect.grow(4).grow_individual(0, -2, 0, 6), SHADOW, radius * 0.4)
-	_draw_rounded(rect.grow(4), color.darkened(0.35), radius * 0.4)
-	_draw_rounded(rect, color, radius * 0.35)
-	_draw_rounded(Rect2(rect.position + Vector2(6, 6), Vector2(rect.size.x - 12, rect.size.y * 0.45)),
-		color.lightened(0.18), radius * 0.3)
-	if i == _selected and has_focus():
-		draw_arc(pos, radius + 12.0, 0, TAU, 48, SELECTED_RING, 4.0, true)
-	if unlocked:
-		var number := str(i + 1)
-		var number_size := 40
-		var text_size := font.get_string_size(number, HORIZONTAL_ALIGNMENT_LEFT, -1, number_size)
-		var baseline := pos + Vector2(-text_size.x * 0.5,
-			font.get_ascent(number_size) * 0.5 - font.get_descent(number_size) * 0.3)
-		draw_string_outline(font, baseline, number, HORIZONTAL_ALIGNMENT_LEFT, -1, number_size, 8,
-			color.darkened(0.55))
-		draw_string(font, baseline, number, HORIZONTAL_ALIGNMENT_LEFT, -1, number_size, TEXT_COLOR)
-	else:
-		_draw_padlock(pos)
-	var name_text: String = tr(Levels.get_level(i)["name"]) if unlocked else tr("LEVEL_LOCKED")
-	var name_size := 22
-	var name_w := font.get_string_size(name_text, HORIZONTAL_ALIGNMENT_LEFT, -1, name_size).x
-	var name_pos := pos + Vector2(-name_w * 0.5, NODE_RADIUS + 30)
-	draw_string_outline(font, name_pos, name_text, HORIZONTAL_ALIGNMENT_LEFT, -1, name_size, 6,
-		Color(0.12, 0.10, 0.08))
-	draw_string(font, name_pos, name_text, HORIZONTAL_ALIGNMENT_LEFT, -1, name_size,
-		TEXT_COLOR if unlocked else TEXT_COLOR.darkened(0.35))
-
-
-func _draw_padlock(pos: Vector2) -> void:
-	var body := Rect2(pos + Vector2(-17, -4), Vector2(34, 26))
-	draw_arc(pos + Vector2(0, -6), 11.0, PI, TAU, 16, Color(0.25, 0.24, 0.23), 6.0, true)
-	_draw_rounded(body, Color(0.25, 0.24, 0.23), 5.0)
-	draw_circle(pos + Vector2(0, 8), 4.0, LOCKED_COLOR)
-
-
-## Cubito con tres caras visibles flotando sobre el nivel siguiente por jugar.
-func _draw_player_marker() -> void:
-	var index := _next_level()
-	var pos := _node_pos(index) + Vector2(0, -NODE_RADIUS - 46 + sin(_time * 3.0) * 6.0)
-	var s := 22.0
-	var top := PackedVector2Array([pos + Vector2(0, -s), pos + Vector2(s, -s * 0.5),
-		pos + Vector2(0, 0), pos + Vector2(-s, -s * 0.5)])
-	var left := PackedVector2Array([pos + Vector2(-s, -s * 0.5), pos, pos + Vector2(0, s),
-		pos + Vector2(-s, s * 0.5)])
-	var right := PackedVector2Array([pos, pos + Vector2(s, -s * 0.5), pos + Vector2(s, s * 0.5),
-		pos + Vector2(0, s)])
-	var faces := RollingCube.FACE_COLORS
-	draw_colored_polygon(top, faces[2])
-	draw_colored_polygon(left, faces[1])
-	draw_colored_polygon(right, faces[0])
-	for poly in [top, left, right]:
-		var closed := PackedVector2Array(poly)
-		closed.append(poly[0])
-		draw_polyline(closed, Color(0.15, 0.12, 0.10, 0.8), 2.0, true)
-
-
-## Bloques de muro a los lados del camino, colocados siempre igual.
-func _build_decor() -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 7071
-	_decor.clear()
-	for i in range(-2, Levels.count() + 3):
-		for side: float in [-1.0, 1.0]:
-			_decor.append(Vector4(i + rng.randf_range(-0.3, 0.3), side,
-				rng.randf_range(0.35, 0.9), rng.randi_range(0, 3)))
-
-
-func _draw_decor() -> void:
-	var amplitude := _amplitude()
-	# Formas: desplazamientos (en bloques) de cada bloque de la pieza.
-	var shapes := [
-		[Vector2(0, 0), Vector2(1, 0), Vector2(2, 0)],
-		[Vector2(0, 0), Vector2(0, 1), Vector2(0, 2)],
-		[Vector2(0, 0), Vector2(1, 0), Vector2(0, 1)],
-		[Vector2(0, 0), Vector2(1, 0)],
-	]
-	for d in _decor:
-		var center := _node_pos_f(d.x)
-		var x := size.x * 0.5 + d.y * (amplitude + NODE_RADIUS + 40.0 + d.z * size.x * 0.12)
-		var origin := Vector2(x, center.y)
-		if origin.y < -120 or origin.y > size.y + 120:
+	# Todos los carteles con el mismo tamaño de letra: el que cabe en todos.
+	var zone_font_size := 0
+	for i in _zones.size():
+		var fit := _fit_font_size(_zone_text_area(_to_screen_rect(_zones[i])), _zone_words(i), font)
+		zone_font_size = fit if zone_font_size == 0 else mini(zone_font_size, fit)
+	for i in _zones.size():
+		var rect := _to_screen_rect(_zones[i])
+		if rect.end.y < 0.0 or rect.position.y > size.y:
 			continue
-		for offset: Vector2 in shapes[int(d.w)]:
-			var pos := origin + Vector2(offset.x * d.y, offset.y) * BLOCK
-			var block := Rect2(pos - Vector2.ONE * BLOCK * 0.5, Vector2.ONE * BLOCK)
-			draw_rect(Rect2(block.position + Vector2(0, BLOCK * 0.3), block.size), WALL_COLOR.darkened(0.35))
-			draw_rect(block, WALL_TOP)
-			draw_rect(block, WALL_COLOR, false, 2.0)
+		_draw_fitted_text(_zone_text_area(rect), _zone_words(i), font, TEXT_COLOR,
+			HORIZONTAL_ALIGNMENT_LEFT, zone_font_size)
+	_draw_fitted_text(_to_screen_rect(_start_label), [tr("MAP_START")], font, TEXT_COLOR)
+	var active := _next_level()
+	for i in _circles.size():
+		var center := _circle_center(i)
+		if center.y < -60.0 or center.y > size.y + 60.0:
+			continue
+		_draw_circle_state(i, center, i == active, font)
 
 
-func _draw_rounded(rect: Rect2, color: Color, radius: float) -> void:
-	var box := StyleBoxFlat.new()
-	box.bg_color = color
-	box.set_corner_radius_all(int(radius))
-	box.anti_aliasing = true
-	draw_style_box(box, rect)
+func _draw_circle_state(i: int, center: Vector2, is_active: bool, font: Font) -> void:
+	var circle_size: Vector2 = _circles[i]["size"] * _scale()
+	var exists := i < Levels.count()
+	var completed := exists and GameState.is_completed(i)
+	var texture: Texture2D = null
+	var outline := LOCKED_OUTLINE
+	var text_color := LOCKED_TEXT
+	var grow := 1.0
+	if completed:
+		texture = DONE_TEXTURE
+		outline = DONE_OUTLINE
+		text_color = TEXT_COLOR
+	if is_active and exists and GameState.is_unlocked(i):
+		texture = ACTIVE_TEXTURE
+		outline = ACTIVE_OUTLINE
+		text_color = TEXT_COLOR
+		grow = 1.0 + PULSE_AMOUNT * sin(_time * PULSE_SPEED)
+	if texture:
+		var k := circle_size.x / SPRITE_INNER_W * grow
+		var tex_size := Vector2(texture.get_width(), texture.get_height()) * k
+		var top_left := center - Vector2(tex_size.x * 0.5, SPRITE_FACE_Y * k)
+		draw_texture_rect(texture, Rect2(top_left, tex_size), false)
+	if i == _selected and has_focus():
+		_draw_ellipse_ring(center, circle_size * 0.5 + Vector2(10, 8), SELECTED_RING, 3.0)
+	var number := str(i + 1)
+	var font_size := maxi(8, int(circle_size.y * NUMBER_SCALE * grow))
+	var text_size := font.get_string_size(number, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
+	var baseline := center + Vector2(-text_size.x * 0.5,
+		font.get_ascent(font_size) * 0.5 - font.get_descent(font_size) * 0.3)
+	draw_string_outline(font, baseline, number, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size,
+		maxi(2, font_size / 6), outline)
+	draw_string(font, baseline, number, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, text_color)
 
+
+func _draw_ellipse_ring(center: Vector2, radii: Vector2, color: Color, width: float) -> void:
+	var points := PackedVector2Array()
+	for s in 41:
+		var a := TAU * s / 40.0
+		points.append(center + Vector2(cos(a) * radii.x, sin(a) * radii.y))
+	draw_polyline(points, color, width, true)
+
+
+## Texto del cartel de la zona `i`: el número romano seguido del nombre
+## («II. LAS TIERRAS SALVAJES»), palabra a palabra.
+func _zone_words(i: int) -> Array[String]:
+	var words: Array[String] = [ROMAN[mini(i, ROMAN.size() - 1)] + "."]
+	if i < ZONE_KEYS.size():
+		words.append_array(tr(ZONE_KEYS[i]).split(" ", false))
+	return words
+
+
+## Hueco para el texto dentro del cartel (acaba en punta por la derecha: el
+## texto se queda algo antes).
+func _zone_text_area(rect: Rect2) -> Rect2:
+	return Rect2(rect.position + Vector2(rect.size.x * 0.05, rect.size.y * 0.1),
+		Vector2(rect.size.x * 0.85, rect.size.y * 0.8))
+
+
+## Tamaño de letra más grande con el que `words`, repartidas en líneas,
+## caben en `rect`.
+func _fit_font_size(rect: Rect2, words: Array[String], font: Font) -> int:
+	var font_size := maxi(int(rect.size.y), 8)
+	while font_size > 8:
+		var lines := _wrap(words, font, font_size, rect.size.x)
+		var widest := 0.0
+		for line in lines:
+			widest = maxf(widest, font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x)
+		if lines.size() * font.get_height(font_size) <= rect.size.y and widest <= rect.size.x:
+			break
+		font_size -= 1
+	return font_size
+
+
+## Escribe `words` en `rect`, repartidas en líneas y centradas en vertical.
+## `align` es la alineación horizontal de cada línea (izquierda o centro) y
+## `font_size` el tamaño de letra (0 = el más grande que quepa).
+func _draw_fitted_text(rect: Rect2, words: Array[String], font: Font, color: Color,
+		align := HORIZONTAL_ALIGNMENT_CENTER, font_size := 0) -> void:
+	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+		return
+	if font_size <= 0:
+		font_size = _fit_font_size(rect, words, font)
+	var lines := _wrap(words, font, font_size, rect.size.x)
+	var line_h := font.get_height(font_size)
+	var y := rect.position.y + (rect.size.y - lines.size() * line_h) * 0.5 + font.get_ascent(font_size)
+	var outline_size := maxi(3, font_size / 5)
+	for line in lines:
+		var w := font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+		var x := rect.position.x
+		if align == HORIZONTAL_ALIGNMENT_CENTER:
+			x += (rect.size.x - w) * 0.5
+		var pos := Vector2(x, y)
+		draw_string_outline(font, pos, line, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, outline_size, LABEL_OUTLINE)
+		draw_string(font, pos, line, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
+		y += line_h
+
+
+func _wrap(words: Array[String], font: Font, font_size: int, max_width: float) -> Array[String]:
+	var lines: Array[String] = []
+	var current := ""
+	for word in words:
+		var candidate := word if current == "" else current + " " + word
+		if current != "" and font.get_string_size(candidate, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x > max_width:
+			lines.append(current)
+			current = word
+		else:
+			current = candidate
+	if current != "":
+		lines.append(current)
+	return lines
+
+
+# --- Posiciones -----------------------------------------------------------------
+
+## Escala de la imagen: ocupa todo el ancho del mapa.
+func _scale() -> float:
+	return size.x / _image_size.x if _image_size.x > 0.0 else 1.0
+
+
+func _content_height() -> float:
+	return _image_size.y * _scale()
+
+
+## Esquina superior izquierda de la imagen en pantalla. Con _scroll = 0 se ve
+## la parte de abajo (la salida); al subir, _scroll crece.
+func _image_origin() -> Vector2:
+	var content := _content_height()
+	if content <= size.y:
+		return Vector2(0, (size.y - content) * 0.5)
+	return Vector2(0, size.y - content + _scroll)
+
+
+func _to_screen(point: Vector2) -> Vector2:
+	return _image_origin() + point * _scale()
+
+
+func _to_screen_rect(rect: Rect2) -> Rect2:
+	return Rect2(_to_screen(rect.position), rect.size * _scale())
+
+
+func _circle_center(i: int) -> Vector2:
+	return _to_screen(_circles[i]["pos"])
+
+
+# --- Selección y desplazamiento ---------------------------------------------
 
 func _tap(at: Vector2) -> void:
-	for i in Levels.count():
-		if at.distance_to(_node_pos(i)) <= NODE_RADIUS + 10.0:
+	for i in _circles.size():
+		var half: Vector2 = _circles[i]["size"] * _scale() * (0.5 + TAP_MARGIN)
+		var d := (at - _circle_center(i)) / half
+		if d.length_squared() <= 1.0:
 			_selected = i
-			if GameState.is_unlocked(i):
+			if i < Levels.count() and GameState.is_unlocked(i):
 				level_chosen.emit(i)
 			return
 
 
 func _select(index: int) -> void:
-	_selected = clampi(index, 0, Levels.count() - 1)
+	_selected = clampi(index, 0, _selectable_count() - 1)
 	_center_on(_selected, false)
 
 
-## Nivel siguiente por jugar: el primero desbloqueado sin completar (o el
-## último si están todos completados).
+func _selectable_count() -> int:
+	return maxi(1, mini(Levels.count(), _circles.size()))
+
+
+## Nivel activo: el primero desbloqueado sin completar (o el último si están
+## todos completados).
 func _next_level() -> int:
-	for i in Levels.count():
+	for i in _selectable_count():
 		if GameState.is_unlocked(i) and not GameState.is_completed(i):
 			return i
-	return Levels.count() - 1
-
-
-## Posición en pantalla de la parada del nivel `i`.
-func _node_pos(i: int) -> Vector2:
-	return _node_pos_f(float(i))
-
-
-func _node_pos_f(i: float) -> Vector2:
-	var y := size.y - BOTTOM_MARGIN - i * SPACING + _scroll
-	var x := size.x * 0.5 + sin(i * WAVE_STEP) * _amplitude()
-	return Vector2(x, y)
-
-
-func _amplitude() -> float:
-	return minf(size.x * WAVE_FRACTION, WAVE_MAX)
+	return _selectable_count() - 1
 
 
 func _max_scroll() -> float:
-	var content := BOTTOM_MARGIN + (Levels.count() - 1) * SPACING + TOP_MARGIN
-	return maxf(0.0, content - size.y)
+	return maxf(0.0, _content_height() - size.y)
 
 
 func _center_on(i: int, instant := true) -> void:
-	var target := clampf(i * SPACING + BOTTOM_MARGIN - size.y * 0.5, 0.0, _max_scroll())
+	if i >= _circles.size():
+		return
+	var y: float = _circles[i]["pos"].y * _scale()
+	var target := clampf(size.y * 0.5 - y - size.y + _content_height(), 0.0, _max_scroll())
 	if instant:
 		_scroll = target
 	else:
