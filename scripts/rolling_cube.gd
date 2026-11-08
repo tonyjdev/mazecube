@@ -31,7 +31,8 @@ extends Node3D
 ## termina la explosión, vuelve a su casilla de salida con el rumbo inicial. Conserva la
 ## llave que llevaba, pierde los power ups y el tablero se queda como estaba.
 ## Al reaparecer hace la animación de aparición (ver más abajo) y después
-## parpadea y es invulnerable durante RESPAWN_GRACE segundos. Un
+## se «disuelve» a medias (ver CubeDissolve) y es invulnerable durante
+## RESPAWN_GRACE segundos. Un
 ## obstáculo es como una pared. Si queda encajonado (bloqueado delante y
 ## detrás), rebota en su casilla a ritmo de vuelco hasta que se libere el paso.
 ##
@@ -91,9 +92,12 @@ const REVERSE_PAUSE := 0.2
 const REVERSE_SMOKE_COLOR := Color(0.38, 0.39, 0.42)
 const REVERSE_SMOKE_PUFFS := 10
 const REVERSE_SMOKE_LIFETIME := 0.8
-## Muerte: invulnerabilidad al reaparecer en la salida
-## (con parpadeo de RESPAWN_BLINK segundos por ciclo).
+## Muerte: invulnerabilidad al reaparecer en la salida, con el efecto de
+## disolverse (CubeDissolve): aparece poco a poco durante
+## RESPAWN_DISSOLVE_FADE segundos, se mantiene y se va poco a poco en los
+## últimos RESPAWN_DISSOLVE_FADE segundos.
 const RESPAWN_GRACE := 1.5
+const RESPAWN_DISSOLVE_FADE := 0.5
 ## Aparición: duración, altura desde la que baja, vueltas que da al bajar,
 ## fracción del tiempo que tarda en posarse (el resto es el aplastamiento) y
 ## cuánto se aplasta.
@@ -102,7 +106,6 @@ const APPEAR_HEIGHT := 2.5
 const APPEAR_SPINS := 1.5
 const APPEAR_LAND := 0.75
 const APPEAR_SQUASH := 0.18
-const RESPAWN_BLINK := 0.12
 ## Caída al vacío: tiempo de caída libre hasta explotar, gravedad, velocidad
 ## inicial (hacia delante y hacia abajo) y giro (rad/s) al salir del borde.
 const FALL_TIME := 0.6
@@ -161,6 +164,13 @@ var _explosion: CubeExplosion
 ## Malla de un pedazo de la explosión (un cubo pequeño con los mismos colores).
 var _piece_mesh: Mesh
 var _grace_left := 0.0
+## Material del efecto de disolverse (se pone en _body solo durante la
+## invulnerabilidad).
+var _dissolve_material: ShaderMaterial
+## Copia del cubo que solo da sombra mientras dura el efecto de disolverse
+## (un material transparente no da sombra y la del cubo desaparecería de
+## golpe).
+var _shadow_caster: MeshInstance3D
 var _cooldown := 0.0
 var _tween: Tween
 var _held_key_node: Node3D
@@ -176,6 +186,12 @@ var _power_ups := {}
 
 func _ready() -> void:
 	_body.mesh = _build_colored_cube(SIZE)
+	_shadow_caster = MeshInstance3D.new()
+	_shadow_caster.mesh = _body.mesh
+	_shadow_caster.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+	_shadow_caster.visible = false
+	_body.add_child(_shadow_caster)
+	_warm_up_dissolve()
 	_piece_mesh = _build_colored_cube(SIZE / CubeExplosion.GRID * 0.94)
 
 
@@ -194,6 +210,7 @@ func reset(target_level: Level) -> void:
 	is_finished = false
 	_dead = false
 	_grace_left = 0.0
+	_set_dissolve(0.0)
 	_body.visible = true
 	if is_instance_valid(_explosion):
 		_explosion.queue_free()
@@ -288,7 +305,9 @@ func _process(delta: float) -> void:
 		return
 	if _grace_left > 0.0:
 		_grace_left -= delta
-		_body.visible = _grace_left <= 0.0 or fmod(_grace_left, RESPAWN_BLINK * 2.0) > RESPAWN_BLINK
+		var elapsed := RESPAWN_GRACE - _grace_left
+		_set_dissolve(minf(smoothstep(0.0, RESPAWN_DISSOLVE_FADE, elapsed),
+			smoothstep(0.0, RESPAWN_DISSOLVE_FADE, _grace_left)))
 	_process_power_ups(delta)
 	# La llave que lleva el cubo sigue girando sobre sí misma, como en el mapa.
 	if _held_key_node:
@@ -550,9 +569,39 @@ func _explode(on_floor: bool) -> void:
 	if on_floor:
 		_spawn_dust(at)
 	_body.visible = false
+	_set_dissolve(0.0)
 	if _held_key_node:
 		_held_key_node.visible = false
 	died.emit(cell)
+
+
+## Dibuja un momento un cubo diminuto con el material de disolverse para que
+## el shader se compile al cargar y no la primera vez que se usa (en el móvil
+## se notaba una pausa de alrededor de un segundo).
+func _warm_up_dissolve() -> void:
+	if _dissolve_material == null:
+		_dissolve_material = CubeDissolve.make_material()
+	var warm := MeshInstance3D.new()
+	warm.mesh = _body.mesh
+	warm.material_override = _dissolve_material
+	warm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	warm.scale = Vector3.ONE * 0.001
+	add_child(warm)
+	for i in 3:
+		await get_tree().process_frame
+	warm.queue_free()
+
+
+## Efecto de disolverse con esa fuerza (0 = cubo normal, sin el material).
+func _set_dissolve(strength: float) -> void:
+	_shadow_caster.visible = strength > 0.0
+	if strength <= 0.0:
+		_body.material_override = null
+		return
+	if _dissolve_material == null:
+		_dissolve_material = CubeDissolve.make_material()
+	_dissolve_material.set_shader_parameter("strength", strength)
+	_body.material_override = _dissolve_material
 
 
 func _respawn() -> void:
