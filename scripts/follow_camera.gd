@@ -55,6 +55,9 @@ const ATTENTION_HOLD := 0.8
 const SHAKE_STRENGTH := 0.06
 const SHAKE_TIME := 0.25
 const SHAKE_FREQ := Vector2(71.0, 53.0)
+## Distancia a su objetivo (foco y distancia) por debajo de la cual la
+## cámara se considera llegada (ver is_settled).
+const SETTLE_EPSILON := 0.06
 ## Exploración: inclinación (casi vertical), alejamiento respecto a la
 ## distancia normal (nunca más que lo necesario para ver el tablero entero
 ## en toda la pantalla) y duración de la transición de ida y de vuelta.
@@ -95,6 +98,7 @@ var _attention_frame_cell := Level.NO_CELL
 ## Hasta cuándo (Time.get_ticks_msec) se mantiene el encuadre tras pulsar.
 var _attention_hold_until := 0
 var _shake_left := 0.0
+var _settled := true
 ## Inclinación con la que se colocan la cámara y los cálculos de encuadre.
 var _pitch := 65.0
 ## Exploración: si está activa, progreso de la transición (0 = vista normal,
@@ -262,6 +266,14 @@ func _process(delta: float) -> void:
 	_focus_vel = f[1]
 	_place(_distance, _focus)
 	_update_shake(delta)
+	_settled = _focus.distance_to(goal_focus) < SETTLE_EPSILON \
+		and absf(_distance - goal_distance) < SETTLE_EPSILON
+
+
+## La cámara ha llegado a donde tiene que estar (p. ej. a la salida tras
+## morir el cubo).
+func is_settled() -> bool:
+	return _settled
 
 
 ## Desplaza la imagen (h_offset/v_offset, sin mover la cámara) con una

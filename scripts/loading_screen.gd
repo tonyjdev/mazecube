@@ -14,7 +14,7 @@ signal continued
 ## Claves de traducción de los consejos (ver Translations).
 const TIPS: Array[String] = [
 	"TIP_TURN", "TIP_TURN_EARLY", "TIP_TURN_BLOCKED", "TIP_BOUNCE", "TIP_REVERSE",
-	"TIP_START", "TIP_ARROW", "TIP_KEY_ONE", "TIP_DOOR", "TIP_BREAKABLE",
+	"TIP_START", "TIP_KEY_ONE", "TIP_DOOR", "TIP_BREAKABLE",
 	"TIP_SPEED", "TIP_BUTTON", "TIP_BARS", "TIP_RESTART", "TIP_CHASER", "TIP_PATROL",
 	"TIP_BLOCKER", "TIP_VOID", "TIP_BRIDGE",
 ]

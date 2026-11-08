@@ -180,16 +180,6 @@ custom_minimum_size = Vector2(120, 56)
 layout_mode = 2
 size_flags_horizontal = 0
 
-[node name="ArrowLabel" type="Label" parent="OptionsScreen/VBox/Panel/Grid"]
-layout_mode = 2
-text = "OPT_ARROW"
-
-[node name="ArrowToggle" type="CheckButton" parent="OptionsScreen/VBox/Panel/Grid"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(120, 56)
-layout_mode = 2
-size_flags_horizontal = 0
-
 [node name="LanguageLabel" type="Label" parent="OptionsScreen/VBox/Panel/Grid"]
 layout_mode = 2
 text = "OPT_LANGUAGE"

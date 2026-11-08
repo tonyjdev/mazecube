@@ -5,8 +5,8 @@ extends Node
 ##   nivel 1 siempre está desbloqueado; completar un nivel desbloquea el
 ##   siguiente.
 ## - Ajustes (user://settings.cfg): volumen de efectos y de música (buses
-##   "SFX" y "Music", ver default_bus_layout.tres), antialiasing, idioma,
-##   vibración y flecha de rumbo sobre el cubo.
+##   "SFX" y "Music", ver default_bus_layout.tres), antialiasing, idioma
+##   y vibración.
 ## - Vibración del móvil (vibrate()), que respeta el ajuste.
 ## - Traducciones: se registran al arrancar a partir de Translations.
 ## - Navegación entre el menú y la partida.
@@ -42,8 +42,6 @@ var music_volume := 1.0
 var antialiasing := true
 var locale := "es"
 var vibration := true
-## Mostrar la flecha de rumbo sobre el cubo.
-var show_arrow := true
 
 var _completed: Array[int] = []
 ## Truco para pruebas: todos los niveles desbloqueados (ver unlock_all_levels).
@@ -138,11 +136,6 @@ func set_vibration(enabled: bool) -> void:
 		vibrate(VIBRATION_PREVIEW)
 
 
-func set_show_arrow(enabled: bool) -> void:
-	show_arrow = enabled
-	save_settings()
-
-
 ## Hace vibrar el móvil (si la vibración está activada). `strength` va de 0 a
 ## 1; en los móviles que no permiten regular la intensidad solo cuenta la
 ## duración.
@@ -165,7 +158,6 @@ func save_settings() -> void:
 	cfg.set_value("video", "antialiasing", antialiasing)
 	cfg.set_value("general", "locale", locale)
 	cfg.set_value("general", "vibration", vibration)
-	cfg.set_value("game", "show_arrow", show_arrow)
 	cfg.save(SETTINGS_PATH)
 
 
@@ -180,7 +172,6 @@ func _load_settings() -> void:
 	music_volume = float(cfg.get_value("audio", "music_volume", music_volume))
 	antialiasing = bool(cfg.get_value("video", "antialiasing", antialiasing))
 	vibration = bool(cfg.get_value("general", "vibration", vibration))
-	show_arrow = bool(cfg.get_value("game", "show_arrow", show_arrow))
 	var saved := str(cfg.get_value("general", "locale", locale))
 	if LOCALES.has(saved):
 		locale = saved

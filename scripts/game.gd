@@ -9,8 +9,7 @@ extends Node3D
 ## de la interfaz.
 ##
 ## Vibración (si está activada en Opciones): al destruir un muro, al pulsar
-## un botón, al morir el cubo y, muy suave, al descartarse un giro. La flecha sobre el cubo se puede ocultar
-## en Opciones.
+## un botón, al morir el cubo y, muy suave, al descartarse un giro.
 ##
 ## Interfaz: número de nivel arriba a la izquierda, botón de pausa arriba a la
 ## derecha e indicaciones de giro abajo. La pausa oculta esa interfaz y
@@ -18,8 +17,9 @@ extends Node3D
 ## Salir al selector de niveles); la cámara se aleja y se pone casi vertical,
 ## y arrastrando el dedo se recorre el mapa (ver FollowCamera.start_explore).
 ## Al continuar, la cámara vuelve a su sitio y después se reanuda el juego:
-## la velocidad del juego (Engine.time_scale) sube de 0 a la normal de forma
-## uniforme en RESUME_RAMP_TIME segundos.
+## la velocidad del juego (Engine.time_scale) sube de 0 a la normal en
+## RESUME_RAMP_TIME segundos con una curva ease-in cúbica (empieza muy
+## despacio y acelera).
 ##
 ## Inicio del nivel (al entrar o reiniciar): el tablero aparece casilla a
 ## casilla (Level.start_reveal) y después aparece el cubo
@@ -56,6 +56,8 @@ const COMPLETE_MENU_DELAY := 0.5
 const SIMULTANEOUS_WINDOW := 0.15
 ## Tiempo que tarda el juego en recuperar su velocidad al salir de la pausa.
 const RESUME_RAMP_TIME := 1.0
+## Tiempo máximo que el cubo espera a la cámara para reaparecer tras morir.
+const RESPAWN_CAMERA_WAIT := 3.0
 
 var current_level := 0
 var _hint_tweens := {}
@@ -97,6 +99,7 @@ func _ready() -> void:
 
 	cube.reached_goal.connect(_on_reached_goal)
 	level.cube = cube
+	cube.respawned.connect(_appear_after_camera)
 	cube.died.connect(func(_cell: Vector2i) -> void:
 		Sfx.play("explode")
 		level.notify_cube_died()
@@ -106,7 +109,6 @@ func _ready() -> void:
 		Sfx.play("fall")
 		level.notify_cube_died()
 		GameState.vibrate(GameState.VIBRATION_TURN_REJECTED))
-	cube.show_arrow = GameState.show_arrow
 	cube.turn_rejected.connect(func(_dir: Vector2i) -> void:
 		Sfx.play("reject")
 		GameState.vibrate(GameState.VIBRATION_TURN_REJECTED))
@@ -271,12 +273,13 @@ func _set_paused(paused: bool) -> void:
 	_start_speed_ramp()
 
 
-## La velocidad del juego sube de 0 a la normal de forma uniforme.
+## La velocidad del juego sube de 0 a la normal (ease-in cúbica).
 func _start_speed_ramp() -> void:
 	_stop_speed_ramp()
 	Engine.time_scale = 0.0
 	_speed_tween = create_tween().set_ignore_time_scale(true)
-	_speed_tween.tween_property(Engine, "time_scale", 1.0, RESUME_RAMP_TIME)
+	_speed_tween.tween_property(Engine, "time_scale", 1.0, RESUME_RAMP_TIME) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
 
 
 func _stop_speed_ramp() -> void:
@@ -337,6 +340,22 @@ func _play_intro() -> void:
 	if id != _intro_id:
 		return
 	level.set_enemies_frozen(false)
+
+
+## Tras morir, el cubo espera oculto en la salida hasta que la cámara llega
+## allí (como mucho RESPAWN_CAMERA_WAIT segundos de juego) y entonces aparece.
+func _appear_after_camera() -> void:
+	var id := _intro_id
+	var waited := 0.0
+	await get_tree().process_frame
+	while not camera.is_settled() and waited < RESPAWN_CAMERA_WAIT:
+		await get_tree().process_frame
+		if id != _intro_id:
+			return
+		if not get_tree().paused:
+			waited += get_process_delta_time()
+	if id == _intro_id:
+		cube.appear()
 
 
 func _load_level(index: int) -> void:

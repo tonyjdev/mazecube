@@ -30,8 +30,8 @@ extends Node3D
 ##
 ## Aparición (start_reveal): al empezar o reiniciar el nivel, el tablero se
 ## dibuja casilla a casilla en orden aleatorio en REVEAL_TIME segundos: cada
-## casilla (suelo, pared, roca y lo que haya encima) baja desde arriba
-## creciendo con un pequeño rebote. Mientras tanto los enemigos están
+## casilla (suelo, pared, roca y lo que haya encima) aparece en su sitio y
+## con su tamaño, pasando de transparente a opaca. Mientras tanto los enemigos están
 ## quietos (ver set_enemies_frozen). Al acabar emite reveal_finished.
 
 signal reveal_finished
@@ -74,11 +74,10 @@ const POWER_UP_FLOAT_HEIGHT := 0.5
 ## se considera cerca de un botón. Ver button_near().
 const BUTTON_APPROACH_CELLS := 4
 const NO_CELL := Vector2i(-9999, -9999)
-## Aparición del tablero: duración total, lo que tarda en aparecer cada
-## casilla y altura desde la que baja.
+## Aparición del tablero: duración total y lo que tarda cada casilla en
+## pasar de transparente a opaca.
 const REVEAL_TIME := 1.3
-const REVEAL_POP_TIME := 0.3
-const REVEAL_DROP := 1.2
+const REVEAL_FADE_TIME := 0.45
 
 @export var layout: PackedStringArray = PackedStringArray([
 	"#######",
@@ -128,8 +127,9 @@ var _enemies: Array[Enemy] = []
 ## casilla -> HangingBridge (solo los que siguen en pie)
 var _bridges := {}
 ## Aparición en curso: tiempo transcurrido, retraso de cada casilla,
-## instancias de los MultiMesh ({ "multimesh", "cells", "transforms" }) y
-## nodos sueltos ({ "node", "delay", "position", "scale" }).
+## MultiMesh ({ "multimesh", "material", "cells" }; la opacidad de cada
+## casilla va en el color de su instancia) y nodos sueltos ({ "delay",
+## "materials": [...] }, ver _fade_materials).
 var _revealing := false
 var _reveal_time := 0.0
 var _reveal_delays := {}
@@ -465,28 +465,23 @@ func get_grid_size() -> Vector2i:
 func start_reveal() -> void:
 	_reveal_time = 0.0
 	_reveal_delays.clear()
-	var max_delay := REVEAL_TIME - REVEAL_POP_TIME
+	var max_delay := REVEAL_TIME - REVEAL_FADE_TIME
 	for z in layout.size():
 		for x in layout[z].length():
 			_reveal_delays[Vector2i(x, z)] = randf() * max_delay
 	for entry in _reveal_multimeshes:
-		var multimesh: MultiMesh = entry["multimesh"]
-		var transforms: Array[Transform3D] = []
-		for i in multimesh.instance_count:
-			transforms.append(multimesh.get_instance_transform(i))
-		entry["transforms"] = transforms
+		(entry["material"] as BaseMaterial3D).transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_reveal_nodes.clear()
 	for child in get_children():
 		var node := child as Node3D
 		if node == null or node is MultiMeshInstance3D or node.is_queued_for_deletion():
 			continue
 		var cell := Vector2i(roundi(node.position.x / CELL_SIZE), roundi(node.position.z / CELL_SIZE))
-		_reveal_nodes.append({"node": node, "delay": _reveal_delays.get(cell, randf() * max_delay),
-			"position": node.position, "scale": node.scale})
+		_reveal_nodes.append({"delay": _reveal_delays.get(cell, randf() * max_delay),
+			"materials": _fade_materials(node)})
 	set_enemies_frozen(true)
 	_revealing = true
-	# Todo empieza oculto (diminuto, no invisible: así sus materiales ya se
-	# preparan detrás de la pantalla de carga).
+	# Todo empieza transparente.
 	_apply_reveal()
 
 
@@ -509,71 +504,92 @@ func _update_reveal(delta: float) -> void:
 		reveal_finished.emit()
 
 
-## Deja todo exactamente en su sitio.
+## Deja todo opaco, con los materiales del juego normales.
 func _finish_reveal() -> void:
 	_revealing = false
 	for entry in _reveal_multimeshes:
 		var multimesh: MultiMesh = entry["multimesh"]
-		var transforms: Array[Transform3D] = entry["transforms"]
-		for i in transforms.size():
-			multimesh.set_instance_transform(i, transforms[i])
+		for i in multimesh.instance_count:
+			multimesh.set_instance_color(i, Color.WHITE)
+		(entry["material"] as BaseMaterial3D).transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
 	for entry in _reveal_nodes:
-		var node: Node3D = entry["node"]
-		if is_instance_valid(node):
-			node.scale = entry["scale"]
-			node.position = entry["position"]
+		for item: Dictionary in entry["materials"]:
+			var mesh_instance: MeshInstance3D = item["node"]
+			if not is_instance_valid(mesh_instance):
+				continue
+			if item["surface"] < 0:
+				mesh_instance.material_override = item["original"]
+			else:
+				mesh_instance.set_surface_override_material(item["surface"], item["original"])
 	_reveal_nodes.clear()
 
 
-## Coloca cada elemento según el progreso de su casilla: baja desde
-## REVEAL_DROP y crece con un pequeño rebote; al acabar, exactamente en su sitio.
+## Opacidad de cada casilla según su progreso: de transparente a opaca.
 func _apply_reveal() -> void:
 	for entry in _reveal_multimeshes:
 		var multimesh: MultiMesh = entry["multimesh"]
 		var cells: Array = entry["cells"]
-		var transforms: Array[Transform3D] = entry["transforms"]
 		for i in cells.size():
 			var k := _reveal_progress(_reveal_delays.get(cells[i], 0.0))
-			if k < 0.0:
-				continue
-			multimesh.set_instance_transform(i, _revealed(transforms[i], k))
+			if k >= 0.0:
+				multimesh.set_instance_color(i, Color(1, 1, 1, k))
 	for entry in _reveal_nodes:
-		var node: Node3D = entry["node"]
-		if not is_instance_valid(node):
-			continue
 		var k := _reveal_progress(entry["delay"])
 		if k < 0.0:
 			continue
-		var grow := _reveal_scale(k)
-		node.scale = entry["scale"] * grow
-		node.position = entry["position"] + Vector3(0, REVEAL_DROP * (1.0 - _reveal_ease(k)), 0)
+		for item: Dictionary in entry["materials"]:
+			var mat: BaseMaterial3D = item["material"]
+			mat.albedo_color.a = item["alpha"] * k
 
 
-## Progreso (0-1) de una casilla con ese retraso; -1 si ya ha terminado y no
-## hay que tocarla (para no recolocar miles de casillas en cada fotograma).
+## Pone a las mallas de `node` (y sus descendientes) copias transparentes
+## de sus materiales para el fundido. Devuelve lo necesario para animarlas
+## y restaurarlas: { "node", "surface" (-1 = material_override), "original",
+## "material", "alpha" }.
+func _fade_materials(node: Node3D) -> Array[Dictionary]:
+	var items: Array[Dictionary] = []
+	var found: Array[Node] = node.find_children("*", "MeshInstance3D", true, false)
+	if node is MeshInstance3D:
+		found.append(node)
+	for mesh_instance: MeshInstance3D in found:
+		if mesh_instance.material_override:
+			var fade := _fade_copy(mesh_instance.material_override)
+			if fade:
+				items.append({"node": mesh_instance, "surface": -1,
+					"original": mesh_instance.material_override, "material": fade,
+					"alpha": fade.albedo_color.a})
+				mesh_instance.material_override = fade
+			continue
+		if mesh_instance.mesh == null:
+			continue
+		for i in mesh_instance.mesh.get_surface_count():
+			var fade := _fade_copy(mesh_instance.get_active_material(i))
+			if fade == null:
+				continue
+			items.append({"node": mesh_instance, "surface": i,
+				"original": mesh_instance.get_surface_override_material(i), "material": fade,
+				"alpha": fade.albedo_color.a})
+			mesh_instance.set_surface_override_material(i, fade)
+	return items
+
+
+static func _fade_copy(material: Material) -> BaseMaterial3D:
+	var base := material as BaseMaterial3D
+	if base == null:
+		return null
+	var fade := base.duplicate() as BaseMaterial3D
+	if fade.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED:
+		fade.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	return fade
+
+
+## Opacidad (0-1, suavizada) de una casilla con ese retraso; -1 si ya ha
+## terminado y no hay que tocarla (para no repintar miles de casillas en
+## cada fotograma).
 func _reveal_progress(delay: float) -> float:
-	if _reveal_time - delay > REVEAL_POP_TIME + 0.1:
+	if _reveal_time - delay > REVEAL_FADE_TIME + 0.1:
 		return -1.0
-	return clampf((_reveal_time - delay) / REVEAL_POP_TIME, 0.0, 1.0)
-
-
-func _revealed(base: Transform3D, k: float) -> Transform3D:
-	var t := base
-	t.basis = base.basis.scaled(Vector3.ONE * _reveal_scale(k))
-	t.origin = base.origin + Vector3(0, REVEAL_DROP * (1.0 - _reveal_ease(k)), 0)
-	return t
-
-
-static func _reveal_ease(k: float) -> float:
-	return 1.0 - pow(1.0 - k, 3.0)
-
-
-## Tamaño: de casi nada a algo más de 1 y vuelta a 1 (rebote).
-static func _reveal_scale(k: float) -> float:
-	if k <= 0.0:
-		return 0.001
-	var c := 1.70158
-	return maxf(0.001, 1.0 + (c + 1.0) * pow(k - 1.0, 3.0) + c * pow(k - 1.0, 2.0))
+	return smoothstep(0.0, 1.0, (_reveal_time - delay) / REVEAL_FADE_TIME)
 
 
 ## Un mismo bloque repetido en varias casillas, en un solo MultiMesh.
@@ -583,18 +599,22 @@ func _add_multimesh(cells: Array, size: Vector3, y: float, mat: Material) -> voi
 	var mesh := BoxMesh.new()
 	mesh.size = size
 	mesh.material = mat
+	# El color de cada instancia (blanco) lleva su opacidad en la aparición.
+	(mat as BaseMaterial3D).vertex_color_use_as_albedo = true
 	var multimesh := MultiMesh.new()
 	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.use_colors = true
 	multimesh.mesh = mesh
 	multimesh.instance_count = cells.size()
 	for i in cells.size():
 		var cell: Vector2i = cells[i]
 		multimesh.set_instance_transform(i,
 			Transform3D(Basis.IDENTITY, Vector3(cell.x * CELL_SIZE, y, cell.y * CELL_SIZE)))
+		multimesh.set_instance_color(i, Color.WHITE)
 	var instance := MultiMeshInstance3D.new()
 	instance.multimesh = multimesh
 	add_child(instance)
-	_reveal_multimeshes.append({"multimesh": multimesh, "cells": cells.duplicate()})
+	_reveal_multimeshes.append({"multimesh": multimesh, "material": mat, "cells": cells.duplicate()})
 
 
 ## Bloques de roca bajo el suelo y las paredes (niveles con vacío): el

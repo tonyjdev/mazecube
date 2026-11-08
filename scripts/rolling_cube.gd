@@ -79,10 +79,7 @@ signal appeared
 const TURN_LEFT := -1
 const TURN_RIGHT := 1
 const HALF := 0.5
-const ARROW_COLOR := Color(1.0, 1.0, 1.0, 0.9)
-const ARROW_REJECTED_COLOR := Color(0.95, 0.2, 0.2, 0.95)
-## Altura sobre el suelo de la flecha y de la llave que lleva el cubo.
-const ARROW_HEIGHT := 1.35
+## Altura sobre el suelo de la llave que lleva el cubo.
 const HELD_KEY_HEIGHT := 2.05
 ## Media vuelta: tiempo que el cubo se queda parado.
 const REVERSE_PAUSE := 0.2
@@ -126,8 +123,6 @@ static var _smoke_material: StandardMaterial3D
 @export var roll_duration := 0.35
 ## Pausa entre vuelcos consecutivos.
 @export var pause_between_rolls := 0.05
-## Tiempo que la flecha se queda en rojo, señalando el giro descartado.
-@export var rejected_turn_flash := 0.35
 
 var level: Level
 var cell := Vector2i.ZERO
@@ -135,13 +130,6 @@ var heading := Vector2i(1, 0)
 var is_finished := false
 ## Color de la llave que lleva el cubo ("" si no lleva ninguna).
 var held_key := ""
-## Mostrar la flecha de rumbo sobre el cubo (ajuste de Opciones). Aunque esté
-## oculta, los giros descartados se siguen notificando con turn_rejected.
-var show_arrow := true:
-	set(value):
-		show_arrow = value
-		if is_node_ready():
-			_update_arrow(_body_offset())
 
 ## Giro pendiente (TURN_LEFT, TURN_RIGHT o 0). Se aplica en el siguiente
 ## límite entre casillas si esa dirección está libre; la última pulsación
@@ -172,24 +160,16 @@ var _piece_mesh: Mesh
 var _grace_left := 0.0
 var _cooldown := 0.0
 var _tween: Tween
-## Dirección del último giro descartado mientras la flecha está en rojo.
-var _rejected_dir := Vector2i.ZERO
-var _flash_tween: Tween
-var _arrow_mat: StandardMaterial3D
 var _held_key_node: Node3D
 ## Power ups activos: id -> { "power_up": PowerUp, "stacks": int, "time_left": float }
 var _power_ups := {}
 
 @onready var _body: MeshInstance3D = $Body
-@onready var _arrow: MeshInstance3D = $HeadingArrow
 
 
 func _ready() -> void:
 	_body.mesh = _build_colored_cube(SIZE)
 	_piece_mesh = _build_colored_cube(SIZE / CubeExplosion.GRID * 0.94)
-	_arrow.top_level = true
-	_arrow.mesh = _build_arrow_mesh()
-	_arrow_mat = _arrow.mesh.material
 
 
 func reset(target_level: Level) -> void:
@@ -202,7 +182,6 @@ func reset(target_level: Level) -> void:
 	_pending_reverse = false
 	_drop_held_key()
 	_end_all_power_ups()
-	_clear_rejected_flash()
 	_rolling = false
 	_cooldown = 0.3
 	is_finished = false
@@ -219,7 +198,7 @@ func reset(target_level: Level) -> void:
 	_appear_time = -1.0
 	_grace_after_appear = false
 	_body.transform = Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * 0.001), Vector3(0, HALF, 0))
-	_update_arrow(Vector3.ZERO)
+	_update_held_key(Vector3.ZERO)
 
 
 ## Empieza la animación de aparición en la salida; al acabar, el cubo rueda.
@@ -229,7 +208,7 @@ func appear() -> void:
 	_appear_landed = false
 	_body.visible = true
 	_apply_appear(0.0)
-	_update_arrow(Vector3.ZERO)
+	_update_held_key(Vector3.ZERO)
 
 
 func is_appearing() -> bool:
@@ -253,7 +232,7 @@ func _process_appear(delta: float) -> void:
 		_grace_left = RESPAWN_GRACE
 	if _held_key_node:
 		_held_key_node.visible = true
-	_update_arrow(Vector3.ZERO)
+	_update_held_key(Vector3.ZERO)
 	appeared.emit()
 
 
@@ -278,20 +257,18 @@ func _apply_appear(t: float) -> void:
 func request_turn(direction: int) -> void:
 	if is_finished:
 		return
-	_clear_rejected_flash()
 	_pending_turn = direction
 	_pending_reverse = false
-	_update_arrow(_body_offset())
+	_update_held_key(_body_offset())
 
 
 ## Registra una media vuelta (sustituye al giro pendiente, si lo hay).
 func request_reverse() -> void:
 	if is_finished:
 		return
-	_clear_rejected_flash()
 	_pending_turn = 0
 	_pending_reverse = true
-	_update_arrow(_body_offset())
+	_update_held_key(_body_offset())
 
 
 func _process(delta: float) -> void:
@@ -325,7 +302,7 @@ func _try_advance() -> void:
 		heading = -heading
 		_end_power_ups_on_bounce(false)
 		_spawn_reverse_smoke()
-		_update_arrow(Vector3.ZERO)
+		_update_held_key(Vector3.ZERO)
 		reversed.emit(cell)
 		_cooldown = REVERSE_PAUSE
 		return
@@ -338,8 +315,8 @@ func _try_advance() -> void:
 		if level.is_walkable(cell + candidate) or level.is_void(cell + candidate):
 			heading = candidate
 		else:
-			_flash_rejected_turn(candidate)
-		_update_arrow(Vector3.ZERO)
+			turn_rejected.emit(candidate)
+		_update_held_key(Vector3.ZERO)
 
 	# Rebote: si la casilla siguiente es pared, borde o puerta cerrada, el rumbo
 	# se invierte al instante y el cubo sigue rodando en sentido contrario.
@@ -363,7 +340,7 @@ func _try_advance() -> void:
 		_end_power_ups_on_bounce(door_like)
 		heading = -heading
 		bounced.emit(cell)
-		_update_arrow(Vector3.ZERO)
+		_update_held_key(Vector3.ZERO)
 
 	var next := cell + heading
 	if level.is_void(next):
@@ -402,9 +379,7 @@ func _fall_to(next: Vector2i) -> void:
 	_roll_target = next
 	_pending_turn = 0
 	_pending_reverse = false
-	_clear_rejected_flash()
 	_end_all_power_ups()
-	_arrow.visible = false
 	if _held_key_node:
 		_held_key_node.visible = false
 	var dir := Vector3(heading.x, 0, heading.y)
@@ -433,9 +408,7 @@ func drop() -> void:
 	_rolling = false
 	_pending_turn = 0
 	_pending_reverse = false
-	_clear_rejected_flash()
 	_end_all_power_ups()
-	_arrow.visible = false
 	if _held_key_node:
 		_held_key_node.visible = false
 	var dir := Vector3(heading.x, 0, heading.y)
@@ -460,10 +433,10 @@ func _process_fall(delta: float) -> void:
 		_explode(false)
 
 
-func _apply_roll(t: float, start: Transform3D, pivot: Vector3, axis: Vector3, arrow_dir: Vector3, angle: float) -> void:
+func _apply_roll(t: float, start: Transform3D, pivot: Vector3, axis: Vector3, body_dir: Vector3, angle: float) -> void:
 	var rot := Basis(axis, angle * t)
 	_body.transform = Transform3D(rot * start.basis, pivot + rot * (start.origin - pivot))
-	_update_arrow(arrow_dir * t)
+	_update_held_key(body_dir * t)
 
 
 func _on_roll_finished(next: Vector2i) -> void:
@@ -487,11 +460,10 @@ func _on_roll_finished(next: Vector2i) -> void:
 	var power_up := level.take_power_up(cell)
 	if power_up:
 		_pick_power_up(power_up)
-	_update_arrow(Vector3.ZERO)
+	_update_held_key(Vector3.ZERO)
 	rolled.emit(cell)
 	if cell == level.goal_cell:
 		is_finished = true
-		_arrow.visible = false
 		if _held_key_node:
 			_held_key_node.visible = false
 		reached_goal.emit()
@@ -509,20 +481,6 @@ static func turned(dir: Vector2i, direction: int) -> Vector2i:
 
 func _body_offset() -> Vector3:
 	return Vector3(_body.position.x, 0, _body.position.z)
-
-
-## La flecha se queda un momento en rojo señalando el giro que no se ha
-## podido hacer y luego vuelve al rumbo actual con su color normal.
-func _flash_rejected_turn(dir: Vector2i) -> void:
-	_clear_rejected_flash()
-	_rejected_dir = dir
-	_arrow_mat.albedo_color = ARROW_REJECTED_COLOR
-	turn_rejected.emit(dir)
-	_flash_tween = create_tween()
-	_flash_tween.tween_interval(rejected_turn_flash)
-	_flash_tween.tween_callback(func() -> void:
-		_clear_rejected_flash()
-		_update_arrow(_body_offset()))
 
 
 ## Está en el tablero (no ha explotado esperando a reaparecer).
@@ -565,7 +523,6 @@ func _explode(on_floor: bool) -> void:
 	_rolling = false
 	_pending_turn = 0
 	_pending_reverse = false
-	_clear_rejected_flash()
 	_end_all_power_ups()
 	_explosion = CubeExplosion.create(_body.mesh, _piece_mesh, body_basis, SIZE, on_floor)
 	_explosion.finished.connect(_respawn)
@@ -574,7 +531,6 @@ func _explode(on_floor: bool) -> void:
 	if on_floor:
 		_spawn_dust(at)
 	_body.visible = false
-	_arrow.visible = false
 	if _held_key_node:
 		_held_key_node.visible = false
 	died.emit(cell)
@@ -589,8 +545,10 @@ func _respawn() -> void:
 	heading = level.start_heading
 	global_position = level.cell_to_world(cell)
 	_cooldown = 0.3
-	# La llave que lleva se vuelve a ver al acabar la aparición.
-	appear()
+	# Espera oculto en la salida a que se llame a appear() (cuando la cámara
+	# ya ha llegado); la llave que lleva se vuelve a ver al acabar la aparición.
+	_waiting = true
+	_body.transform = Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * 0.001), Vector3(0, HALF, 0))
 	_grace_after_appear = true
 	respawned.emit()
 
@@ -773,27 +731,9 @@ static func _get_smoke_material() -> StandardMaterial3D:
 	return _smoke_material
 
 
-func _clear_rejected_flash() -> void:
-	if _flash_tween and _flash_tween.is_valid():
-		_flash_tween.kill()
-	_rejected_dir = Vector2i.ZERO
-	_arrow_mat.albedo_color = ARROW_COLOR
-
-
-## Flecha flotante sobre el cubo que indica el rumbo, el giro pendiente o,
-## en rojo, el giro descartado.
-func _update_arrow(offset: Vector3) -> void:
-	var shown := heading
-	if _pending_reverse:
-		shown = -heading
-	elif _pending_turn != 0:
-		shown = turned(heading, _pending_turn)
-	elif _rejected_dir != Vector2i.ZERO:
-		shown = _rejected_dir
-	var dir := Vector3(shown.x, 0, shown.y)
-	var base := Basis.looking_at(dir, Vector3.UP) * Basis(Vector3.RIGHT, -PI * 0.5)
-	_arrow.global_transform = Transform3D(base, global_position + offset + dir * 0.1 + Vector3(0, ARROW_HEIGHT, 0))
-	_arrow.visible = show_arrow and not is_finished and not _dead and not is_appearing()
+## Coloca la llave que lleva el cubo sobre él (offset: desplazamiento del
+## cuerpo durante el vuelco).
+func _update_held_key(offset: Vector3) -> void:
 	if _held_key_node:
 		_held_key_node.global_position = global_position + offset + Vector3(0, HELD_KEY_HEIGHT, 0)
 
@@ -842,16 +782,3 @@ static func _add_quad(st: SurfaceTool, n: Vector3, color: Color,
 		st.set_color(color)
 		st.set_normal(n)
 		st.add_vertex(p)
-
-
-static func _build_arrow_mesh() -> PrismMesh:
-	var prism := PrismMesh.new()
-	prism.size = Vector3(0.45, 0.4, 0.03)
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.no_depth_test = true
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mat.albedo_color = ARROW_COLOR
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	prism.material = mat
-	return prism
