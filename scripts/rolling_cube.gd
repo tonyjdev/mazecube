@@ -778,6 +778,12 @@ func _on_roll_finished(next: Vector2i) -> void:
 		_cooldown = pause_between_rolls / speed_multiplier()
 
 
+## Segundos que dura un teletransporte entero (desde que entra hasta que
+## sigue rodando).
+static func teleport_duration() -> float:
+	return TELEPORT_OUT_TIME + TELEPORT_TRAVEL_TIME + TELEPORT_IN_TIME + TELEPORT_FADE_TIME
+
+
 func is_teleporting() -> bool:
 	return _teleport_phase != 0
 

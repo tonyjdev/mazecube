@@ -7,7 +7,9 @@ extends Enemy
 ##
 ## Se anticipa al jugador: calcula el camino más corto del cubo hasta la meta
 ## (como si las puertas y los muros destructibles estuvieran abiertos, pero
-## respetando los barrotes cerrados) y busca la casilla de ese camino a la
+## respetando los barrotes cerrados, y contando con los teletransportes: al
+## entrar en uno, el cubo sigue desde su pareja, y tarda lo que dura el
+## teletransporte) y busca la casilla de ese camino a la
 ## que puede llegar antes que el cubo, la más cercana a él. Si ya está sobre
 ## el camino, se queda quieto bloqueándolo; cuando el cubo cambia de zona y
 ## su camino deja de pasar por él, vuelve a moverse. Si no puede ganar la
@@ -132,12 +134,19 @@ func _pick_target() -> Vector2i:
 	var cube_step := cube.step_time()
 	var best := cell
 	var best_score := INF
+	# Lo que tarda el cubo en llegar a cada casilla del camino: un paso por
+	# casilla y, al pasar por un teletransporte, lo que dura en lugar del paso
+	# de la casilla de destino.
+	var cube_time := 0.0
 	for i in route.size():
 		var target := route[i]
+		if i > 0 and level.teleport_partner(route[i - 1]) == target:
+			cube_time += RollingCube.teleport_duration()
+		else:
+			cube_time += cube_step
 		if not mine.has(target):
 			continue
-		# El cubo llega a route[i] en i + 1 pasos.
-		var margin: float = (i + 1) * cube_step - mine[target] * step_time
+		var margin: float = cube_time - mine[target] * step_time
 		var score: float = mine[target] if margin > 0.0 else 100000.0 - margin
 		if score < best_score:
 			best_score = score
@@ -180,11 +189,41 @@ func _predicted_route() -> Array[Vector2i]:
 func _compute_route() -> Array[Vector2i]:
 	var from := cube.cell
 	var goal := level.goal_cell
-	var route := _path(from, goal, func(c: Vector2i) -> bool:
+	var route := _cube_path(from, goal, func(c: Vector2i) -> bool:
 		return level.has_floor(c) and not level.bars_closed(c))
 	if route.is_empty():
-		route = _path(from, goal, level.has_floor)
+		route = _cube_path(from, goal, level.has_floor)
 	return route
+
+
+## Como _path, pero por donde puede ir el cubo: al entrar en una casilla de
+## teletransporte sigue desde su pareja (el camino incluye las dos).
+func _cube_path(from: Vector2i, goal: Vector2i, can_pass: Callable) -> Array[Vector2i]:
+	var came := {from: from}
+	var queue: Array[Vector2i] = [from]
+	var head := 0
+	while head < queue.size() and not came.has(goal):
+		var current: Vector2i = queue[head]
+		head += 1
+		for dir in DIRS:
+			var n := current + dir
+			if came.has(n) or not can_pass.call(n):
+				continue
+			came[n] = current
+			var partner := level.teleport_partner(n)
+			if partner == Level.NO_CELL:
+				queue.append(n)
+			elif not came.has(partner):
+				came[partner] = n
+				queue.append(partner)
+	var path: Array[Vector2i] = []
+	if not came.has(goal) or goal == from:
+		return path
+	var step := goal
+	while step != from:
+		path.push_front(step)
+		step = came[step]
+	return path
 
 
 func _set_parked(parked: bool) -> void:
