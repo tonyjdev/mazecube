@@ -19,7 +19,10 @@ extends RefCounted
 ## 'n' patrulleros; el campo "patrols" da la ruta de cada patrullero como
 ## tramos rectos desde su casilla: {"i": "R3 D2 L3 U2"} (R derecha, L
 ## izquierda, U arriba, D abajo; si acaba donde empieza es circular, si no,
-## de ida y vuelta). Ver Chaser, Blocker y Patroller.
+## de ida y vuelta). Ver Chaser, Blocker y Patroller. Cada enemigo del mapa
+## es un punto de origen que lo crea y lo regenera (ver EnemySpawner); el
+## campo opcional "spawners" cambia cuántos gestiona y su radio:
+## {"x": {"count": 2}, Vector2i(10, 4): {"count": 3, "radius": 7}}.
 ## Niveles 17-30: mapas grandes generados con tools/build_levels.py (salas
 ## unidas por pasillos o laberintos) que combinan todos los mecanismos; cada
 ## botón está a 6 casillas o menos de sus barrotes.

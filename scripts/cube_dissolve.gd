@@ -15,6 +15,11 @@ extends RefCounted
 ## `strength` (0-1) mezcla del cubo normal (0) al efecto completo (1):
 ## RollingCube la sube al empezar y la baja al acabar para que no haya
 ## saltos.
+##
+## Los enemigos usan el mismo efecto al aparecer (ver Enemy): make_material()
+## acepta el color del objeto (`albedo`, que multiplica al color de vértice),
+## su brillo propio (`base_emission`, en lineal) y el color del borde; `fade` (0-1)
+## multiplica la opacidad final para que puedan surgir de la nada.
 
 const MAX_DISSOLVE := 0.40
 const MIN_ALPHA := 0.25
@@ -39,6 +44,9 @@ uniform float edge_energy = 2.2;
 uniform float noise_scale = 4.0;
 uniform float noise_speed = 0.5;
 uniform float roughness_value = 0.6;
+uniform vec3 albedo : source_color = vec3(1.0);
+uniform vec3 base_emission = vec3(0.0);
+uniform float fade : hint_range(0.0, 1.0) = 1.0;
 
 varying vec3 local_pos;
 
@@ -75,20 +83,22 @@ void fragment() {
 	// El borde se enciende y se apaga con strength (sin saltos).
 	float edge = (1.0 - smoothstep(0.0, edge_width, n - amount)) * step(amount, n)
 		* smoothstep(0.0, 0.6, strength);
-	ALBEDO = mix(COLOR.rgb, edge_color, edge * 0.6);
+	ALBEDO = mix(COLOR.rgb * albedo, edge_color, edge * 0.6);
 	ROUGHNESS = roughness_value;
-	EMISSION = edge_color * edge * edge_energy;
+	EMISSION = base_emission + edge_color * edge * edge_energy;
 	float a = mix(min_alpha, body_alpha, solid);
 	a = max(a, edge * 0.95);
-	ALPHA = mix(1.0, a, strength);
+	ALPHA = mix(1.0, a, strength) * fade;
 }
 """
 
 static var _shader: Shader
 
 
-## Material nuevo del efecto, con strength = 0 (cubo normal).
-static func make_material() -> ShaderMaterial:
+## Material nuevo del efecto, con strength = 0 (cubo normal). `color` es el
+## del objeto, `emission` su brillo propio y `edge` el color del borde.
+static func make_material(color := Color.WHITE, emission := Color.BLACK,
+		edge := EDGE_COLOR) -> ShaderMaterial:
 	if _shader == null:
 		_shader = Shader.new()
 		_shader.code = SHADER
@@ -99,7 +109,9 @@ static func make_material() -> ShaderMaterial:
 	mat.set_shader_parameter("min_alpha", MIN_ALPHA)
 	mat.set_shader_parameter("body_alpha", BODY_ALPHA)
 	mat.set_shader_parameter("edge_width", EDGE_WIDTH)
-	mat.set_shader_parameter("edge_color", EDGE_COLOR)
+	mat.set_shader_parameter("edge_color", edge)
+	mat.set_shader_parameter("albedo", color)
+	mat.set_shader_parameter("base_emission", emission)
 	mat.set_shader_parameter("edge_energy", EDGE_ENERGY)
 	mat.set_shader_parameter("noise_scale", NOISE_SCALE)
 	mat.set_shader_parameter("noise_speed", NOISE_SPEED)

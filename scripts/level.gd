@@ -17,6 +17,14 @@ extends Node3D
 ##   Enemigos (sobre una casilla libre): x perseguidor (ver Chaser),
 ##   z obstáculo (ver Blocker), i j k m n patrulleros (ver Patroller); la ruta
 ##   de cada patrullero se indica en `patrol_routes` ({"i": "R3 D2 L3 U2"}).
+##   Cada enemigo del mapa es un punto de origen (EnemySpawner), invisible,
+##   que crea sus enemigos cuando el tablero termina de aparecer y los vuelve
+##   a crear un rato después de que los destruyan. Por defecto gestiona un
+##   enemigo y su radio se calcula solo; `spawner_settings` (campo
+##   "spawners" del nivel) lo cambia por tipo de enemigo o por casilla:
+##   {"x": {"count": 2}, Vector2i(10, 4): {"count": 3, "radius": 7}}
+##   ("count" = enemigos que gestiona; "radius" = casillas de recorrido
+##   alrededor del origen donde aparecen; lo de la casilla gana al del tipo).
 ##   Vacío: '~' = ni suelo ni pared. Si el cubo entra en el vacío, se cae y
 ##   explota (ver RollingCube). Fuera del mapa también es vacío. En los
 ##   niveles con vacío, bajo cada casilla con suelo o pared se dibuja un
@@ -123,6 +131,9 @@ const REVEAL_FADE_TIME := 0.45
 ## Bloques del nivel (campo "theme") y por zonas ("theme_regions"). Ver la
 ## leyenda del principio.
 @export var block_theme := {}
+## Ajustes de los puntos de origen de enemigos (campo "spawners"). Ver la
+## leyenda del principio.
+@export var spawner_settings := {}
 @export var block_regions: Array = []
 ## Cubo del jugador: los enemigos lo buscan y lo matan.
 var cube: RollingCube:
@@ -149,6 +160,9 @@ var _bars := {}
 ##             "near": { casilla: casillas de recorrido hasta el botón } }
 var _buttons := {}
 var _enemies: Array[Enemy] = []
+var _spawners: Array[EnemySpawner] = []
+## Los enemigos están quietos (ver set_enemies_frozen).
+var _enemies_frozen := false
 ## casilla -> HangingBridge (solo los que siguen en pie)
 var _bridges := {}
 ## Aparición en curso: tiempo transcurrido, retraso de cada casilla,
@@ -172,6 +186,7 @@ func configure(data: Dictionary) -> void:
 	start_heading = data["start_heading"]
 	button_links = data.get("buttons", {})
 	patrol_routes = data.get("patrols", {})
+	spawner_settings = data.get("spawners", {})
 	block_theme = data.get("theme", {})
 	block_regions = data.get("theme_regions", [])
 
@@ -191,6 +206,7 @@ func build() -> void:
 	_bars.clear()
 	_buttons.clear()
 	_enemies.clear()
+	_spawners.clear()
 	_bridges.clear()
 	var enemy_cells := {}
 	var bridge_cells := {}
@@ -257,7 +273,7 @@ func build() -> void:
 		_add_foundations(wall_cells)
 	_add_bridges(bridge_cells)
 	for cell: Vector2i in enemy_cells:
-		_add_enemy(cell, enemy_cells[cell])
+		_add_spawner(cell, enemy_cells[cell])
 	for button in _buttons.values():
 		button["near"] = _cells_within(button["front"], BUTTON_APPROACH_CELLS)
 
@@ -265,6 +281,9 @@ func build() -> void:
 func _process(delta: float) -> void:
 	if _revealing:
 		_update_reveal(delta)
+	else:
+		for spawner in _spawners:
+			spawner.update(delta)
 	_check_enemy_hits()
 	for item in _keys.values():
 		item["node"].rotate_y(KEY_SPIN_SPEED * delta)
@@ -332,6 +351,22 @@ func has_floor(cell: Vector2i) -> bool:
 	return _walkable.has(cell)
 
 
+## Casilla por la que pueden pasar los enemigos (sin contar a los demás
+## enemigos): libre, sin puerta, barrotes cerrados ni muro destructible, y
+## que no sea la salida, la meta ni un puente colgante.
+func enemy_can_pass(cell: Vector2i) -> bool:
+	return is_terrain_walkable(cell) and cell != start_cell and cell != goal_cell \
+		and not is_bridge(cell)
+
+
+## Hay algún enemigo (de cualquier tipo) ocupando la casilla.
+func enemy_at(cell: Vector2i) -> bool:
+	for enemy in _enemies:
+		if enemy.occupies(cell):
+			return true
+	return false
+
+
 ## Hay un enemigo sólido (obstáculo) ocupando la casilla, sin contar `except`.
 func solid_enemy_at(cell: Vector2i, except: Enemy = null) -> bool:
 	for enemy in _enemies:
@@ -353,7 +388,7 @@ func _check_enemy_hits() -> void:
 	var anchor := to_local(cube.get_trail_anchor())
 	var cube_pos := Vector2(anchor.x, anchor.z) / CELL_SIZE
 	for enemy in _enemies:
-		if enemy.lethal and enemy.board_position().distance_to(cube_pos) < ENEMY_HIT_DISTANCE:
+		if enemy.can_hurt() and enemy.board_position().distance_to(cube_pos) < ENEMY_HIT_DISTANCE:
 			cube.die()
 			return
 
@@ -607,11 +642,14 @@ func is_revealing() -> bool:
 	return _revealing
 
 
-## Detiene o reanuda a los enemigos (durante la aparición del nivel).
+## Detiene o reanuda a los enemigos (durante la aparición del nivel y del
+## cubo). Los que están apareciendo terminan su aparición, pero no se mueven.
 func set_enemies_frozen(frozen: bool) -> void:
-	for enemy in _enemies:
-		if is_instance_valid(enemy):
-			enemy.process_mode = Node.PROCESS_MODE_DISABLED if frozen else Node.PROCESS_MODE_INHERIT
+	_enemies_frozen = frozen
+
+
+func are_enemies_frozen() -> bool:
+	return _enemies_frozen
 
 
 func _update_reveal(delta: float) -> void:
@@ -925,26 +963,47 @@ func _cells_within(origin: Vector2i, max_steps: int) -> Dictionary:
 	return steps
 
 
-func _add_enemy(cell: Vector2i, symbol: String) -> void:
+## Punto de origen de enemigos del tipo `symbol` en `cell` (ver la leyenda
+## del principio y EnemySpawner).
+func _add_spawner(cell: Vector2i, symbol: String) -> void:
+	var settings: Dictionary = spawner_settings.get(symbol, {}).duplicate()
+	settings.merge(spawner_settings.get(cell, {}), true)
+	var route := ""
+	if PATROL_CHARS.contains(symbol):
+		route = patrol_routes.get(symbol, "")
+		var check := Patroller.new()
+		var problem := check.set_route(cell, route)
+		for route_cell in check.route:
+			if problem == "" and not _walkable.has(route_cell):
+				problem = "pasa por la casilla %s, que no es libre" % route_cell
+		check.free()
+		if problem != "":
+			push_warning("Ruta del patrullero '%s': %s" % [symbol, problem])
+			route = ""
+	var radius: int = settings.get("radius", EnemySpawner.auto_radius(self, cell))
+	_spawners.append(EnemySpawner.new(self, symbol, cell, settings.get("count", 1),
+		clampi(radius, 1, 99), route))
+
+
+## Crea un enemigo del punto de origen `spawner` en `cell` y empieza su
+## aparición.
+func spawn_enemy(spawner: EnemySpawner, cell: Vector2i) -> Enemy:
 	var enemy: Enemy
-	if symbol == CHASER_CHAR:
+	if spawner.symbol == CHASER_CHAR:
 		enemy = Chaser.new()
-	elif symbol == BLOCKER_CHAR:
+	elif spawner.symbol == BLOCKER_CHAR:
 		enemy = Blocker.new()
 	else:
 		var patroller := Patroller.new()
-		var problem := patroller.set_route(cell, patrol_routes.get(symbol, ""))
-		for route_cell in patroller.route:
-			if problem == "" and not _walkable.has(route_cell):
-				problem = "pasa por la casilla %s, que no es libre" % route_cell
-		if problem != "":
-			push_warning("Ruta del patrullero '%s': %s" % [symbol, problem])
-			patroller.route = [cell]
+		patroller.set_route(cell, spawner.route)
 		enemy = patroller
+	enemy.spawner = spawner
 	add_child(enemy)
 	enemy.setup(self, cell)
 	enemy.cube = cube
+	enemy.start_appearing()
 	_enemies.append(enemy)
+	return enemy
 
 
 func _add_breakable(cell: Vector2i, hits: int) -> void:

@@ -152,6 +152,15 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 - Al matar al cubo le pierde la pista y **no vuelve a buscarlo durante 3 s**, para que no se quede esperando junto a la salida.
 - Los perseguidores y los patrulleros pueden cruzarse entre sí.
 
+#### Puntos de origen y regeneración
+
+- Los enemigos no se colocan directamente en el mapa: lo que el mapa marca como enemigo (`x`, `z`, `i`…`n`) es un **punto de origen** de ese tipo de enemigo, **invisible**. Puede haber varios repartidos por el mapa.
+- Cada punto de origen **gestiona sus enemigos activos**: de **1** (por defecto, como un enemigo de los de antes) a **varios**, según la dificultad del nivel. Cuando destruyen a uno, el punto de origen crea otro pasado un tiempo al azar de **30 a 60 s**.
+- Al empezar o reiniciar el nivel, en cuanto el tablero termina de aparecer, cada punto de origen crea sus enemigos pasados **1-2 s** (cada uno con su propio tiempo).
+- **Dónde aparecen:** en una casilla al azar a **5-10 casillas de recorrido** del origen (solo por casillas que pisan los enemigos). El radio se calcula según el espacio disponible: el menor desde 5 cuya zona tenga al menos 24 casillas, o 10 si no se llega. La casilla tiene que estar libre de otros enemigos, tener al menos una casilla vecina a la que moverse y estar a **más de 3 casillas de recorrido del cubo**; si en ese momento no hay ninguna así, se reintenta cada 0,5 s.
+- Los **patrulleros** aparecen siempre en el **principio de su ruta** (la casilla del punto de origen).
+- **Aparición:** el enemigo nuevo está **2 s quieto** en su casilla con el mismo efecto de **disolverse** que el cubo al reaparecer, con el **borde del color del enemigo**; surge de la nada en 0,5 s y el efecto se va en los últimos 0,5 s. Mientras aparece **no hace daño al cubo** (un obstáculo sí es sólido), pero se le puede destruir con un dash o un pisotón.
+
 #### Patrullero (octaedro flotante)
 
 - Octaedro morado que flota y gira sobre sí mismo. Recorre siempre **la misma ruta** y **nunca se sale de ella** (0,55 s por casilla).
@@ -216,7 +225,7 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 - **Enemigos destruidos:** revientan en pedazos que salen despedidos, caen y desaparecen en ≈1,6 s.
   - **Perseguidor** (criatura orgánica): se deshace en **muchas gotitas** de su color, y sus dos ojos salen volando. Las gotas se **aplastan como un charquito** al caer, sin rebotar. Suena un **estallido acuoso**, como una explosión en agua.
   - **Patrullero y obstáculo** (sintéticos): se rompen en **piezas con su misma forma** (octaedros o dodecaedros pequeños) que giran deprisa y **rebotan**. Suena una **rotura de cristal y metal**.
-- Los enemigos destruidos **no vuelven** al morir el cubo (el tablero se queda como estaba); sí al reiniciar el nivel.
+- Los enemigos destruidos **vuelven a aparecer** pasados 30-60 s desde su punto de origen (apartado 2.13); al morir el cubo no cambia nada, y al reiniciar el nivel los puntos de origen empiezan de cero.
 - El resolvedor de niveles **no las usa**, como la media vuelta.
 
 ## 3. Escenario y objetivo — Confirmados
@@ -272,7 +281,7 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 - Muros destructibles: un dígito del `1` al `5` con los golpes que aguantan (`5` pocas grietas, `1` muchas).
 - Barrotes: `c`, `d`, `e`, `f`, `h`, cada letra es un **grupo** (todas las casillas con la misma letra cambian juntas); en **minúscula empiezan abiertos** y en **mayúscula cerrados**. Un mismo grupo puede tener casillas abiertas y cerradas. Debe haber muro justo a ambos lados del pasillo.
 - Botones: `p`, `q`, `t`, `v`, `w` en lugar de un muro; el botón se coloca en la cara que da a su **única casilla libre** contigua. El campo `buttons` indica qué grupos de barrotes cambia cada botón, por ejemplo `"buttons": {"p": "cd", "q": "d"}`.
-- Enemigos (sobre una casilla libre): `x` perseguidor, `z` obstáculo, y `i`, `j`, `k`, `m`, `n` patrulleros. El campo `patrols` da la ruta de cada patrullero (apartado 2.13), por ejemplo `"patrols": {"i": "D6", "j": "R4 D2 L4 U2"}`.
+- Enemigos (sobre una casilla libre): `x` perseguidor, `z` obstáculo, y `i`, `j`, `k`, `m`, `n` patrulleros. El campo `patrols` da la ruta de cada patrullero (apartado 2.13), por ejemplo `"patrols": {"i": "D6", "j": "R4 D2 L4 U2"}`. Cada uno es un **punto de origen** (apartado 2.13); el campo opcional `spawners` cambia cuántos enemigos gestiona (`count`, 1 por defecto) y el radio en el que aparecen (`radius`, automático por defecto), por tipo de enemigo o por casilla (lo de la casilla gana): `"spawners": {"x": {"count": 2}, Vector2i(10, 4): {"count": 3, "radius": 7}}`.
 - Vacío: `~` (ni suelo ni pared; apartado 2.14).
 - Puente colgante: `=` (apartado 2.15). Las casillas `=` seguidas forman un puente recto; debe tener vacío a ambos lados y suelo en los dos extremos.
 - Opcional: `theme`, los bloques del catálogo (apartado 5) del suelo, los muros y la roca de debajo, p. ej. `"theme": {"floor": "snow", "wall": "ice"}` (la roca, si no se indica, es la que corresponde al suelo). Y `theme_regions`, zonas rectangulares del mapa con otros bloques, para transiciones: `[{"rect": Rect2i(x, z, ancho, alto), "floor": "grass"}]`. Los niveles sin `theme` toman el de su tramo de `Levels.THEMES`, que sigue las zonas del mapa: en la zona I praderas, aldeas y ruinas (hierba, tierra, sillería, tronco, ladrillo) y en la zona II islas que suben desde los prados en flor (hierba con flores y piedra con musgo) por la hierba seca y el granito hasta la nieve y el hielo de las cumbres.
@@ -282,7 +291,7 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 ### 6.3. Medida de la dificultad
 
 - La dificultad de un nivel se mide como el **mínimo número de giros** necesario para resolverlo con las reglas del apartado 2 (incluido el rebote, el descarte de giros bloqueados, la ausencia de giro en la casilla de salida, las llaves y puertas y los muros destructibles).
-- Los **enemigos** se mueven en tiempo real y el resolvedor no los simula: los perseguidores y patrulleros no cuentan y el obstáculo cuenta como un **muro fijo** en su casilla de partida. El resolvedor sí comprueba que las rutas de los patrulleros solo pasan por casillas libres y no tocan la salida ni la meta y que cumplen la regla de las tres salidas (apartado 2.13).
+- Los **enemigos** se mueven en tiempo real y el resolvedor no los simula: los perseguidores y patrulleros no cuentan y el obstáculo cuenta como un **muro fijo** en su punto de origen (aunque aparece en una casilla al azar cerca de él). El resolvedor sí comprueba que las rutas de los patrulleros solo pasan por casillas libres y no tocan la salida ni la meta y que cumplen la regla de las tres salidas (apartado 2.13).
 - Caer al vacío devuelve el cubo a la salida; el resolvedor descarta esos movimientos (nunca usa una caída como atajo).
 - El resolvedor sí simula el **desgaste de los puentes colgantes** (las salidas que le quedan a cada casilla forman parte del estado): nunca usa un puente más veces de las que aguanta. También comprueba su forma (recta, con vacío a los lados y suelo en los extremos).
 - Ese mínimo se calcula con un **resolvedor automático** que también comprueba que todos los niveles tienen solución.

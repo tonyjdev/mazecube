@@ -171,6 +171,10 @@ func _set_parked(parked: bool) -> void:
 	_mat.albedo_color = PARKED_COLOR if parked else COLOR
 
 
+func _dissolve_color() -> Color:
+	return COLOR.lightened(0.35)
+
+
 func _build_visual() -> Node3D:
 	var root := Node3D.new()
 	_mat = _make_material(COLOR)

@@ -84,6 +84,10 @@ func _on_arrived() -> void:
 	_index = _next_index
 
 
+func _dissolve_color() -> Color:
+	return COLOR.lightened(0.35)
+
+
 func _build_visual() -> Node3D:
 	var root := Node3D.new()
 	_mesh = MeshInstance3D.new()

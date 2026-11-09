@@ -13,6 +13,13 @@ extends Node3D
 ## - El obstáculo es sólido para todos: los demás enemigos no entran en sus
 ##   casillas. Perseguidores y patrulleros sí pueden cruzarse entre ellos.
 ## - `lethal`: si toca al cubo, el cubo explota (lo comprueba Level).
+## - Los crea un punto de origen (EnemySpawner), que vuelve a crearlos un
+##   tiempo después de que los destruyan.
+## - Aparición (start_appearing): durante APPEAR_TIME segundos se queda
+##   quieto en su casilla, «disolviéndose» como el cubo al reaparecer (ver
+##   CubeDissolve) con el borde de su color (_dissolve_color), y no hace daño
+##   al cubo (can_hurt). Surge de la nada en APPEAR_FADE_IN segundos y el
+##   efecto se va en los últimos APPEAR_FADE_OUT. Sí se le puede destruir.
 ##
 ## El nodo es hijo de Level, así que `position` está en coordenadas del
 ## tablero (casilla * CELL_SIZE).
@@ -20,11 +27,18 @@ extends Node3D
 const DIRS: Array[Vector2i] = [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
 ## Tiempo de espera antes de volver a intentar moverse si el paso está cortado.
 const RETRY_TIME := 0.15
+## Aparición: duración total, lo que tarda en dejar de ser invisible y lo que
+## tarda el efecto en irse al final.
+const APPEAR_TIME := 2.0
+const APPEAR_FADE_IN := 0.5
+const APPEAR_FADE_OUT := 0.5
 
 var level: Level
 ## Cubo del jugador (lo asigna Level).
 var cube: RollingCube
 var cell := Vector2i.ZERO
+## Punto de origen que lo ha creado (se le avisa al destruirlo).
+var spawner: EnemySpawner
 ## Rumbo del último paso (para no dar media vuelta sin motivo y orientar el visual).
 var heading := Vector2i.ZERO
 ## Si toca al cubo, lo mata.
@@ -42,6 +56,12 @@ var _to := Vector2i.ZERO
 var _t := 0.0
 var _wait := 0.0
 var _visual: Node3D
+## Tiempo que le queda de aparición (0 = ya ha aparecido).
+var _appear_left := 0.0
+## Materiales de disolverse puestos durante la aparición:
+## { "node": MeshInstance3D, "surface": int, "original": Material,
+##   "material": ShaderMaterial }.
+var _appear_materials: Array[Dictionary] = []
 
 
 func setup(target_level: Level, start: Vector2i) -> void:
@@ -56,6 +76,12 @@ func setup(target_level: Level, start: Vector2i) -> void:
 
 func _process(delta: float) -> void:
 	if level == null:
+		return
+	if _appear_left > 0.0:
+		_process_appear(delta)
+		_animate(delta)
+		return
+	if level.are_enemies_frozen():
 		return
 	if _moving:
 		_t = minf(_t + delta / step_time, 1.0)
@@ -78,12 +104,79 @@ func _process(delta: float) -> void:
 	_animate(delta)
 
 
+## Empieza la aparición (ver la descripción de la clase).
+func start_appearing() -> void:
+	_appear_left = APPEAR_TIME
+	var edge := _dissolve_color()
+	var made := {}
+	for node in _visual.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := node as MeshInstance3D
+		if mesh_instance.mesh == null:
+			continue
+		for i in mesh_instance.mesh.get_surface_count():
+			var source := mesh_instance.get_active_material(i)
+			if not made.has(source):
+				var color := Color.WHITE
+				var emission := Color.BLACK
+				var standard := source as BaseMaterial3D
+				if standard:
+					color = standard.albedo_color
+					if standard.emission_enabled:
+						emission = standard.emission.srgb_to_linear() \
+							* standard.emission_energy_multiplier
+				var mat := CubeDissolve.make_material(color, emission, edge)
+				mat.set_shader_parameter("strength", 1.0)
+				mat.set_shader_parameter("fade", 0.0)
+				made[source] = mat
+			_appear_materials.append({"node": mesh_instance, "surface": i,
+				"original": mesh_instance.get_surface_override_material(i),
+				"material": made[source]})
+			mesh_instance.set_surface_override_material(i, made[source])
+
+
+## Está apareciendo (quieto y sin hacer daño).
+func is_appearing() -> bool:
+	return _appear_left > 0.0
+
+
+## Si ahora mismo mata al cubo al tocarlo.
+func can_hurt() -> bool:
+	return lethal and not is_appearing()
+
+
+func _process_appear(delta: float) -> void:
+	_appear_left = maxf(_appear_left - delta, 0.0)
+	var elapsed := APPEAR_TIME - _appear_left
+	var fade := smoothstep(0.0, APPEAR_FADE_IN, elapsed)
+	var strength := smoothstep(0.0, APPEAR_FADE_OUT, _appear_left)
+	var done := {}
+	for item in _appear_materials:
+		var mat: ShaderMaterial = item["material"]
+		if not done.has(mat):
+			done[mat] = true
+			mat.set_shader_parameter("fade", fade)
+			mat.set_shader_parameter("strength", strength)
+	if _appear_left <= 0.0:
+		for item in _appear_materials:
+			var mesh_instance: MeshInstance3D = item["node"]
+			if is_instance_valid(mesh_instance):
+				mesh_instance.set_surface_override_material(item["surface"], item["original"])
+		_appear_materials.clear()
+
+
+## Color del borde del efecto de aparición.
+func _dissolve_color() -> Color:
+	return Color.WHITE
+
+
 ## Lo ha alcanzado un dash o un pisotón del cubo (Level ya lo ha quitado de
 ## su lista): revienta en pedazos (EnemyDebris, que cada tipo llena en
 ## _add_debris), suena su rotura (_destroy_sound) y desaparece.
 func destroy() -> void:
 	if level == null:
 		return
+	if spawner:
+		spawner.on_enemy_destroyed(self)
 	var debris := EnemyDebris.new()
 	debris.position = position
 	level.add_child(debris)
@@ -175,8 +268,7 @@ func _animate(_delta: float) -> void:
 
 ## Casilla por la que puede pasar (sin contar a los demás enemigos).
 func _passable(target: Vector2i) -> bool:
-	return level.is_terrain_walkable(target) and target != level.start_cell \
-		and target != level.goal_cell and not level.is_bridge(target)
+	return level.enemy_can_pass(target)
 
 
 func _can_enter(target: Vector2i) -> bool:

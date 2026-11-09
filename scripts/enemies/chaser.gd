@@ -101,6 +101,10 @@ func _wander() -> Vector2i:
 	return options[_rng.randi_range(0, options.size() - 1)]
 
 
+func _dissolve_color() -> Color:
+	return CALM_COLOR.lightened(0.35)
+
+
 func _build_visual() -> Node3D:
 	var root := Node3D.new()
 	_body_mat = _make_material(CALM_COLOR, 0.25)
