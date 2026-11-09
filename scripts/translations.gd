@@ -74,6 +74,7 @@ const MESSAGES := {
 		"TIP_BLOCKER": "El dodecaedro no hace daño, pero intenta cortarte el paso. Usa los barrotes para encerrarlo.",
 		"TIP_VOID": "Donde no hay paredes ni suelo está el vacío: si no giras a tiempo, el cubo se cae.",
 		"TIP_BRIDGE": "Los puentes colgantes se gastan cada vez que pasas: cuanto más polvo sueltan, menos aguantan. Si una tabla cede, el puente entero se cae.",
+		"TIP_TELEPORT": "Los portales del mismo color están conectados: el cubo sale por el otro con el mismo rumbo. Los enemigos no pueden seguirte.",
 	},
 	"en": {
 		"MENU_PLAY": "Play",
@@ -142,6 +143,7 @@ const MESSAGES := {
 		"TIP_BLOCKER": "The dodecahedron doesn't hurt you, but it tries to block your way. Use the bars to lock it in.",
 		"TIP_VOID": "Where there are no walls and no floor lies the void: turn in time or the cube will fall.",
 		"TIP_BRIDGE": "Rope bridges wear out every time you cross them: the more dust they shed, the less they'll hold. If one plank gives way, the whole bridge falls.",
+		"TIP_TELEPORT": "Portals of the same colour are linked: the cube comes out of the other one heading the same way. Enemies can't follow you.",
 		"Primer giro": "First Turn",
 		"El muro": "The Wall",
 		"La llave": "The Key",
@@ -202,6 +204,8 @@ const MESSAGES := {
 		"Glaciar": "Glacier",
 		"El paso helado": "The Frozen Pass",
 		"El techo del mundo": "The Roof of the World",
+		"Portales": "Portals",
+		"Los cuatro portales": "The Four Portals",
 	},
 }
 

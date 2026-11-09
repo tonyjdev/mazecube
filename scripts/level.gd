@@ -34,6 +34,11 @@ extends Node3D
 ##   dos extremos. Cada casilla aguanta HangingBridge.MAX_STABILITY salidas
 ##   del cubo; cuando una llega a 0 el puente entero cae y sus casillas pasan
 ##   a ser vacío (ver HangingBridge).
+##   Teletransporte: '6' '7' '8' '9' = parejas de casillas conectadas (las dos
+##   casillas con el mismo número). Cuando el cubo entra en una, se
+##   teletransporta a la otra y sigue con el mismo rumbo (ver RollingCube).
+##   Los enemigos no las pisan. Cada casilla debe tener al lado (no en
+##   diagonal) un muro o el borde del suelo. Ver TeleportPad.
 ## Materiales (ver BlockCatalog): el campo "theme" del nivel elige el bloque
 ## del suelo ("floor"), de los muros ("wall") y, opcionalmente, de la roca de
 ## debajo ("foundation"; si no se da, la que va bajo el suelo). Lo que falte
@@ -63,6 +68,14 @@ const BLOCKER_CHAR := "z"
 const PATROL_CHARS := "ijkmn"
 const VOID_CHAR := "~"
 const BRIDGE_CHAR := "="
+const TELEPORT_CHARS := "6789"
+## Color de cada pareja de teletransporte.
+const TELEPORT_COLORS := {
+	"6": Color(0.25, 0.85, 1.0),
+	"7": Color(1.0, 0.35, 0.9),
+	"8": Color(0.65, 1.0, 0.25),
+	"9": Color(1.0, 0.6, 0.35),
+}
 ## Profundidad del bloque de roca bajo las casillas en los niveles con vacío.
 const FOUNDATION_DEPTH := 0.9
 ## Distancia (en casillas) entre el centro del cubo y el de un enemigo letal a
@@ -171,6 +184,8 @@ var _topology_version := 0
 var _spawners: Array[EnemySpawner] = []
 ## Los enemigos están quietos (ver set_enemies_frozen).
 var _enemies_frozen := false
+## casilla -> { "partner": Vector2i, "symbol": String, "node": TeleportPad }
+var _teleports := {}
 ## casilla -> HangingBridge (solo los que siguen en pie)
 var _bridges := {}
 ## Aparición en curso: tiempo transcurrido, retraso de cada casilla,
@@ -218,7 +233,10 @@ func build() -> void:
 	_topology_version += 1
 	_spawners.clear()
 	_bridges.clear()
+	_teleports.clear()
 	var enemy_cells := {}
+	## símbolo -> casillas de teletransporte
+	var teleport_cells := {}
 	var bridge_cells := {}
 
 	var start_mat := _make_material(START_COLOR)
@@ -271,6 +289,8 @@ func build() -> void:
 				_add_bars(cell, symbol)
 			elif symbol == CHASER_CHAR or symbol == BLOCKER_CHAR or PATROL_CHARS.contains(symbol):
 				enemy_cells[cell] = symbol
+			elif TELEPORT_CHARS.contains(symbol):
+				_group(teleport_cells, symbol, cell)
 	for id: String in wall_groups:
 		_add_multimesh(wall_groups[id], id, Vector3(CELL_SIZE, WALL_HEIGHT, CELL_SIZE),
 			WALL_HEIGHT * 0.5, Color.WHITE)
@@ -282,6 +302,7 @@ func build() -> void:
 	if not _void.is_empty():
 		_add_foundations(wall_cells)
 	_add_bridges(bridge_cells)
+	_add_teleports(teleport_cells)
 	for cell: Vector2i in enemy_cells:
 		_add_spawner(cell, enemy_cells[cell])
 	for button in _buttons.values():
@@ -367,7 +388,23 @@ func has_floor(cell: Vector2i) -> bool:
 ## que no sea la salida, la meta ni un puente colgante.
 func enemy_can_pass(cell: Vector2i) -> bool:
 	return is_terrain_walkable(cell) and cell != start_cell and cell != goal_cell \
-		and not is_bridge(cell)
+		and not is_bridge(cell) and not _teleports.has(cell)
+
+
+## Casilla de teletransporte conectada con `cell`, o NO_CELL si `cell` no es
+## de teletransporte.
+func teleport_partner(cell: Vector2i) -> Vector2i:
+	return _teleports[cell]["partner"] if _teleports.has(cell) else NO_CELL
+
+
+func is_teleport(cell: Vector2i) -> bool:
+	return _teleports.has(cell)
+
+
+## El cubo entra o sale por la casilla de teletransporte: brilla un momento.
+func pulse_teleport(cell: Vector2i) -> void:
+	if _teleports.has(cell):
+		_teleports[cell]["node"].pulse()
 
 
 ## Hay algún enemigo (de cualquier tipo) ocupando la casilla.
@@ -706,7 +743,7 @@ func _finish_reveal() -> void:
 			mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
 			mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_OPAQUE_ONLY
 	for entry in _reveal_nodes:
-		if entry["node"] is TileGlow and is_instance_valid(entry["node"]):
+		if is_instance_valid(entry["node"]) and entry["node"].has_method("set_reveal_alpha"):
 			entry["node"].set_reveal_alpha(1.0)
 		for item: Dictionary in entry["materials"]:
 			var mesh_instance: MeshInstance3D = item["node"]
@@ -735,7 +772,7 @@ func _apply_reveal() -> void:
 		for item: Dictionary in entry["materials"]:
 			var mat: BaseMaterial3D = item["material"]
 			mat.albedo_color.a = item["alpha"] * k
-		if entry["node"] is TileGlow and is_instance_valid(entry["node"]):
+		if is_instance_valid(entry["node"]) and entry["node"].has_method("set_reveal_alpha"):
 			entry["node"].set_reveal_alpha(k)
 
 
@@ -917,6 +954,28 @@ func _add_bridges(bridge_cells: Dictionary) -> void:
 
 
 ## Luz que sale del suelo de la casilla (salida y meta).
+## Empareja las casillas de teletransporte de cada símbolo y les pone su
+## aspecto. Avisa si un símbolo no tiene exactamente dos casillas o si una
+## casilla no tiene un muro o el borde al lado.
+func _add_teleports(teleport_cells: Dictionary) -> void:
+	for symbol: String in teleport_cells:
+		var cells: Array = teleport_cells[symbol]
+		if cells.size() != 2:
+			push_warning("El teletransporte '%s' tiene %d casillas (deben ser 2)" % [symbol, cells.size()])
+			continue
+		for i in 2:
+			var cell: Vector2i = cells[i]
+			var by_edge := false
+			for dir: Vector2i in [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
+				by_edge = by_edge or _is_wall(cell + dir) or is_void(cell + dir)
+			if not by_edge:
+				push_warning("La casilla de teletransporte %s no tiene muro ni borde al lado" % cell)
+			var pad := TeleportPad.create(TELEPORT_COLORS[symbol])
+			pad.position = Vector3(cell.x * CELL_SIZE, 0.0, cell.y * CELL_SIZE)
+			add_child(pad)
+			_teleports[cell] = {"partner": cells[1 - i], "symbol": symbol, "node": pad}
+
+
 func _add_glow(cell: Vector2i, glow_color: Color, power := 1.0) -> void:
 	var glow := TileGlow.create(glow_color, power)
 	glow.position = Vector3(cell.x * CELL_SIZE, 0.0, cell.y * CELL_SIZE)

@@ -200,6 +200,29 @@ def main():
         shards.append(offset(mix(tone(f, 0.12, "bell", decay=0.035, volume=rng.uniform(0.15, 0.4)),
                                  noise(0.015, decay=0.004, lowpass=1.0, volume=0.25)), start))
     save("shatter", mix(*shards), peak=0.7)
+    # Teletransporte (al final para no cambiar el azar de los anteriores).
+    # Ida: zumbido que sube de tono con trémolo y destellos que se apagan,
+    # como si el cubo se deshiciera en luz.
+    hum = []
+    n = int(1.0 * RATE)
+    phase = 0.0
+    for i in range(n):
+        t = i / n
+        f = 180 + 700 * t ** 1.6
+        phase += 2 * math.pi * f / RATE
+        trem = 0.6 + 0.4 * math.sin(2 * math.pi * (6 + 18 * t) * i / RATE)
+        env = min(1.0, t / 0.08) * (1.0 - t ** 3)
+        hum.append((math.sin(phase) + 0.3 * math.sin(2 * phase)) * trem * env * 0.6)
+    sparkle = [offset(tone(rng.uniform(1800, 4200), 0.18, "bell", decay=0.06, volume=rng.uniform(0.15, 0.3)),
+                      0.15 + i * 0.07 + rng.uniform(0, 0.04)) for i in range(11)]
+    save("teleport", mix(hum, *sparkle, noise(1.0, decay=0.5, lowpass=0.05, volume=0.25, attack=0.4)), peak=0.6)
+    # Llegada: barrido que baja y se asienta en una nota clara con eco.
+    arrive = [tone(1400, 0.45, "sine", attack=0.02, decay=0.2, sweep_to=520, volume=0.6),
+              offset(tone(523.25, 0.7, "bell", decay=0.3, volume=0.7), 0.25),
+              offset(tone(784.0, 0.6, "bell", decay=0.25, volume=0.4), 0.3),
+              offset(tone(523.25, 0.5, "bell", decay=0.2, volume=0.25), 0.5),
+              noise(0.4, decay=0.15, lowpass=0.08, volume=0.3, attack=0.05)]
+    save("teleport_in", mix(*arrive), peak=0.55)
     print("Sonidos generados en", OUT)
 
 

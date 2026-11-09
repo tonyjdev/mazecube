@@ -46,6 +46,11 @@ extends RefCounted
 ## colgantes, con todos los mecanismos y enemigos. Traen "theme_regions" para
 ## el suelo de las islas amuralladas y de los puentes.
 ##
+## Teletransporte (niveles 61-62, zona III, «El mundo desconocido»): '6' '7'
+## '8' '9' = parejas de casillas conectadas; al entrar en una, el cubo sale
+## por la otra con el mismo rumbo (sin poder girar en ella). Son zonas
+## cerradas unidas solo por teletransportes; cada pareja es imprescindible.
+##
 ## Los niveles crecen de forma progresiva (en torno a un 15-20% más de
 ## casillas cada uno) y alternan forma apaisada y vertical. Los pequeños
 ## caben enteros en pantalla; en los grandes la cámara sigue al cubo.
@@ -3139,6 +3144,57 @@ const LIST: Array[Dictionary] = [
 		],
 		"spawners": {"x": {"count": 2}, "z": {"count": 2}, "i": {"count": 2}, "j": {"count": 2}, "k": {"count": 2}, "m": {"count": 2}},
 	},
+	{
+		"name": "Portales",
+		"turns": 27,
+		"start_heading": Vector2i(1, 0),
+		"layout": [
+			"#########################",
+			"#A......#.......#7......#",
+			"#.#####.#.#####.#.#####.#",
+			"#.#...#.#.#...###.#...#.#",
+			"#.#.#.#.#...#...#.#.#.#.#",
+			"#...#...###.#.###...#...#",
+			"###.#.###6..#..8###.#.###",
+			"#...#...#.#######...#...#",
+			"#.#####.#.......#.#####.#",
+			"#.......#.##.##.#...x...#",
+			"####.##.#...#...#.##.##.#",
+			"#8y#....#.#.#.#.#...#...#",
+			"####.#..#.#...#.#.#...#Y#",
+			"#......6#..#.#.7#...#.#B#",
+			"#########################",
+		],
+	},
+	{
+		"name": "Los cuatro portales",
+		"turns": 39,
+		"start_heading": Vector2i(1, 0),
+		"layout": [
+			"###############################",
+			"#A........#.........#7........#",
+			"#.#######.#.###.###.#.#######.#",
+			"#.#.....#.#.#.....#.#.#..C.8#.#",
+			"#.#.###.#.#.#.#.#.#.#.#.####..#",
+			"#...#.#...#...#.#...#...#p#...#",
+			"###.#.#.#######6#######.#.#.###",
+			"#...#.#...#...#.#...#...#.#...#",
+			"#.#######.#.#.....#.#.###.###.#",
+			"#.........3.........#........x#",
+			"###############################",
+			"#.........#....x....#z........#",
+			"#.#######.#.###.###.#.#######.#",
+			"#.#y....#.#.#.....#.#.#.....#.#",
+			"#.#####.#.#.#.#.#.#.#.#.###.#.#",
+			"#...#8....#...#6#...#...#9#...#",
+			"###.#####.###.#.#.#####.#.#.###",
+			"#...#...#.#...#.#...#...#.#...#",
+			"#.#...#...#.#######.#.###.#Y#.#",
+			"#9#.#.#...#7........#.....#B#.#",
+			"###############################",
+		],
+		"buttons": {"p": "c"},
+	},
 ]
 
 
@@ -3170,6 +3226,8 @@ const THEMES := [
 	[48, {"floor": "stone", "wall": "granite"}],
 	[52, {"floor": "snow", "wall": "snow"}],
 	[56, {"floor": "snow", "wall": "ice", "foundation": "stone"}],
+	# Zona III
+	[60, {"floor": "sand", "wall": "sandstone"}],
 ]
 
 

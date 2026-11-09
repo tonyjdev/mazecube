@@ -49,6 +49,14 @@ Simula las reglas de scripts/rolling_cube.gd:
   también al rebotar sobre el puente); cuando una llega a 0 cae el puente
   entero y todas sus casillas pasan a ser vacío. Si el cubo sigue encima, cae
   con él (el resolvedor descarta ese movimiento).
+- Teletransporte ('6' '7' '8' '9'): parejas de casillas con el mismo número.
+  Al entrar en una, el cubo aparece en la otra con el mismo rumbo. Durante
+  el teletransporte no se puede girar, así que en la casilla de destino solo
+  se puede seguir recto (como en la salida). Salir de ella no teletransporta.
+  Los enemigos no las pisan. "validate" comprueba que cada número tiene dos
+  casillas, que cada una tiene al lado un muro o el borde del suelo y que,
+  entre por donde entre, el cubo no queda encajonado en la otra (sin poder
+  seguir ni rebotar).
 - Al llegar a la meta B termina el nivel.
 
 La dificultad de un nivel es el mínimo de giros necesarios (búsqueda 0-1 BFS),
@@ -91,6 +99,7 @@ BLOCKER_CHAR = "z"
 PATROL_CHARS = "ijkmn"
 VOID_CHAR = "~"
 BRIDGE_CHAR = "="
+TELEPORT_CHARS = "6789"
 # Salidas del cubo que aguanta cada casilla de puente colgante.
 BRIDGE_STABILITY = 4
 ENEMY_CHARS = CHASER_CHAR + BLOCKER_CHAR + PATROL_CHARS
@@ -98,7 +107,8 @@ ROUTE_DIRS = {"R": (1, 0), "L": (-1, 0), "U": (0, -1), "D": (0, 1)}
 # Salidas mínimas de la ruta de un patrullero (ver patrol_exits).
 PATROL_MIN_EXITS = 3
 LEVEL_CHARS = ("#.AB" + KEY_CHARS + DOOR_CHARS + POWERUP_CHARS + BREAKABLE_CHARS
-               + BAR_CHARS + BAR_CHARS.upper() + BUTTON_CHARS + ENEMY_CHARS + VOID_CHAR + BRIDGE_CHAR)
+               + BAR_CHARS + BAR_CHARS.upper() + BUTTON_CHARS + ENEMY_CHARS + VOID_CHAR + BRIDGE_CHAR
+               + TELEPORT_CHARS)
 
 
 def turn_left(h):
@@ -183,6 +193,8 @@ class Board:
                 self.bridge_at[cell] = len(self.bridge_at)
                 self.bridge_group.append(group)
         self.initial_wear = (BRIDGE_STABILITY,) * len(self.bridge_at)
+        # Teletransporte: casilla -> casilla pareja.
+        self.teleport_at = find_teleports(layout)
 
     def is_void(self, cell):
         """Casilla de vacío ('~' o fuera del mapa)."""
@@ -259,6 +271,7 @@ def step(board, state, turn):
             wear = tuple(0 if i in group else w for i, w in enumerate(wear))
             if board.bridge_at.get(nxt) in group:
                 return None
+    nxt = board.teleport_at.get(nxt, nxt)
     key = board.key_at.get(nxt)
     if key is not None and held is None and not taken >> key[0] & 1:
         held = key[1]
@@ -298,7 +311,8 @@ def solve(layout, start_heading, doors_as_walls=False, breakables_as_walls=False
                 key, turn = prev[key]
                 path.append((key[0], turn))
             return turns, steps, path[::-1]
-        options = (0,) if steps == 0 else (0, -1, 1)
+        # En la salida y al llegar por un teletransporte no se puede girar.
+        options = (0,) if steps == 0 or state[0] in board.teleport_at else (0, -1, 1)
         for turn in options:
             nstate = step(board, state, turn)
             if nstate is None:
@@ -483,6 +497,55 @@ def patrol_exits(free, cells):
     return len(exits), len(lateral)
 
 
+def find_teleports(rows):
+    """Casilla de teletransporte -> casilla pareja (solo parejas completas)."""
+    cells = {}
+    for z, row in enumerate(rows):
+        for x, c in enumerate(row):
+            if c in TELEPORT_CHARS:
+                cells.setdefault(c, []).append((x, z))
+    pairs = {}
+    for group in cells.values():
+        if len(group) == 2:
+            pairs[group[0]] = group[1]
+            pairs[group[1]] = group[0]
+    return pairs
+
+
+def check_teleports(rows):
+    """Problemas de las casillas de teletransporte (lista de textos)."""
+    problems = []
+    cells = {}
+    for z, row in enumerate(rows):
+        for x, c in enumerate(row):
+            if c in TELEPORT_CHARS:
+                cells.setdefault(c, []).append((x, z))
+
+    def edge(x, z):
+        if z < 0 or z >= len(rows) or x < 0 or x >= len(rows[z]):
+            return True
+        return rows[z][x] in "#" + VOID_CHAR + BUTTON_CHARS + BREAKABLE_CHARS
+
+    free, _, _ = parse(rows)
+    for c, group in sorted(cells.items()):
+        if len(group) != 2:
+            problems.append(f"el teletransporte {c} tiene {len(group)} casillas (deben ser 2)")
+            continue
+        for i, (x, z) in enumerate(group):
+            if not any(edge(x + dx, z + dz) for dx, dz in DIRS):
+                problems.append(f"la casilla de teletransporte {c} en {(x, z)} no tiene muro ni borde al lado")
+            # Por cada lado por el que se puede entrar, el cubo sale de la
+            # otra casilla con ese rumbo: no puede quedar encajonado (sin
+            # poder seguir ni rebotar), porque allí no se puede girar.
+            px, pz = group[1 - i]
+            for dx, dz in DIRS:
+                if (x - dx, z - dz) in free and (px + dx, pz + dz) not in free \
+                        and (px - dx, pz - dz) not in free:
+                    problems.append(f"entrando en el teletransporte {c} de {(x, z)} con rumbo {(dx, dz)}, "
+                                    f"el cubo queda encajonado en {(px, pz)}")
+    return problems
+
+
 def find_bridges(rows):
     """Puentes colgantes: listas de casillas '=' seguidas en fila recta, en
     orden de lectura. Una casilla suelta cuenta como un puente de una casilla."""
@@ -556,9 +619,10 @@ def check_enemies(rows, patrols):
                     break
                 for _ in range(int(part[1:])):
                     cell = (cell[0] + d[0], cell[1] + d[1])
-                    if cell not in free or cell in (start, goal) or rows[cell[1]][cell[0]] == BRIDGE_CHAR:
+                    if cell not in free or cell in (start, goal) \
+                            or rows[cell[1]][cell[0]] in BRIDGE_CHAR + TELEPORT_CHARS:
                         problems.append(f"la ruta de {c} pasa por {cell}, que no es libre o es la salida, "
-                                        f"la meta o un puente colgante")
+                                        f"la meta, un puente colgante o un teletransporte")
                         break
                 else:
                     continue
@@ -589,6 +653,7 @@ def cmd_validate(_args):
         problems += check_buttons(rows, lvl["buttons"])
         problems += check_enemies(rows, lvl["patrols"])
         problems += check_bridges(rows)
+        problems += check_teleports(rows)
         result = None if problems else solve(rows, lvl["heading"], buttons=lvl["buttons"])
         if not problems and result is None:
             problems.append("sin solución")

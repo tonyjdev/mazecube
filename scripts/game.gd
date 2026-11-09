@@ -173,6 +173,12 @@ func _ready() -> void:
 		Sfx.play("stomp", 0.05)
 		camera.shake()
 		GameState.vibrate(GameState.VIBRATION_STOMP))
+	cube.teleport_started.connect(func(_from: Vector2i, _to: Vector2i) -> void:
+		Sfx.play("teleport")
+		GameState.vibrate(GameState.VIBRATION_TELEPORT))
+	cube.teleport_travel.connect(func(_to: Vector2i, duration: float) -> void:
+		camera.travel(duration))
+	cube.teleport_arrived.connect(func(_cell: Vector2i) -> void: Sfx.play("teleport_in"))
 	cube.bounced.connect(func(_cell: Vector2i) -> void: Sfx.play("bounce", 0.1))
 	cube.landed.connect(func() -> void: Sfx.play("bounce", 0.1))
 	cube.key_picked.connect(func(_color: String) -> void: Sfx.play("key"))

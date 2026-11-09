@@ -24,6 +24,10 @@ extends Camera3D
 ##   Al alejarse el cubo del botón, vuelve a su comportamiento normal, aunque
 ##   tras pulsarlo espera un momento (ATTENTION_HOLD) para que se vea cómo
 ##   cambian los barrotes. Si al llegar ya se ven todos, no cambia nada.
+## - Teletransporte: travel() lleva la cámara hasta donde está ahora el cubo
+##   (ya en la casilla de destino) en el tiempo indicado: primero se aleja un
+##   poco (TRAVEL_ZOOM), va hacia el destino y se vuelve a acercar hasta su
+##   distancia normal. Después sigue al cubo como siempre.
 ## - shake() hace temblar la cámara un momento (media vuelta del cubo).
 ## - Exploración (menú de pausa): start_explore() aleja la cámara y la pone
 ##   casi vertical (EXPLORE_PITCH) para ver más mapa, y explore_drag() la
@@ -64,6 +68,12 @@ const SETTLE_EPSILON := 0.06
 const EXPLORE_PITCH := 82.0
 const EXPLORE_ZOOM := 1.7
 const EXPLORE_TIME := 0.45
+## Viaje del teletransporte: cuánto se aleja (fracción de la distancia) y en
+## qué parte del viaje (0-1) se aleja, se desplaza y se vuelve a acercar.
+const TRAVEL_ZOOM := 0.3
+const TRAVEL_ZOOM_OUT := Vector2(0.0, 0.3)
+const TRAVEL_MOVE := Vector2(0.15, 0.85)
+const TRAVEL_ZOOM_IN := Vector2(0.7, 1.0)
 
 ## Inclinación de la vista cenital (90 = totalmente desde arriba).
 @export_range(45.0, 90.0) var pitch_degrees := 65.0
@@ -110,6 +120,13 @@ var _explore_distance := MAX_DISTANCE
 var _explore_focus := Vector3.ZERO
 ## Los cálculos de encuadre usan toda la pantalla en lugar del hueco libre.
 var _full_area := false
+## Viaje del teletransporte en curso: progreso (0-1), duración y foco y
+## distancia de partida.
+var _travel := false
+var _travel_t := 0.0
+var _travel_time := 1.0
+var _travel_from_focus := Vector3.ZERO
+var _travel_from_distance := MAX_DISTANCE
 
 
 func _ready() -> void:
@@ -157,6 +174,7 @@ func refresh_layout() -> void:
 ## Coloca la cámara directamente en su posición final, sin transición.
 func snap() -> void:
 	var was_exploring := _explore or _explore_blend > 0.0
+	_travel = false
 	_explore = false
 	_explore_blend = 0.0
 	_pitch = pitch_degrees
@@ -248,6 +266,9 @@ func _process(delta: float) -> void:
 		return
 	if _update_explore(delta) or get_tree().paused:
 		return
+	if _travel:
+		_update_travel(delta)
+		return
 	_update_attention()
 	var goal_distance := _target_distance()
 	var goal_focus := Vector3.ZERO
@@ -268,6 +289,43 @@ func _process(delta: float) -> void:
 	_update_shake(delta)
 	_settled = _focus.distance_to(goal_focus) < SETTLE_EPSILON \
 		and absf(_distance - goal_distance) < SETTLE_EPSILON
+
+
+## Viaja hasta el cubo (que ya está en su destino) en `duration` segundos
+## (ver la descripción de la clase).
+func travel(duration: float) -> void:
+	if level == null:
+		return
+	_travel = true
+	_travel_t = 0.0
+	_travel_time = maxf(duration, 0.05)
+	_travel_from_focus = _focus
+	_travel_from_distance = _distance
+	_attention_active = false
+	_attention_button = Level.NO_CELL
+
+
+func _update_travel(delta: float) -> void:
+	_travel_t = minf(_travel_t + delta / _travel_time, 1.0)
+	var k := _travel_t
+	var goal_distance := _target_distance()
+	var anchor: Vector3 = target.get_trail_anchor() if target.has_method("get_trail_anchor") \
+		else target.global_position
+	var goal_focus := _clamped_focus(anchor, goal_distance)
+	var base := lerpf(_travel_from_distance, goal_distance, smoothstep(0.0, 1.0, k))
+	var zoom := smoothstep(TRAVEL_ZOOM_OUT.x, TRAVEL_ZOOM_OUT.y, k) \
+		* (1.0 - smoothstep(TRAVEL_ZOOM_IN.x, TRAVEL_ZOOM_IN.y, k))
+	_distance = base * (1.0 + TRAVEL_ZOOM * zoom)
+	_focus = _travel_from_focus.lerp(goal_focus, smoothstep(TRAVEL_MOVE.x, TRAVEL_MOVE.y, k))
+	_place(_distance, _focus)
+	_update_shake(delta)
+	_settled = false
+	if k >= 1.0:
+		_travel = false
+		_distance = goal_distance
+		_focus = goal_focus
+		_distance_vel = 0.0
+		_focus_vel = Vector3.ZERO
 
 
 ## La cámara ha llegado a donde tiene que estar (p. ej. a la salida tras

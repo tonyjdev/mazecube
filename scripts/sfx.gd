@@ -13,7 +13,8 @@ extends RefCounted
 ## bars, powerup, reverse (media vuelta), explode (muerte del cubo), goal,
 ## alert (un perseguidor ha visto al cubo), fall (caída al vacío), dash,
 ## stomp (pisotón), splat (perseguidor reventado), shatter (enemigo
-## sintético roto) y click
+## sintético roto), teleport (el cubo entra en un portal), teleport_in (sale
+## por el otro) y click
 ## (botones de la interfaz).
 
 const POOL_SIZE := 10

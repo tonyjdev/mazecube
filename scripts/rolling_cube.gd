@@ -67,6 +67,16 @@ extends Node3D
 ## pequeño aplastamiento y una nube de polvo, y entonces empieza a rodar
 ## (emite appeared). Mientras espera o aparece no se le puede matar.
 ##
+## Teletransporte: al llegar a una casilla de teletransporte (ver Level), el
+## cubo se «disuelve» (CubeDissolve) durante TELEPORT_OUT_TIME segundos y
+## desaparece; pasa a la casilla pareja y, mientras está oculto
+## (TELEPORT_TRAVEL_TIME), la cámara viaja hasta allí (teleport_travel); luego
+## reaparece disolviéndose, se queda quieto TELEPORT_IN_TIME segundos, el
+## efecto se va en TELEPORT_FADE_TIME y sigue con el mismo rumbo que tenía.
+## Durante todo el teletransporte no atiende giros ni acciones (lo pendiente
+## se olvida) y es invulnerable. Salir de la casilla de destino rodando no
+## lo teletransporta; volver a entrar en ella, sí.
+##
 ## Power ups: al llegar a su casilla el cubo lo coge y se activa su efecto.
 ## Las reglas de cada tipo (acumulación, duración, fin al rebotar...) las
 ## define su clase (ver PowerUp); aquí se gestionan de forma genérica.
@@ -101,6 +111,13 @@ signal dashed(from: Vector2i, to: Vector2i)
 signal stomped(cell: Vector2i)
 ## Se ha pedido un dash o un pisotón sin la fuerza llena.
 signal strength_rejected
+## Ha entrado en una casilla de teletransporte y empieza a disolverse.
+signal teleport_started(from: Vector2i, to: Vector2i)
+## Ya ha desaparecido y está en la casilla de destino (`to`): la cámara tiene
+## `duration` segundos para llegar hasta allí antes de que reaparezca.
+signal teleport_travel(to: Vector2i, duration: float)
+## Ha reaparecido en la casilla de destino.
+signal teleport_arrived(cell: Vector2i)
 
 const TURN_LEFT := -1
 const TURN_RIGHT := 1
@@ -159,6 +176,16 @@ const FALL_FORWARD_SPEED := 1.0
 const FALL_DOWN_SPEED := 0.8
 const FALL_SPIN := 6.5
 ## Lado del cubo.
+## Teletransporte (ver la descripción de la clase): disolverse hasta
+## desaparecer, viaje de la cámara, quieto en el destino y desvanecido del
+## efecto; y lo que tarda en desaparecer al final de la ida y en hacerse
+## visible al principio de la llegada.
+const TELEPORT_OUT_TIME := 1.0
+const TELEPORT_TRAVEL_TIME := 1.0
+const TELEPORT_IN_TIME := 1.0
+const TELEPORT_FADE_TIME := 0.35
+const TELEPORT_VANISH_TIME := 0.35
+
 const SIZE := 0.98
 ## Colores del cubo: todas las caras blancas (la iluminación y las sombras
 ## distinguen las caras) con las aristas en gris claro.
@@ -202,6 +229,14 @@ var _strength := 1.0
 ## Haciendo un dash (arrastrándose) o un pisotón (en el aire o aplastado).
 var _dashing := false
 var _stomping := false
+## Fase del teletransporte: 0 ninguno, 1 disolviéndose, 2 viaje (oculto),
+## 3 en el destino; tiempo dentro de la fase y casilla de destino.
+var _teleport_phase := 0
+var _teleport_time := 0.0
+var _teleport_to := Vector2i.ZERO
+## Escala de la llave que lleva al empezar el teletransporte (se encoge al
+## desaparecer y crece al aparecer).
+var _teleport_key_scale := Vector3.ONE
 var _rolling := false
 ## Casilla hacia la que está volcando (solo vale mientras _rolling).
 var _roll_target := Vector2i.ZERO
@@ -263,6 +298,7 @@ func reset(target_level: Level) -> void:
 	_strength = 1.0
 	_dashing = false
 	_stomping = false
+	_teleport_phase = 0
 	_drop_held_key()
 	_end_all_power_ups()
 	_rolling = false
@@ -339,7 +375,7 @@ func _apply_appear(t: float) -> void:
 
 ## Registra un giro relativo al rumbo actual (izquierda o derecha).
 func request_turn(direction: int) -> void:
-	if is_finished:
+	if is_finished or is_teleporting():
 		return
 	_clear_pending()
 	_pending_turn = direction
@@ -348,7 +384,7 @@ func request_turn(direction: int) -> void:
 
 ## Registra una media vuelta (sustituye al giro pendiente, si lo hay).
 func request_reverse() -> void:
-	if is_finished:
+	if is_finished or is_teleporting():
 		return
 	_clear_pending()
 	_pending_reverse = true
@@ -366,7 +402,7 @@ func request_stomp() -> void:
 
 
 func _request_ability(ability: int) -> void:
-	if is_finished or _dead or is_appearing():
+	if is_finished or _dead or is_appearing() or is_teleporting():
 		return
 	if _strength < 1.0:
 		strength_rejected.emit()
@@ -417,6 +453,9 @@ func _process(delta: float) -> void:
 			_key_lift = minf(_key_lift + delta / KEY_LIFT_TIME, 1.0)
 			if not _rolling:
 				_update_held_key(Vector3.ZERO)
+	if _teleport_phase != 0:
+		_process_teleport(delta)
+		return
 	if level == null or _rolling or is_finished:
 		return
 	if _cooldown > 0.0:
@@ -726,6 +765,10 @@ func _on_roll_finished(next: Vector2i) -> void:
 		_pick_power_up(power_up)
 	_update_held_key(Vector3.ZERO)
 	rolled.emit(cell)
+	var partner := level.teleport_partner(cell)
+	if partner != Level.NO_CELL:
+		_start_teleport(partner)
+		return
 	if cell == level.goal_cell:
 		is_finished = true
 		if _held_key_node:
@@ -733,6 +776,68 @@ func _on_roll_finished(next: Vector2i) -> void:
 		reached_goal.emit()
 	else:
 		_cooldown = pause_between_rolls / speed_multiplier()
+
+
+func is_teleporting() -> bool:
+	return _teleport_phase != 0
+
+
+func _start_teleport(to: Vector2i) -> void:
+	_clear_pending()
+	_teleport_phase = 1
+	_teleport_time = 0.0
+	_teleport_to = to
+	if _held_key_node:
+		_teleport_key_scale = _held_key_node.scale
+	level.pulse_teleport(cell)
+	teleport_started.emit(cell, to)
+
+
+## Avanza el teletransporte (ver la descripción de la clase).
+func _process_teleport(delta: float) -> void:
+	_teleport_time += delta
+	var t := _teleport_time
+	match _teleport_phase:
+		1:
+			# Se disuelve y, al final, desaparece del todo.
+			var vanish := 1.0 - smoothstep(TELEPORT_OUT_TIME - TELEPORT_VANISH_TIME,
+				TELEPORT_OUT_TIME, t)
+			_set_dissolve(smoothstep(0.0, 0.25, t), vanish)
+			if _held_key_node:
+				_held_key_node.scale = _teleport_key_scale * maxf(vanish, 0.001)
+			if t >= TELEPORT_OUT_TIME:
+				_teleport_phase = 2
+				_teleport_time = 0.0
+				_body.visible = false
+				if _held_key_node:
+					_held_key_node.visible = false
+				cell = _teleport_to
+				global_position = level.cell_to_world(cell)
+				_update_held_key(Vector3.ZERO)
+				teleport_travel.emit(cell, TELEPORT_TRAVEL_TIME)
+		2:
+			if t >= TELEPORT_TRAVEL_TIME:
+				_teleport_phase = 3
+				_teleport_time = 0.0
+				_body.visible = true
+				if _held_key_node:
+					_held_key_node.visible = true
+				_set_dissolve(1.0, 0.0)
+				level.pulse_teleport(cell)
+				teleport_arrived.emit(cell)
+		3:
+			# Aparece disuelto, se queda quieto y el efecto se va.
+			var appear := smoothstep(0.0, TELEPORT_VANISH_TIME, t)
+			_set_dissolve(1.0 - smoothstep(TELEPORT_IN_TIME, TELEPORT_IN_TIME + TELEPORT_FADE_TIME, t),
+				appear)
+			if _held_key_node:
+				_held_key_node.scale = _teleport_key_scale * maxf(appear, 0.001)
+			if t >= TELEPORT_IN_TIME + TELEPORT_FADE_TIME:
+				_teleport_phase = 0
+				_set_dissolve(0.0)
+				if _held_key_node:
+					_held_key_node.scale = _teleport_key_scale
+				_cooldown = pause_between_rolls / speed_multiplier()
 
 
 ## Gira un rumbo 90° a la izquierda o a la derecha. En el tablero "arriba"
@@ -757,7 +862,7 @@ func is_alive() -> bool:
 ## un pisotón.
 func is_vulnerable() -> bool:
 	return not _dead and not is_finished and _grace_left <= 0.0 and not is_appearing() \
-		and not _dashing and not _stomping
+		and not _dashing and not _stomping and not is_teleporting()
 
 
 ## Casilla en la que está o hacia la que está volcando.
@@ -822,14 +927,17 @@ func _warm_up_dissolve() -> void:
 
 
 ## Efecto de disolverse con esa fuerza (0 = cubo normal, sin el material).
-func _set_dissolve(strength: float) -> void:
-	_shadow_caster.visible = strength > 0.0
-	if strength <= 0.0:
+## `fade` (0-1) es la opacidad de todo el cubo (0 = invisible; para el
+## teletransporte).
+func _set_dissolve(strength: float, fade := 1.0) -> void:
+	_shadow_caster.visible = strength > 0.0 and fade > 0.5
+	if strength <= 0.0 and fade >= 1.0:
 		_body.material_override = null
 		return
 	if _dissolve_material == null:
 		_dissolve_material = CubeDissolve.make_material()
 	_dissolve_material.set_shader_parameter("strength", strength)
+	_dissolve_material.set_shader_parameter("fade", fade)
 	_body.material_override = _dissolve_material
 
 
