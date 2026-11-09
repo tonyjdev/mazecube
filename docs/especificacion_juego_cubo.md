@@ -156,6 +156,7 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 
 - Los enemigos no se colocan directamente en el mapa: lo que el mapa marca como enemigo (`x`, `z`, `i`…`n`) es un **punto de origen** de ese tipo de enemigo, **invisible**. Puede haber varios repartidos por el mapa.
 - Cada punto de origen **gestiona sus enemigos activos**: de **1** (por defecto, como un enemigo de los de antes) a **varios**, según la dificultad del nivel. Cuando destruyen a uno, el punto de origen crea otro pasado un tiempo al azar de **30 a 60 s**.
+- En los niveles de prueba, los más difíciles (**50 giros o más**: niveles 26-30 y 50-60) tienen **2 enemigos por punto de origen**; el resto, 1.
 - Al empezar o reiniciar el nivel, en cuanto el tablero termina de aparecer, cada punto de origen crea sus enemigos pasados **1-2 s** (cada uno con su propio tiempo).
 - **Dónde aparecen:** en una casilla al azar a **5-10 casillas de recorrido** del origen (solo por casillas que pisan los enemigos). El radio se calcula según el espacio disponible: el menor desde 5 cuya zona tenga al menos 24 casillas, o 10 si no se llega. La casilla tiene que estar libre de otros enemigos, tener al menos una casilla vecina a la que moverse y estar a **más de 3 casillas de recorrido del cubo**; si en ese momento no hay ninguna así, se reintenta cada 0,5 s.
 - Los **patrulleros** aparecen siempre en el **principio de su ruta** (la casilla del punto de origen).

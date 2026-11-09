@@ -23,6 +23,8 @@ extends RefCounted
 ## es un punto de origen que lo crea y lo regenera (ver EnemySpawner); el
 ## campo opcional "spawners" cambia cuántos gestiona y su radio:
 ## {"x": {"count": 2}, Vector2i(10, 4): {"count": 3, "radius": 7}}.
+## Los niveles más difíciles (50 giros o más: 26-30 y 50-60) tienen 2
+## enemigos por punto de origen.
 ## Niveles 17-30: mapas grandes generados con tools/build_levels.py (salas
 ## unidas por pasillos o laberintos) que combinan todos los mecanismos; cada
 ## botón está a 6 casillas o menos de sus barrotes.
@@ -689,6 +691,7 @@ const LIST: Array[Dictionary] = [
 	{
 		"name": "Persecución",
 		"turns": 50,
+		"spawners": {"x": {"count": 2}, "i": {"count": 2}},
 		"start_heading": Vector2i(1, 0),
 		"layout": [
 			"###################################",
@@ -723,6 +726,7 @@ const LIST: Array[Dictionary] = [
 	{
 		"name": "La ronda",
 		"turns": 53,
+		"spawners": {"x": {"count": 2}, "i": {"count": 2}, "j": {"count": 2}, "k": {"count": 2}},
 		"start_heading": Vector2i(1, 0),
 		"layout": [
 			"#####################################################",
@@ -760,6 +764,7 @@ const LIST: Array[Dictionary] = [
 	{
 		"name": "El bastión",
 		"turns": 59,
+		"spawners": {"x": {"count": 2}, "z": {"count": 2}, "i": {"count": 2}, "j": {"count": 2}},
 		"start_heading": Vector2i(1, 0),
 		"layout": [
 			"#################p###################",
@@ -796,6 +801,7 @@ const LIST: Array[Dictionary] = [
 	{
 		"name": "El palacio",
 		"turns": 59,
+		"spawners": {"x": {"count": 2}, "z": {"count": 2}, "i": {"count": 2}, "j": {"count": 2}, "k": {"count": 2}},
 		"start_heading": Vector2i(1, 0),
 		"layout": [
 			"#####################################################",
@@ -839,6 +845,7 @@ const LIST: Array[Dictionary] = [
 	{
 		"name": "El gran laberinto",
 		"turns": 64,
+		"spawners": {"x": {"count": 2}, "z": {"count": 2}, "i": {"count": 2}, "j": {"count": 2}, "k": {"count": 2}},
 		"start_heading": Vector2i(1, 0),
 		"layout": [
 			"################################################################",
@@ -1983,6 +1990,7 @@ const LIST: Array[Dictionary] = [
 	{
 		"name": "Paso de montaña",
 		"turns": 53,
+		"spawners": {"x": {"count": 2}, "i": {"count": 2}, "j": {"count": 2}},
 		"start_heading": Vector2i(1, 0),
 		"layout": [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
@@ -2079,6 +2087,7 @@ const LIST: Array[Dictionary] = [
 	{
 		"name": "Granito",
 		"turns": 55,
+		"spawners": {"x": {"count": 2}, "z": {"count": 2}, "i": {"count": 2}, "j": {"count": 2}},
 		"start_heading": Vector2i(1, 0),
 		"layout": [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
@@ -2182,6 +2191,7 @@ const LIST: Array[Dictionary] = [
 	{
 		"name": "La cornisa",
 		"turns": 56,
+		"spawners": {"x": {"count": 2}, "z": {"count": 2}, "i": {"count": 2}, "j": {"count": 2}},
 		"start_heading": Vector2i(0, -1),
 		"layout": [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
@@ -2288,6 +2298,7 @@ const LIST: Array[Dictionary] = [
 	{
 		"name": "Primeras nieves",
 		"turns": 59,
+		"spawners": {"x": {"count": 2}, "z": {"count": 2}, "i": {"count": 2}, "j": {"count": 2}},
 		"start_heading": Vector2i(1, 0),
 		"layout": [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
@@ -2396,6 +2407,7 @@ const LIST: Array[Dictionary] = [
 	{
 		"name": "El refugio",
 		"turns": 60,
+		"spawners": {"x": {"count": 2}, "z": {"count": 2}, "i": {"count": 2}, "j": {"count": 2}, "k": {"count": 2}},
 		"start_heading": Vector2i(1, 0),
 		"layout": [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
@@ -2502,6 +2514,7 @@ const LIST: Array[Dictionary] = [
 	{
 		"name": "Ventisca",
 		"turns": 62,
+		"spawners": {"x": {"count": 2}, "z": {"count": 2}, "i": {"count": 2}, "j": {"count": 2}},
 		"start_heading": Vector2i(1, 0),
 		"layout": [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
@@ -2610,6 +2623,7 @@ const LIST: Array[Dictionary] = [
 	{
 		"name": "Lago helado",
 		"turns": 66,
+		"spawners": {"x": {"count": 2}, "z": {"count": 2}, "i": {"count": 2}, "j": {"count": 2}, "k": {"count": 2}},
 		"start_heading": Vector2i(0, -1),
 		"layout": [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
@@ -2707,6 +2721,7 @@ const LIST: Array[Dictionary] = [
 	{
 		"name": "Las cumbres",
 		"turns": 67,
+		"spawners": {"x": {"count": 2}, "z": {"count": 2}, "i": {"count": 2}, "j": {"count": 2}, "k": {"count": 2}},
 		"start_heading": Vector2i(1, 0),
 		"layout": [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
@@ -2813,6 +2828,7 @@ const LIST: Array[Dictionary] = [
 	{
 		"name": "Glaciar",
 		"turns": 68,
+		"spawners": {"x": {"count": 2}, "z": {"count": 2}, "i": {"count": 2}, "j": {"count": 2}, "k": {"count": 2}},
 		"start_heading": Vector2i(1, 0),
 		"layout": [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
@@ -2916,6 +2932,7 @@ const LIST: Array[Dictionary] = [
 	{
 		"name": "El paso helado",
 		"turns": 73,
+		"spawners": {"x": {"count": 2}, "z": {"count": 2}, "i": {"count": 2}, "j": {"count": 2}, "k": {"count": 2}},
 		"start_heading": Vector2i(1, 0),
 		"layout": [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
@@ -3028,6 +3045,7 @@ const LIST: Array[Dictionary] = [
 	{
 		"name": "El techo del mundo",
 		"turns": 71,
+		"spawners": {"x": {"count": 2}, "z": {"count": 2}, "i": {"count": 2}, "j": {"count": 2}, "k": {"count": 2}, "m": {"count": 2}},
 		"start_heading": Vector2i(1, 0),
 		"layout": [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
