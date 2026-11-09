@@ -164,6 +164,25 @@ def main():
         snap.append(offset(mix(tone(320 - i * 25, 0.12, "bell", decay=0.04, volume=0.55 - i * 0.06),
                                noise(0.08, decay=0.02, lowpass=0.4, volume=0.4 - i * 0.04)), 0.08 + i * 0.09))
     save("collapse", mix(*snap), peak=0.8)
+    # Dash: arrastre rápido (ruido que sube y se corta) con un golpe seco al
+    # final.
+    drag = []
+    last = 0.0
+    n = int(0.16 * RATE)
+    for i in range(n):
+        t = i / n
+        cutoff = 0.1 + 0.5 * t
+        last += cutoff * (rng.uniform(-1, 1) - last)
+        drag.append(last * (t ** 0.5) * (1.0 - t ** 4))
+    save("dash", mix(drag, offset(tone(150, 0.1, decay=0.025, sweep_to=100, volume=0.7), 0.13)), peak=0.6)
+    # Pisotón: golpe grave y fuerte contra el suelo con retumbo y polvo.
+    save("stomp", mix(tone(65, 0.55, decay=0.18, sweep_to=38), tone(130, 0.2, decay=0.05, sweep_to=70, volume=0.6),
+                      noise(0.45, decay=0.14, lowpass=0.2, volume=0.8), noise(0.05, decay=0.01, lowpass=0.9, volume=0.5)),
+         peak=0.9)
+    # Enemigo destruido: estallido corto que sube de tono.
+    save("smash", mix(tone(300, 0.14, "square", decay=0.05, sweep_to=900, volume=0.4),
+                      noise(0.12, decay=0.035, lowpass=0.7), tone(90, 0.12, decay=0.04, sweep_to=60, volume=0.6)),
+         peak=0.6)
     print("Sonidos generados en", OUT)
 
 

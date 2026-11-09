@@ -4,7 +4,8 @@ extends Node3D
 ## El nivel que se juega lo indica GameState.current_level (se elige en el
 ## selector de niveles del menú).
 ##
-## Sonidos (ver Sfx): vuelcos, rebotes, giros descartados, llaves, puertas,
+## Sonidos (ver Sfx): vuelcos, rebotes, giros descartados, dash, pisotón,
+## enemigos destruidos, llaves, puertas,
 ## muros, botones y barrotes, power ups, media vuelta, muerte, meta y botones
 ## de la interfaz.
 ##
@@ -35,7 +36,16 @@ extends Node3D
 ##   pulsado, o con menos de SIMULTANEOUS_WINDOW segundos de diferencia). La
 ##   primera pulsación ya ha pedido un giro, pero la media vuelta lo sustituye.
 ##   Al darla, la cámara tiembla y el móvil vibra.
-##   Teclado: ←/A gira a la izquierda, →/D a la derecha, R reinicia,
+##   Dash y pisotón: deslizar el dedo hacia arriba (dash) o hacia abajo
+##   (pisotón), en cualquier lado de la pantalla. Para distinguir un toque de
+##   un deslizamiento, el giro de un toque no se pide al apoyar el dedo sino
+##   en cuanto se levanta o, si se deja apoyado sin moverlo, a los
+##   TAP_COMMIT_TIME segundos. Si el dedo se mueve más de SWIPE_SLOP antes de
+##   eso, se espera a ver si llega a deslizamiento (SWIPE_DISTANCE en vertical,
+##   claramente más vertical que horizontal); si se levanta o pasa
+##   SWIPE_MAX_TIME sin llegar, cuenta como toque. El dedo que desliza no
+##   cuenta para la media vuelta.
+##   Teclado: ←/A gira a la izquierda, →/D a la derecha, ↑/W dash, ↓/S pisotón, R reinicia,
 ##            Esc pausa o reanuda; al completar un nivel, Intro/N pasa al siguiente.
 ##   Táctil:  tocar la mitad izquierda o derecha de la pantalla gira hacia ese
 ##            lado (con dos dedos, uno en cada mitad, media vuelta). El botón Atrás de Android pausa o reanuda.
@@ -56,6 +66,14 @@ const COMPLETE_MENU_DELAY := 0.5
 ## Diferencia máxima entre pulsar izquierda y derecha para que cuente como a
 ## la vez (media vuelta).
 const SIMULTANEOUS_WINDOW := 0.15
+## Toque frente a deslizamiento (ver Controles): distancias en fracción del
+## alto de la pantalla y tiempos en segundos.
+const TAP_COMMIT_TIME := 0.08
+const SWIPE_SLOP := 0.02
+const SWIPE_DISTANCE := 0.06
+const SWIPE_MAX_TIME := 0.35
+## Un deslizamiento debe ser al menos así de más vertical que horizontal.
+const SWIPE_VERTICAL_RATIO := 1.5
 ## Tiempo que tarda el juego en recuperar su velocidad al salir de la pausa.
 const RESUME_RAMP_TIME := 1.0
 ## Tiempo máximo que el cubo espera a la cámara para reaparecer tras morir.
@@ -67,8 +85,12 @@ var _hint_tweens := {}
 ## (Time.get_ticks_msec) y si sigue pulsado (teclas o dedos).
 var _side_pressed_at := {RollingCube.TURN_LEFT: -100000, RollingCube.TURN_RIGHT: -100000}
 var _keys_held := {RollingCube.TURN_LEFT: false, RollingCube.TURN_RIGHT: false}
-## Dedo (índice del toque) -> lado de la pantalla en que se apoyó.
+## Dedo (índice del toque) -> lado de la pantalla en que se apoyó (solo los
+## que ya han contado como toque).
 var _touches := {}
+## Dedos apoyados que aún no se sabe si son un toque o un deslizamiento:
+## índice -> { "side": int, "start": Vector2, "pos": Vector2, "time": int (ms) }
+var _pending_touches := {}
 ## Arrastre del mapa en la pausa: si hay un dedo (o el ratón) pulsado y
 ## dónde estaba en el último movimiento.
 var _dragging := false
@@ -130,6 +152,13 @@ func _ready() -> void:
 		camera.notify_button_pressed()
 		GameState.vibrate(GameState.VIBRATION_BUTTON))
 	cube.rolled.connect(func(_cell: Vector2i) -> void: Sfx.play("roll", 0.12))
+	cube.dashed.connect(func(_from: Vector2i, _to: Vector2i) -> void:
+		Sfx.play("dash", 0.08)
+		GameState.vibrate(GameState.VIBRATION_DASH))
+	cube.stomped.connect(func(_cell: Vector2i) -> void:
+		Sfx.play("stomp", 0.05)
+		camera.shake()
+		GameState.vibrate(GameState.VIBRATION_STOMP))
 	cube.bounced.connect(func(_cell: Vector2i) -> void: Sfx.play("bounce", 0.1))
 	cube.landed.connect(func() -> void: Sfx.play("bounce", 0.1))
 	cube.key_picked.connect(func(_color: String) -> void: Sfx.play("key"))
@@ -184,11 +213,26 @@ func _unhandled_input(event: InputEvent) -> void:
 		var touch := event as InputEventScreenTouch
 		if not touch.pressed:
 			_touches.erase(touch.index)
+			if _pending_touches.has(touch.index):
+				_pending_touches[touch.index]["pos"] = touch.position
+				# Levantado sin llegar a deslizamiento: es un toque.
+				if not _try_swipe(touch.index):
+					var side: int = _pending_touches[touch.index]["side"]
+					_pending_touches.erase(touch.index)
+					_press_side(side)
 		elif not _is_over_buttons(touch.position):
 			var half := get_viewport().get_visible_rect().size.x * 0.5
 			var side := RollingCube.TURN_LEFT if touch.position.x < half else RollingCube.TURN_RIGHT
-			_touches[touch.index] = side
-			_press_side(side)
+			_pending_touches[touch.index] = {"side": side, "start": touch.position,
+				"pos": touch.position, "time": Time.get_ticks_msec()}
+			get_viewport().set_input_as_handled()
+		return
+
+	if event is InputEventScreenDrag:
+		var drag := event as InputEventScreenDrag
+		if _pending_touches.has(drag.index):
+			_pending_touches[drag.index]["pos"] = drag.position
+			_try_swipe(drag.index)
 			get_viewport().set_input_as_handled()
 		return
 
@@ -202,6 +246,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("turn_right"):
 		_keys_held[RollingCube.TURN_RIGHT] = true
 		_press_side(RollingCube.TURN_RIGHT)
+	elif event.is_action_pressed("dash"):
+		cube.request_dash()
+	elif event.is_action_pressed("stomp"):
+		cube.request_stomp()
 	elif event.is_action_pressed("restart"):
 		_restart_with_fade()
 	elif event.is_action_pressed("next_level") and complete_menu.visible:
@@ -232,8 +280,49 @@ func _press_side(side: int) -> void:
 		_flash_hint(left_hint if side == RollingCube.TURN_LEFT else right_hint)
 
 
+## Deslizamiento del dedo `index` (pendiente): si ya ha recorrido
+## SWIPE_DISTANCE en vertical, pide el dash (arriba) o el pisotón (abajo),
+## olvida el dedo y devuelve true.
+func _try_swipe(index: int) -> bool:
+	var info: Dictionary = _pending_touches[index]
+	var moved: Vector2 = info["pos"] - info["start"]
+	var height := get_viewport().get_visible_rect().size.y
+	if absf(moved.y) < SWIPE_DISTANCE * height \
+			or absf(moved.y) < absf(moved.x) * SWIPE_VERTICAL_RATIO:
+		return false
+	_pending_touches.erase(index)
+	if moved.y < 0.0:
+		cube.request_dash()
+	else:
+		cube.request_stomp()
+	return true
+
+
+## Dedos pendientes que ya cuentan como toque: los que siguen quietos
+## pasados TAP_COMMIT_TIME y los que se han movido pero no han llegado a
+## deslizamiento en SWIPE_MAX_TIME.
+func _commit_pending_touches() -> void:
+	var now := Time.get_ticks_msec()
+	var height := get_viewport().get_visible_rect().size.y
+	for index: int in _pending_touches.keys():
+		var info: Dictionary = _pending_touches[index]
+		var age := (now - int(info["time"])) / 1000.0
+		var moved: Vector2 = info["pos"] - info["start"]
+		var still := moved.length() < SWIPE_SLOP * height
+		if (still and age >= TAP_COMMIT_TIME) or age >= SWIPE_MAX_TIME:
+			_pending_touches.erase(index)
+			_touches[index] = info["side"]
+			_press_side(info["side"])
+
+
+func _process(_delta: float) -> void:
+	if not _pending_touches.is_empty() and not get_tree().paused:
+		_commit_pending_touches()
+
+
 func _clear_held_sides() -> void:
 	_touches.clear()
+	_pending_touches.clear()
 	for side in _keys_held:
 		_keys_held[side] = false
 		_side_pressed_at[side] = -100000

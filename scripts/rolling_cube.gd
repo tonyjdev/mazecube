@@ -26,6 +26,21 @@ extends Node3D
 ## ups), el cubo se queda parado REVERSE_PAUSE segundos y por sus cuatro
 ## lados sale humo gris.
 ##
+## Dash y pisotón: el jugador los pide (deslizando el dedo arriba o abajo) y,
+## como los giros, se aplican en el siguiente límite entre casillas; la última
+## petición (giro, media vuelta, dash o pisotón) sustituye a la anterior.
+## No tienen tiempo de recarga: se pueden encadenar.
+## - Dash: el cubo se arrastra sin volcar hasta la casilla de delante en
+##   DASH_TIME segundos. Antes destruye a cualquier enemigo que la ocupe y, si
+##   es un muro destructible, lo rompe de una vez y pasa sin rebotar. Si
+##   delante hay una pared, puerta, barrotes o un botón, el dash se queda en un
+##   choque normal (rebote). Si es vacío, se cae.
+## - Pisotón: salta y cae con fuerza en su casilla (STOMP_TIME en total). Al
+##   caer destruye a los enemigos a `stomp_radius` casillas o menos (cuadrado,
+##   diagonales incluidas, sin importar las paredes) y quita
+##   STOMP_WALL_HITS golpes a los muros destructibles de esa zona.
+## Durante el dash y el pisotón el cubo es invulnerable.
+##
 ## Enemigos: si un perseguidor o un patrullero lo toca (lo comprueba Level),
 ## el cubo explota en pedazos de sus colores (ver CubeExplosion) y, cuando
 ## termina la explosión, vuelve a su casilla de salida con el rumbo inicial. Conserva la
@@ -76,9 +91,33 @@ signal respawned
 signal landed
 ## Ha terminado la aparición y empieza a rodar.
 signal appeared
+## Ha empezado un dash desde `from` hacia `to`.
+signal dashed(from: Vector2i, to: Vector2i)
+## Ha caído el pisotón en esa casilla.
+signal stomped(cell: Vector2i)
 
 const TURN_LEFT := -1
 const TURN_RIGHT := 1
+## Acción especial pendiente (_pending_ability).
+const ABILITY_NONE := 0
+const ABILITY_DASH := 1
+const ABILITY_STOMP := 2
+## Dash: duración del arrastre hasta la casilla de delante y cuánto se estira
+## el cubo en el rumbo (y se aplasta en altura) a mitad de camino.
+const DASH_TIME := 0.14
+const DASH_STRETCH := 0.18
+## Pisotón: subida, caída y recuperación del aplastamiento (segundos), altura
+## del salto, aplastamiento al caer y golpes que quita a los muros.
+const STOMP_RISE_TIME := 0.22
+const STOMP_FALL_TIME := 0.1
+const STOMP_RECOVER_TIME := 0.16
+const STOMP_HEIGHT := 0.9
+const STOMP_SQUASH := 0.28
+const STOMP_WALL_HITS := 2
+## Onda del pisotón: anillo en el suelo que se abre hasta el borde de la zona
+## de daño y se desvanece.
+const STOMP_WAVE_TIME := 0.35
+const STOMP_WAVE_COLOR := Color(1.0, 0.92, 0.75)
 const HALF := 0.5
 ## Altura sobre el suelo de la llave que lleva el cubo.
 const HELD_KEY_HEIGHT := 2.05
@@ -129,6 +168,9 @@ static var _smoke_material: StandardMaterial3D
 @export var roll_duration := 0.35
 ## Pausa entre vuelcos consecutivos.
 @export var pause_between_rolls := 0.05
+## Alcance del pisotón en casillas (distancia en cuadrado: 2 = zona de 5×5).
+## Más adelante podrá aumentar con otras habilidades.
+@export var stomp_radius := 2
 
 var level: Level
 var cell := Vector2i.ZERO
@@ -144,6 +186,11 @@ var _pending_turn := 0
 ## Media vuelta pendiente: se aplica en el siguiente límite entre casillas y
 ## sustituye al giro pendiente.
 var _pending_reverse := false
+## Dash o pisotón pendiente (ABILITY_*), con las mismas reglas que un giro.
+var _pending_ability := ABILITY_NONE
+## Haciendo un dash (arrastrándose) o un pisotón (en el aire o aplastado).
+var _dashing := false
+var _stomping := false
 var _rolling := false
 ## Casilla hacia la que está volcando (solo vale mientras _rolling).
 var _roll_target := Vector2i.ZERO
@@ -201,8 +248,9 @@ func reset(target_level: Level) -> void:
 	level = target_level
 	cell = level.start_cell
 	heading = level.start_heading
-	_pending_turn = 0
-	_pending_reverse = false
+	_clear_pending()
+	_dashing = false
+	_stomping = false
 	_drop_held_key()
 	_end_all_power_ups()
 	_rolling = false
@@ -281,8 +329,8 @@ func _apply_appear(t: float) -> void:
 func request_turn(direction: int) -> void:
 	if is_finished:
 		return
+	_clear_pending()
 	_pending_turn = direction
-	_pending_reverse = false
 	_update_held_key(_body_offset())
 
 
@@ -290,9 +338,33 @@ func request_turn(direction: int) -> void:
 func request_reverse() -> void:
 	if is_finished:
 		return
-	_pending_turn = 0
+	_clear_pending()
 	_pending_reverse = true
 	_update_held_key(_body_offset())
+
+
+## Registra un dash (ver la descripción de la clase).
+func request_dash() -> void:
+	_request_ability(ABILITY_DASH)
+
+
+## Registra un pisotón (ver la descripción de la clase).
+func request_stomp() -> void:
+	_request_ability(ABILITY_STOMP)
+
+
+func _request_ability(ability: int) -> void:
+	if is_finished or _dead or is_appearing():
+		return
+	_clear_pending()
+	_pending_ability = ability
+
+
+## Olvida el giro, la media vuelta y la acción especial pendientes.
+func _clear_pending() -> void:
+	_pending_turn = 0
+	_pending_reverse = false
+	_pending_ability = ABILITY_NONE
 
 
 func _process(delta: float) -> void:
@@ -325,6 +397,24 @@ func _process(delta: float) -> void:
 
 
 func _try_advance() -> void:
+	if _pending_ability != ABILITY_NONE:
+		var ability := _pending_ability
+		_pending_ability = ABILITY_NONE
+		if ability == ABILITY_STOMP:
+			_stomp()
+			return
+		# Dash: despeja la casilla de delante (enemigos y muro destructible) y se
+		# arrastra hasta ella. Si sigue bloqueada (pared, puerta, barrotes o
+		# botón) o es vacío, sigue como un avance normal: choque o caída.
+		var target := cell + heading
+		level.destroy_enemies_at(target)
+		if level.breakable_hits(target) > 0:
+			level.smash_breakable(target, heading)
+			breakable_hit.emit(target, 0)
+		if level.is_walkable(target):
+			_dash_to(target)
+			return
+
 	# Media vuelta: el rumbo se invierte como al chocar con una pared y el
 	# cubo se queda parado un momento antes de seguir.
 	if _pending_reverse:
@@ -402,6 +492,112 @@ func _roll_to(next: Vector2i) -> void:
 	_tween.finished.connect(_on_roll_finished.bind(next))
 
 
+## Dash: se arrastra sin volcar hasta `next` (libre), estirándose en el rumbo
+## y aplastándose un poco a mitad de camino.
+func _dash_to(next: Vector2i) -> void:
+	_rolling = true
+	_dashing = true
+	_roll_target = next
+	var dir := Vector3(heading.x, 0, heading.y)
+	_spawn_dust(global_position - dir * 0.35 + Vector3(0, 0.1, 0))
+	_tween = create_tween()
+	_tween.tween_method(_apply_dash.bind(_body.transform.basis, dir), 0.0, 1.0, DASH_TIME) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_tween.finished.connect(_on_dash_finished.bind(next))
+	dashed.emit(cell, next)
+
+
+func _apply_dash(t: float, start_basis: Basis, dir: Vector3) -> void:
+	var s := sin(t * PI) * DASH_STRETCH
+	var along := Vector3(absf(dir.x), 0, absf(dir.z))
+	var across := Vector3(1, 0, 1) - along
+	var size := Vector3.ONE + along * s - across * s * 0.25 - Vector3.UP * s * 0.4
+	_body.transform = Transform3D(Basis.from_scale(size) * start_basis,
+		dir * t + Vector3(0, HALF * size.y, 0))
+	_update_held_key(dir * t)
+
+
+func _on_dash_finished(next: Vector2i) -> void:
+	_dashing = false
+	# Un enemigo que haya entrado en la casilla durante el arrastre también cae.
+	level.destroy_enemies_at(next)
+	_on_roll_finished(next)
+
+
+## Pisotón: sube, cae con fuerza en su casilla (ver _stomp_impact) y se
+## recupera del aplastamiento; después sigue con su rumbo.
+func _stomp() -> void:
+	_rolling = true
+	_stomping = true
+	_roll_target = cell
+	var start_basis := _body.transform.basis
+	_tween = create_tween()
+	_tween.tween_method(_apply_stomp_height.bind(start_basis), 0.0, STOMP_HEIGHT, STOMP_RISE_TIME) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_tween.tween_method(_apply_stomp_height.bind(start_basis), STOMP_HEIGHT, 0.0, STOMP_FALL_TIME) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	_tween.tween_callback(_stomp_impact)
+	_tween.tween_method(_apply_stomp_squash.bind(start_basis), 1.0, 0.0, STOMP_RECOVER_TIME) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_tween.finished.connect(_on_stomp_finished)
+
+
+func _apply_stomp_height(height: float, start_basis: Basis) -> void:
+	_body.transform = Transform3D(start_basis, Vector3(0, HALF + height, 0))
+	_update_held_key(Vector3(0, height, 0))
+
+
+func _apply_stomp_squash(amount: float, start_basis: Basis) -> void:
+	var squash := STOMP_SQUASH * amount
+	var size := Vector3(1.0 + squash * 0.5, 1.0 - squash, 1.0 + squash * 0.5)
+	_body.transform = Transform3D(Basis.from_scale(size) * start_basis, Vector3(0, HALF * size.y, 0))
+
+
+## Golpe del pisotón contra el suelo: polvo, onda y daño en la zona.
+func _stomp_impact() -> void:
+	_spawn_dust(global_position + Vector3(0, 0.1, 0))
+	_spawn_stomp_wave()
+	level.stomp(cell, stomp_radius, STOMP_WALL_HITS)
+	stomped.emit(cell)
+
+
+func _on_stomp_finished() -> void:
+	_stomping = false
+	_rolling = false
+	_body.transform = Transform3D(_snap_basis(_body.transform.basis.orthonormalized()), Vector3(0, HALF, 0))
+	_update_held_key(Vector3.ZERO)
+	_cooldown = pause_between_rolls / speed_multiplier()
+
+
+## Anillo en el suelo que se abre hasta el borde de la zona del pisotón y se
+## desvanece.
+func _spawn_stomp_wave() -> void:
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.86
+	torus.outer_radius = 1.0
+	torus.rings = 48
+	torus.ring_segments = 6
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = STOMP_WAVE_COLOR
+	var ring := MeshInstance3D.new()
+	ring.mesh = torus
+	ring.material_override = mat
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	ring.top_level = true
+	add_child(ring)
+	ring.global_position = global_position + Vector3(0, 0.06, 0)
+	ring.scale = Vector3(0.3, 0.12, 0.3)
+	var reach := (stomp_radius + 0.5) * Level.CELL_SIZE
+	var tween := ring.create_tween().set_parallel()
+	tween.tween_property(ring, "scale", Vector3(reach, 0.12, reach), STOMP_WAVE_TIME) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.tween_property(mat, "albedo_color:a", 0.0, STOMP_WAVE_TIME) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.chain().tween_callback(ring.queue_free)
+
+
 ## Entra en una casilla de vacío: vuelca por el borde acelerando y luego cae
 ## (ver _process_fall).
 func _fall_to(next: Vector2i) -> void:
@@ -410,8 +606,7 @@ func _fall_to(next: Vector2i) -> void:
 	_fall_time = 0.0
 	_rolling = true
 	_roll_target = next
-	_pending_turn = 0
-	_pending_reverse = false
+	_clear_pending()
 	_end_all_power_ups()
 	if _held_key_node:
 		_held_key_node.visible = false
@@ -439,8 +634,9 @@ func drop() -> void:
 	_falling = true
 	_fall_time = 0.0
 	_rolling = false
-	_pending_turn = 0
-	_pending_reverse = false
+	_clear_pending()
+	_dashing = false
+	_stomping = false
 	_end_all_power_ups()
 	if _held_key_node:
 		_held_key_node.visible = false
@@ -526,10 +722,12 @@ func is_alive() -> bool:
 	return not _dead
 
 
-## Un enemigo puede matarlo ahora: vivo, sin haber llegado a la meta y sin la
-## invulnerabilidad de después de reaparecer.
+## Un enemigo puede matarlo ahora: vivo, sin haber llegado a la meta, sin la
+## invulnerabilidad de después de reaparecer y sin estar haciendo un dash o
+## un pisotón.
 func is_vulnerable() -> bool:
-	return not _dead and not is_finished and _grace_left <= 0.0 and not is_appearing()
+	return not _dead and not is_finished and _grace_left <= 0.0 and not is_appearing() \
+		and not _dashing and not _stomping
 
 
 ## Casilla en la que está o hacia la que está volcando.
@@ -559,8 +757,9 @@ func _explode(on_floor: bool) -> void:
 		_tween.kill()
 	_dead = true
 	_rolling = false
-	_pending_turn = 0
-	_pending_reverse = false
+	_clear_pending()
+	_dashing = false
+	_stomping = false
 	_end_all_power_ups()
 	_explosion = CubeExplosion.create(_body.mesh, _piece_mesh, body_basis, SIZE, on_floor)
 	_explosion.finished.connect(_respawn)

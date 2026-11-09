@@ -78,6 +78,52 @@ func _process(delta: float) -> void:
 	_animate(delta)
 
 
+## Lo ha alcanzado un dash o un pisotón del cubo (Level ya lo ha quitado de
+## su lista): deja de moverse, se hincha un momento, encoge hasta desaparecer
+## soltando una bocanada de humo y se libera.
+func destroy() -> void:
+	if level == null:
+		return
+	level = null
+	set_process(false)
+	var puff := CPUParticles3D.new()
+	puff.one_shot = true
+	puff.explosiveness = 0.95
+	puff.amount = 12
+	puff.lifetime = 0.6
+	puff.direction = Vector3.UP
+	puff.spread = 180.0
+	puff.initial_velocity_min = 1.0
+	puff.initial_velocity_max = 2.0
+	puff.damping_min = 3.0
+	puff.damping_max = 4.0
+	var grow := Curve.new()
+	grow.max_value = 3.0
+	grow.add_point(Vector2(0, 0.8))
+	grow.add_point(Vector2(1, 2.2))
+	puff.scale_amount_curve = grow
+	var fade := Gradient.new()
+	fade.set_color(0, Color(1, 1, 1, 0.8))
+	fade.set_color(1, Color(1, 1, 1, 0.0))
+	puff.color_ramp = fade
+	var quad := QuadMesh.new()
+	quad.size = Vector2.ONE * 0.4
+	quad.material = RollingCube._get_smoke_material()
+	puff.mesh = quad
+	puff.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	puff.position = Vector3(0, float_height, 0)
+	add_child(puff)
+	puff.emitting = true
+	var tween := create_tween()
+	if _visual:
+		tween.tween_property(_visual, "scale", Vector3.ONE * 1.35, 0.07) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tween.tween_property(_visual, "scale", Vector3.ONE * 0.01, 0.18) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	tween.tween_interval(puff.lifetime)
+	tween.tween_callback(queue_free)
+
+
 ## Casillas que ocupa ahora mismo (dos mientras se mueve).
 func occupies(target: Vector2i) -> bool:
 	return target == cell or (_moving and target == _to)

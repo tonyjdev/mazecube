@@ -429,6 +429,61 @@ func hit_breakable(cell: Vector2i, heading: Vector2i) -> int:
 	return left
 
 
+## Rompe de una vez el muro destructible de la casilla (dash del cubo).
+func smash_breakable(cell: Vector2i, heading: Vector2i) -> void:
+	while hit_breakable(cell, heading) > 0:
+		pass
+
+
+## Destruye a todos los enemigos que ocupan la casilla (de cualquier tipo).
+## Devuelve cuántos.
+func destroy_enemies_at(cell: Vector2i) -> int:
+	var destroyed := 0
+	for enemy in _enemies.duplicate():
+		if enemy.occupies(cell):
+			_destroy_enemy(enemy)
+			destroyed += 1
+	return destroyed
+
+
+## Pisotón del cubo en `center`: destruye a los enemigos que ocupan alguna
+## casilla a `radius` o menos (en cuadrado, diagonales incluidas, sin que lo
+## frenen las paredes) y quita `wall_hits` golpes a los muros destructibles
+## de esa zona.
+func stomp(center: Vector2i, radius: int, wall_hits: int) -> void:
+	for enemy in _enemies.duplicate():
+		for dy in range(-radius, radius + 1):
+			for dx in range(-radius, radius + 1):
+				if is_instance_valid(enemy) and _enemies.has(enemy) \
+						and enemy.occupies(center + Vector2i(dx, dy)):
+					_destroy_enemy(enemy)
+	var broke := false
+	var cracked := false
+	for cell: Vector2i in _breakables.keys():
+		var offset := cell - center
+		if maxi(absi(offset.x), absi(offset.y)) > radius:
+			continue
+		var away := Vector2i(signi(offset.x), signi(offset.y))
+		var left := 1
+		for i in wall_hits:
+			left = hit_breakable(cell, away)
+			if left == 0:
+				break
+		broke = broke or left == 0
+		cracked = cracked or left > 0
+	if broke:
+		Sfx.play("break", 0.08)
+		GameState.vibrate(GameState.VIBRATION_WALL_BROKEN)
+	elif cracked:
+		Sfx.play("crack", 0.08)
+
+
+func _destroy_enemy(enemy: Enemy) -> void:
+	_enemies.erase(enemy)
+	enemy.destroy()
+	Sfx.play("smash", 0.1)
+
+
 ## Color de la puerta cerrada de la casilla, o "" si no hay.
 func door_color(cell: Vector2i) -> String:
 	return _doors[cell]["color"] if _doors.has(cell) else ""

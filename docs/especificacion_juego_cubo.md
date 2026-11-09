@@ -25,7 +25,7 @@ El diseño busca combinar **lógica y planificación** con **controles y reglas 
 - Cada avance de una casilla consiste en **volcar el cubo 90° sobre la arista inferior situada en la dirección de desplazamiento**.
 - El cubo apoya sucesivamente distintas caras sobre el suelo.
 - Por defecto el cubo es **blanco** en todas sus caras, con las **aristas en gris claro**; la iluminación y las sombras bastan para distinguir las caras.
-- **No se desliza, no salta y no rota sobre su propio eje vertical para cambiar de rumbo**.
+- **No se desliza, no salta y no rota sobre su propio eje vertical para cambiar de rumbo**. Las únicas excepciones son el **dash** (se arrastra) y el **pisotón** (salta), que pide el jugador (apartado 2.16).
 - Durante el vuelco, la arista utilizada como pivote permanece en contacto con el suelo.
 
 ### 2.3. Controles: dos acciones
@@ -35,6 +35,7 @@ El diseño busca combinar **lógica y planificación** con **controles y reglas 
 - Tras el giro, la dirección elegida pasa a ser el nuevo rumbo de avance automático.
 - Los controles son **relativos al rumbo del cubo**, no a direcciones absolutas del tablero o de la pantalla.
 - **Media vuelta:** pulsar **izquierda y derecha a la vez** (ver apartado 2.12).
+- **Dash** y **pisotón:** deslizar el dedo hacia arriba o hacia abajo (ver apartado 2.16).
 
 **Ejemplo:** si el cubo avanza hacia arriba en el tablero y el jugador pulsa izquierda, vuelca sobre la arista inferior izquierda y continúa avanzando hacia la izquierda. Si después vuelve a pulsar izquierda, su nuevo rumbo será hacia abajo.
 
@@ -192,6 +193,26 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 - Como el cubo sale de la primera casilla mientras aún está sobre la segunda, un puente de dos casillas o más se puede **cruzar 3 veces sin peligro**: en la 4.ª travesía se cae con el cubo encima. Uno de una sola casilla aguanta 4 travesías.
 - El estado de los puentes **se mantiene** al morir el cubo, como el resto del tablero. Si se cae un puente imprescindible, hay que **reiniciar** el nivel desde el menú de pausa.
 - Los enemigos no pisan los puentes colgantes (los patrulleros no pueden tener rutas que pasen por ellos), así que un puente también sirve para escapar de un perseguidor.
+
+### 2.16. Dash y pisotón — En pruebas en el prototipo
+
+Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pantalla (apartado 7.5).
+
+- **Momento en que se aplican:** como los giros (apartado 2.7), en el **siguiente límite entre casillas**. Giro, media vuelta, dash y pisotón comparten una sola petición pendiente: **cuenta la última**.
+- **Sin recarga:** se pueden usar siempre y encadenar (se quitó la recarga de 1,5 s porque estorbaba a los giros).
+- **Invulnerable:** mientras dura el dash o el pisotón, los enemigos no matan al cubo.
+- **Dash (deslizar hacia arriba):** el cubo **se arrastra sin volcar** hasta la casilla de delante en ≈0,14 s, estirándose en el rumbo, y sigue con el mismo rumbo.
+  - Destruye a **cualquier enemigo** (perseguidor, patrullero u obstáculo) que ocupe esa casilla.
+  - Si es un **muro destructible**, lo **rompe de una vez** (le queden los golpes que le queden) y **entra en su casilla sin rebotar**.
+  - Si es una pared, una puerta, unos barrotes cerrados o un botón, el dash se queda en un **choque normal**: el cubo rebota (y abre la puerta si lleva su llave, o pulsa el botón).
+  - Si es **vacío**, el cubo se cae.
+- **Pisotón (deslizar hacia abajo):** el cubo **salta** (≈0,9 de altura) y **cae con fuerza en la misma casilla**, se aplasta un momento y sigue con su rumbo. Dura ≈0,5 s.
+  - Al caer: polvo, un **anillo de onda** que se abre hasta el borde de la zona, la cámara tiembla y el móvil vibra.
+  - Afecta a la **zona de radio 2** alrededor del cubo (cuadrado de 5×5 casillas, diagonales incluidas; las paredes **no** lo frenan). El radio podrá aumentar en el futuro con otras habilidades.
+  - Destruye a **todos los enemigos** que ocupen alguna casilla de la zona.
+  - Quita **2 golpes** a cada muro destructible de la zona.
+- Los enemigos destruidos **no vuelven** al morir el cubo (el tablero se queda como estaba); sí al reiniciar el nivel.
+- El resolvedor de niveles **no las usa**, como la media vuelta.
 
 ## 3. Escenario y objetivo — Confirmados
 
@@ -374,9 +395,11 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 - **Tocar la mitad izquierda de la pantalla** gira a la izquierda y **tocar la mitad derecha** gira a la derecha (relativo al rumbo, como en el apartado 2.3).
 - Toda la mitad de la pantalla es zona de toque, sin botones pequeños; cada toque cuenta como una pulsación. Tocar el botón de pausa no cuenta como giro.
 - **Media vuelta:** tocar las dos mitades a la vez, con un dedo en cada una (en el teclado, las dos flechas a la vez). Se resaltan las dos indicaciones.
+- **Dash:** deslizar el dedo **hacia arriba**; **pisotón:** deslizar **hacia abajo** (apartado 2.16). Vale en cualquier mitad de la pantalla. Un deslizamiento es un recorrido vertical de al menos el **6 % del alto de la pantalla**, claramente más vertical que horizontal (1,5 veces), en menos de 0,35 s.
+- **Toque frente a deslizamiento:** para poder distinguirlos, el giro de un toque se pide **al levantar el dedo** o, si se deja apoyado sin moverse (menos del 2 % del alto), a los **80 ms**. Si el dedo se mueve más, se espera a ver si llega a deslizamiento; si no llega, cuenta como toque. El dedo que desliza no gira ni cuenta para la media vuelta.
 - Las indicaciones de las esquinas inferiores («← Izquierda» y «Derecha →») se resaltan al tocar cada lado.
 - El botón **Atrás** de Android pausa y reanuda la partida; en los menús vuelve a la pantalla anterior y, desde el menú principal, cierra el juego.
-- En PC se mantienen los controles de teclado (←/A, →/D, R reiniciar, Esc pausa/atrás, Intro/N siguiente nivel) y el clic del ratón se trata como un toque.
+- En PC se mantienen los controles de teclado (←/A, →/D, ↑/W dash, ↓/S pisotón, R reiniciar, Esc pausa/atrás, Intro/N siguiente nivel) y el clic del ratón se trata como un toque.
 
 ## 8. Tecnologías — Decididas y propuestas
 

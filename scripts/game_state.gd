@@ -30,6 +30,8 @@ const VIBRATION_WALL_BROKEN := Vector2(90, 0.8)
 const VIBRATION_TURN_REJECTED := Vector2(18, 0.25)
 const VIBRATION_BUTTON := Vector2(40, 0.5)
 const VIBRATION_REVERSE := Vector2(70, 0.7)
+const VIBRATION_DASH := Vector2(35, 0.5)
+const VIBRATION_STOMP := Vector2(110, 0.9)
 const VIBRATION_DEATH := Vector2(160, 1.0)
 ## Al activar la vibración en Opciones, para notar que funciona.
 const VIBRATION_PREVIEW := Vector2(60, 0.6)
