@@ -160,6 +160,14 @@ var _bars := {}
 ##             "near": { casilla: casillas de recorrido hasta el botón } }
 var _buttons := {}
 var _enemies: Array[Enemy] = []
+## Casillas ocupadas por enemigos sólidos: casilla -> [Enemy]. Se rehace al
+## consultarla si _solid_dirty (ver solid_cells_changed).
+var _solid_cells := {}
+var _solid_dirty := true
+## Cambia cada vez que cambia por dónde se puede ir sin contar puertas ni
+## muros destructibles (al construir, al pulsar un botón y al caer un puente):
+## sirve para reutilizar cálculos de caminos (ver Blocker).
+var _topology_version := 0
 var _spawners: Array[EnemySpawner] = []
 ## Los enemigos están quietos (ver set_enemies_frozen).
 var _enemies_frozen := false
@@ -206,6 +214,8 @@ func build() -> void:
 	_bars.clear()
 	_buttons.clear()
 	_enemies.clear()
+	_solid_dirty = true
+	_topology_version += 1
 	_spawners.clear()
 	_bridges.clear()
 	var enemy_cells := {}
@@ -340,6 +350,7 @@ func cube_left_cell(cell: Vector2i) -> void:
 		_bridges.erase(c)
 		_walkable.erase(c)
 		_void[c] = true
+	_topology_version += 1
 	bridge.collapse(cell, cube_cell)
 	Sfx.play("collapse")
 	if cube_cell != NO_CELL:
@@ -368,11 +379,33 @@ func enemy_at(cell: Vector2i) -> bool:
 
 
 ## Hay un enemigo sólido (obstáculo) ocupando la casilla, sin contar `except`.
+## Se consulta muchísimo (en cada búsqueda de camino), así que usa la tabla
+## _solid_cells en lugar de recorrer los enemigos.
 func solid_enemy_at(cell: Vector2i, except: Enemy = null) -> bool:
-	for enemy in _enemies:
-		if enemy.solid and enemy != except and enemy.occupies(cell):
+	if _solid_dirty:
+		_solid_dirty = false
+		_solid_cells.clear()
+		for enemy in _enemies:
+			if enemy.solid:
+				for c: Vector2i in [enemy.cell, enemy.target_cell()]:
+					if not _solid_cells.has(c):
+						_solid_cells[c] = []
+					if not _solid_cells[c].has(enemy):
+						_solid_cells[c].append(enemy)
+	var found: Array = _solid_cells.get(cell, [])
+	for enemy in found:
+		if enemy != except:
 			return true
 	return false
+
+
+## Un enemigo sólido ha cambiado las casillas que ocupa.
+func solid_cells_changed() -> void:
+	_solid_dirty = true
+
+
+func topology_version() -> int:
+	return _topology_version
 
 
 ## El cubo ha muerto: los enemigos le pierden la pista.
@@ -445,6 +478,7 @@ func press_button(cell: Vector2i) -> void:
 		if groups.contains(item["group"]):
 			var bars: Bars = item["node"]
 			bars.set_open(not bars.is_open)
+	_topology_version += 1
 
 
 ## Golpes que le quedan al muro destructible de la casilla (0 si no hay).
@@ -515,6 +549,7 @@ func stomp(center: Vector2i, radius: int, wall_hits: int) -> void:
 
 func _destroy_enemy(enemy: Enemy) -> void:
 	_enemies.erase(enemy)
+	_solid_dirty = true
 	enemy.destroy()
 
 
@@ -1003,6 +1038,7 @@ func spawn_enemy(spawner: EnemySpawner, cell: Vector2i) -> Enemy:
 	enemy.cube = cube
 	enemy.start_appearing()
 	_enemies.append(enemy)
+	_solid_dirty = true
 	return enemy
 
 

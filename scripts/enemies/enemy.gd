@@ -91,6 +91,8 @@ func _process(delta: float) -> void:
 			_moving = false
 			cell = _to
 			_from = _to
+			if solid:
+				level.solid_cells_changed()
 			_on_arrived()
 	if not _moving:
 		if _wait > 0.0:
@@ -215,6 +217,11 @@ func occupies(target: Vector2i) -> bool:
 	return target == cell or (_moving and target == _to)
 
 
+## Casilla a la que va (la suya si está quieto).
+func target_cell() -> Vector2i:
+	return _to if _moving else cell
+
+
 ## Posición actual en el tablero (en casillas, con decimales mientras se mueve).
 func board_position() -> Vector2:
 	return Vector2(position.x, position.z) / Level.CELL_SIZE
@@ -240,8 +247,10 @@ func _on_arrived() -> void:
 func _path(from: Vector2i, goal: Vector2i, can_pass: Callable) -> Array[Vector2i]:
 	var came := {from: from}
 	var queue: Array[Vector2i] = [from]
-	while not queue.is_empty() and not came.has(goal):
-		var current: Vector2i = queue.pop_front()
+	var head := 0
+	while head < queue.size() and not came.has(goal):
+		var current: Vector2i = queue[head]
+		head += 1
 		for dir in DIRS:
 			var n := current + dir
 			if not came.has(n) and can_pass.call(n):
@@ -281,6 +290,8 @@ func _start_move(next: Vector2i) -> void:
 	_to = next
 	_t = 0.0
 	_moving = true
+	if solid:
+		level.solid_cells_changed()
 
 
 func _place(board: Vector2) -> void:
@@ -295,8 +306,10 @@ func _place(board: Vector2) -> void:
 func _distances(origin: Vector2i, can_pass: Callable, max_steps := -1) -> Dictionary:
 	var dist := {origin: 0}
 	var queue: Array[Vector2i] = [origin]
-	while not queue.is_empty():
-		var current: Vector2i = queue.pop_front()
+	var head := 0
+	while head < queue.size():
+		var current: Vector2i = queue[head]
+		head += 1
 		if max_steps >= 0 and dist[current] >= max_steps:
 			continue
 		for dir in DIRS:
@@ -308,19 +321,33 @@ func _distances(origin: Vector2i, can_pass: Callable, max_steps := -1) -> Dictio
 
 
 ## Primer paso del camino más corto de `cell` a `goal` (o `cell` si no hay
-## camino). Va hacia atrás desde la meta siguiendo las distancias.
+## camino). Busca hacia atrás desde la meta y para en cuanto llega a una
+## casilla vecina (la primera que encuentra está a la menor distancia), sin
+## recorrer todo el mapa.
 func _first_step_towards(goal: Vector2i, can_pass: Callable) -> Vector2i:
 	if goal == cell:
 		return cell
-	var dist := _distances(goal, can_pass)
-	var best := cell
-	var best_dist: int = 1 << 30
+	var neighbors := {}
 	for dir in DIRS:
-		var n := cell + dir
-		if dist.has(n) and dist[n] < best_dist:
-			best = n
-			best_dist = dist[n]
-	return best
+		neighbors[cell + dir] = true
+	if neighbors.has(goal):
+		return goal
+	var seen := {goal: true, cell: true}
+	var queue: Array[Vector2i] = [goal]
+	var head := 0
+	while head < queue.size():
+		var current: Vector2i = queue[head]
+		head += 1
+		for dir in DIRS:
+			var n := current + dir
+			if seen.has(n):
+				continue
+			seen[n] = true
+			if can_pass.call(n):
+				if neighbors.has(n):
+					return n
+				queue.append(n)
+	return cell
 
 
 ## Añade a `st` un triángulo plano de un poliedro centrado en el origen, con

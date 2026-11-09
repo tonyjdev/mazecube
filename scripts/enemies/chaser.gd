@@ -32,6 +32,20 @@ const ALERT_SHAKE := 0.05
 const ALERT_SHAKE_SPEED := 70.0
 ## Gotas en las que revienta al destruirlo (ver _add_debris).
 const DEBRIS_DROPS := 26
+## Resolución de las esferas (meridianos, paralelos): las de serie de
+## SphereMesh (64×32) son demasiados triángulos para muchos enemigos en el
+## móvil.
+const BODY_SEGMENTS := Vector2i(20, 10)
+const EYE_SEGMENTS := Vector2i(12, 6)
+const PUPIL_SEGMENTS := Vector2i(8, 4)
+
+## Mallas y materiales que comparten todos los perseguidores (el material
+## del cuerpo es de cada uno porque cambia de color al perseguir).
+static var _body_mesh: SphereMesh
+static var _eye_mesh: SphereMesh
+static var _pupil_mesh: SphereMesh
+static var _drop_mesh: SphereMesh
+static var _white_mat: StandardMaterial3D
 
 var is_chasing := false
 
@@ -106,37 +120,28 @@ func _dissolve_color() -> Color:
 
 
 func _build_visual() -> Node3D:
+	_init_shared()
 	var root := Node3D.new()
 	_body_mat = _make_material(CALM_COLOR, 0.25)
-	var sphere := SphereMesh.new()
-	sphere.radius = RADIUS
-	sphere.height = RADIUS * 2.0
-	sphere.material = _body_mat
 	var body := MeshInstance3D.new()
-	body.mesh = sphere
+	body.mesh = _body_mesh
+	body.set_surface_override_material(0, _body_mat)
 	root.add_child(body)
 
 	# Ojos: dos esferas blancas con pupila negra, en la cara que mira a -Z
 	# local; el conjunto gira para mirar hacia donde va.
 	_eyes = Node3D.new()
 	root.add_child(_eyes)
-	var white := _make_material(Color(0.97, 0.97, 0.97))
-	var black := _make_material(Color(0.05, 0.05, 0.08))
+	# Los ojos son pequeños y quedan sobre el cuerpo: no proyectan sombra.
 	for side: float in [-1.0, 1.0]:
-		var eye_mesh := SphereMesh.new()
-		eye_mesh.radius = RADIUS * 0.3
-		eye_mesh.height = RADIUS * 0.6
-		eye_mesh.material = white
 		var eye := MeshInstance3D.new()
-		eye.mesh = eye_mesh
+		eye.mesh = _eye_mesh
+		eye.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		eye.position = Vector3(side * RADIUS * 0.38, RADIUS * 0.3, -RADIUS * 0.82)
 		_eyes.add_child(eye)
-		var pupil_mesh := SphereMesh.new()
-		pupil_mesh.radius = RADIUS * 0.14
-		pupil_mesh.height = RADIUS * 0.28
-		pupil_mesh.material = black
 		var pupil := MeshInstance3D.new()
-		pupil.mesh = pupil_mesh
+		pupil.mesh = _pupil_mesh
+		pupil.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		pupil.position = Vector3(0, 0, -RADIUS * 0.2)
 		eye.add_child(pupil)
 	_set_chasing(is_chasing)
@@ -146,15 +151,32 @@ func _build_visual() -> Node3D:
 ## Criatura orgánica: revienta en muchas gotitas de su color (y sus dos ojos)
 ## que se aplastan al caer, con un estallido acuoso.
 func _add_debris(debris: EnemyDebris, center: Vector3) -> void:
-	var drop := SphereMesh.new()
-	drop.radius = 1.0
-	drop.height = 2.0
-	drop.radial_segments = 12
-	drop.rings = 6
-	_burst(debris, drop, _body_mat, center, DEBRIS_DROPS, RADIUS * 0.15, RADIUS * 0.38, 1.0,
+	_burst(debris, _drop_mesh, _body_mat, center, DEBRIS_DROPS, RADIUS * 0.15, RADIUS * 0.38, 1.0,
 		RADIUS * 0.5, 1.2, 3.2, true)
-	_burst(debris, drop, _make_material(Color(0.97, 0.97, 0.97)), center, 2, RADIUS * 0.28,
+	_burst(debris, _drop_mesh, _white_mat, center, 2, RADIUS * 0.28,
 		RADIUS * 0.3, 1.0, RADIUS * 0.6, 1.5, 2.5, true)
+
+
+## Crea (la primera vez) las mallas y materiales compartidos.
+static func _init_shared() -> void:
+	if _body_mesh:
+		return
+	_white_mat = _make_material(Color(0.97, 0.97, 0.97))
+	_body_mesh = _make_sphere(RADIUS, BODY_SEGMENTS, null)
+	_eye_mesh = _make_sphere(RADIUS * 0.3, EYE_SEGMENTS, _white_mat)
+	_pupil_mesh = _make_sphere(RADIUS * 0.14, PUPIL_SEGMENTS,
+		_make_material(Color(0.05, 0.05, 0.08)))
+	_drop_mesh = _make_sphere(1.0, Vector2i(12, 6), null)
+
+
+static func _make_sphere(radius: float, segments: Vector2i, mat: Material) -> SphereMesh:
+	var sphere := SphereMesh.new()
+	sphere.radius = radius
+	sphere.height = radius * 2.0
+	sphere.radial_segments = segments.x
+	sphere.rings = segments.y
+	sphere.material = mat
+	return sphere
 
 
 func _destroy_sound() -> String:

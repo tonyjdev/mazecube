@@ -37,6 +37,9 @@ var _direction := 1
 var _time := 0.0
 var _mesh: MeshInstance3D
 
+## Malla que comparten todos los patrulleros.
+static var _shared_mesh: ArrayMesh
+
 
 func _init() -> void:
 	lethal = true
@@ -91,7 +94,9 @@ func _dissolve_color() -> Color:
 func _build_visual() -> Node3D:
 	var root := Node3D.new()
 	_mesh = MeshInstance3D.new()
-	_mesh.mesh = _build_octahedron(SIZE)
+	if _shared_mesh == null:
+		_shared_mesh = _build_octahedron(SIZE)
+	_mesh.mesh = _shared_mesh
 	root.add_child(_mesh)
 	return root
 

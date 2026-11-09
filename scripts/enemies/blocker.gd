@@ -55,6 +55,16 @@ var _rng := RandomNumberGenerator.new()
 var _mesh: MeshInstance3D
 var _mat: StandardMaterial3D
 
+## Último camino previsto del cubo (ver _predicted_route), compartido por
+## todos los obstáculos: [id del Level, casilla del cubo, Level.topology_version()]
+## y el camino.
+static var _route_key := []
+static var _route_cache: Array[Vector2i] = []
+
+## Malla que comparten todos los obstáculos (el material es de cada uno
+## porque se oscurece al quedarse quieto).
+static var _shared_mesh: ArrayMesh
+
 
 func _init() -> void:
 	lethal = false
@@ -63,6 +73,9 @@ func _init() -> void:
 	float_height = RADIUS * 0.93
 	_rng.randomize()
 	_patience = _rng.randf_range(MIN_PATIENCE, MAX_BLOCK_TIME)
+	# Cada obstáculo piensa en un momento distinto, para que no coincidan
+	# todos en el mismo frame.
+	_think_left = _rng.randf_range(0.0, THINK_TIME)
 
 
 func on_cube_died() -> void:
@@ -154,7 +167,17 @@ func _pick_roam_target() -> Vector2i:
 
 
 ## Casillas por las que pasará el cubo camino de la meta (sin contar la suya).
+## Solo depende de la casilla del cubo y de los barrotes y puentes, así que se
+## reutiliza mientras no cambien.
 func _predicted_route() -> Array[Vector2i]:
+	var key := [level.get_instance_id(), cube.cell, level.topology_version()]
+	if key != _route_key:
+		_route_key = key
+		_route_cache = _compute_route()
+	return _route_cache
+
+
+func _compute_route() -> Array[Vector2i]:
 	var from := cube.cell
 	var goal := level.goal_cell
 	var route := _path(from, goal, func(c: Vector2i) -> bool:
@@ -179,8 +202,11 @@ func _build_visual() -> Node3D:
 	var root := Node3D.new()
 	_mat = _make_material(COLOR)
 	_mat.roughness = 0.8
+	if _shared_mesh == null:
+		_shared_mesh = _build_dodecahedron(RADIUS, null)
 	_mesh = MeshInstance3D.new()
-	_mesh.mesh = _build_dodecahedron(RADIUS, _mat)
+	_mesh.mesh = _shared_mesh
+	_mesh.set_surface_override_material(0, _mat)
 	root.add_child(_mesh)
 	return root
 
@@ -188,7 +214,7 @@ func _build_visual() -> Node3D:
 ## Sintético: se rompe en dodecaedros pequeños (su misma forma) con un sonido
 ## de cristal y metal.
 func _add_debris(debris: EnemyDebris, center: Vector3) -> void:
-	_burst(debris, _mesh.mesh, null, center, DEBRIS_PIECES, 0.2, 0.42, RADIUS, RADIUS * 0.4, 1.8, 3.8, false)
+	_burst(debris, _mesh.mesh, _mat, center, DEBRIS_PIECES, 0.2, 0.42, RADIUS, RADIUS * 0.4, 1.8, 3.8, false)
 
 
 func _animate(delta: float) -> void:
