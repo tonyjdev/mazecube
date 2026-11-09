@@ -481,7 +481,6 @@ func stomp(center: Vector2i, radius: int, wall_hits: int) -> void:
 func _destroy_enemy(enemy: Enemy) -> void:
 	_enemies.erase(enemy)
 	enemy.destroy()
-	Sfx.play("smash", 0.1)
 
 
 ## Color de la puerta cerrada de la casilla, o "" si no hay.

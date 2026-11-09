@@ -22,6 +22,8 @@ const HOVER_HEIGHT := 0.55
 const HOVER_AMPLITUDE := 0.06
 const HOVER_SPEED := 3.0
 const SPIN_SPEED := 2.2
+## Pedazos en los que se rompe al destruirlo (ver _add_debris).
+const DEBRIS_PIECES := 12
 
 ## Casillas de la ruta, empezando por la de partida. En una ruta circular no
 ## se repite la de partida al final.
@@ -88,6 +90,12 @@ func _build_visual() -> Node3D:
 	_mesh.mesh = _build_octahedron(SIZE)
 	root.add_child(_mesh)
 	return root
+
+
+## Sintético: se rompe en octaedros pequeños (su misma forma) con un sonido
+## de cristal y metal.
+func _add_debris(debris: EnemyDebris, center: Vector3) -> void:
+	_burst(debris, _mesh.mesh, null, center, DEBRIS_PIECES, 0.22, 0.45, SIZE, SIZE * 0.4, 2.0, 4.2, false)
 
 
 func _animate(delta: float) -> void:

@@ -29,7 +29,11 @@ extends Node3D
 ## Dash y pisotón: el jugador los pide (deslizando el dedo arriba o abajo) y,
 ## como los giros, se aplican en el siguiente límite entre casillas; la última
 ## petición (giro, media vuelta, dash o pisotón) sustituye a la anterior.
-## No tienen tiempo de recarga: se pueden encadenar.
+## Fuerza: los dos gastan la misma fuerza (de 0 a 1). Hacer uno la deja a 0
+## y solo se puede volver a pedir cualquiera de los dos cuando está llena; se
+## recarga en `strength_recharge_time` segundos, sin contar lo que dura la
+## acción. Si se piden sin fuerza, se descartan (strength_rejected) sin tocar
+## lo que hubiera pendiente.
 ## - Dash: el cubo se arrastra sin volcar hasta la casilla de delante en
 ##   DASH_TIME segundos. Antes destruye a cualquier enemigo que la ocupe y, si
 ##   es un muro destructible, lo rompe de una vez y pasa sin rebotar. Si
@@ -95,6 +99,8 @@ signal appeared
 signal dashed(from: Vector2i, to: Vector2i)
 ## Ha caído el pisotón en esa casilla.
 signal stomped(cell: Vector2i)
+## Se ha pedido un dash o un pisotón sin la fuerza llena.
+signal strength_rejected
 
 const TURN_LEFT := -1
 const TURN_RIGHT := 1
@@ -171,6 +177,9 @@ static var _smoke_material: StandardMaterial3D
 ## Alcance del pisotón en casillas (distancia en cuadrado: 2 = zona de 5×5).
 ## Más adelante podrá aumentar con otras habilidades.
 @export var stomp_radius := 2
+## Segundos que tarda la fuerza en llenarse tras un dash o un pisotón. Más
+## adelante podrá cambiar con otras habilidades.
+@export var strength_recharge_time := 2.0
 
 var level: Level
 var cell := Vector2i.ZERO
@@ -188,6 +197,8 @@ var _pending_turn := 0
 var _pending_reverse := false
 ## Dash o pisotón pendiente (ABILITY_*), con las mismas reglas que un giro.
 var _pending_ability := ABILITY_NONE
+## Fuerza para el dash y el pisotón (1 = llena, se pueden pedir).
+var _strength := 1.0
 ## Haciendo un dash (arrastrándose) o un pisotón (en el aire o aplastado).
 var _dashing := false
 var _stomping := false
@@ -249,6 +260,7 @@ func reset(target_level: Level) -> void:
 	cell = level.start_cell
 	heading = level.start_heading
 	_clear_pending()
+	_strength = 1.0
 	_dashing = false
 	_stomping = false
 	_drop_held_key()
@@ -356,8 +368,23 @@ func request_stomp() -> void:
 func _request_ability(ability: int) -> void:
 	if is_finished or _dead or is_appearing():
 		return
+	if _strength < 1.0:
+		strength_rejected.emit()
+		return
 	_clear_pending()
 	_pending_ability = ability
+
+
+## Olvida el giro o la media vuelta pendientes (p. ej. si el toque que los
+## pidió resulta ser un deslizamiento).
+func cancel_turn() -> void:
+	_pending_turn = 0
+	_pending_reverse = false
+
+
+## Fuerza para el dash y el pisotón, de 0 (recién gastada) a 1 (llena).
+func strength() -> float:
+	return _strength
 
 
 ## Olvida el giro, la media vuelta y la acción especial pendientes.
@@ -375,6 +402,8 @@ func _process(delta: float) -> void:
 	if _appear_time >= 0.0:
 		_process_appear(delta)
 		return
+	if _strength < 1.0 and not _dashing and not _stomping:
+		_strength = minf(_strength + delta / strength_recharge_time, 1.0)
 	if _grace_left > 0.0:
 		_grace_left -= delta
 		var elapsed := RESPAWN_GRACE - _grace_left
@@ -400,6 +429,7 @@ func _try_advance() -> void:
 	if _pending_ability != ABILITY_NONE:
 		var ability := _pending_ability
 		_pending_ability = ABILITY_NONE
+		_strength = 0.0
 		if ability == ABILITY_STOMP:
 			_stomp()
 			return

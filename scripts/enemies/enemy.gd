@@ -79,49 +79,42 @@ func _process(delta: float) -> void:
 
 
 ## Lo ha alcanzado un dash o un pisotón del cubo (Level ya lo ha quitado de
-## su lista): deja de moverse, se hincha un momento, encoge hasta desaparecer
-## soltando una bocanada de humo y se libera.
+## su lista): revienta en pedazos (EnemyDebris, que cada tipo llena en
+## _add_debris), suena su rotura (_destroy_sound) y desaparece.
 func destroy() -> void:
 	if level == null:
 		return
+	var debris := EnemyDebris.new()
+	debris.position = position
+	level.add_child(debris)
+	_add_debris(debris, _visual.position if _visual else Vector3(0, float_height, 0))
+	Sfx.play(_destroy_sound(), 0.1)
 	level = null
-	set_process(false)
-	var puff := CPUParticles3D.new()
-	puff.one_shot = true
-	puff.explosiveness = 0.95
-	puff.amount = 12
-	puff.lifetime = 0.6
-	puff.direction = Vector3.UP
-	puff.spread = 180.0
-	puff.initial_velocity_min = 1.0
-	puff.initial_velocity_max = 2.0
-	puff.damping_min = 3.0
-	puff.damping_max = 4.0
-	var grow := Curve.new()
-	grow.max_value = 3.0
-	grow.add_point(Vector2(0, 0.8))
-	grow.add_point(Vector2(1, 2.2))
-	puff.scale_amount_curve = grow
-	var fade := Gradient.new()
-	fade.set_color(0, Color(1, 1, 1, 0.8))
-	fade.set_color(1, Color(1, 1, 1, 0.0))
-	puff.color_ramp = fade
-	var quad := QuadMesh.new()
-	quad.size = Vector2.ONE * 0.4
-	quad.material = RollingCube._get_smoke_material()
-	puff.mesh = quad
-	puff.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	puff.position = Vector3(0, float_height, 0)
-	add_child(puff)
-	puff.emitting = true
-	var tween := create_tween()
-	if _visual:
-		tween.tween_property(_visual, "scale", Vector3.ONE * 1.35, 0.07) \
-			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		tween.tween_property(_visual, "scale", Vector3.ONE * 0.01, 0.18) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-	tween.tween_interval(puff.lifetime)
-	tween.tween_callback(queue_free)
+	queue_free()
+
+
+## Llena `debris` con los pedazos del enemigo; `center` es el centro del
+## visual relativo al suelo de su casilla.
+func _add_debris(_debris: EnemyDebris, _center: Vector3) -> void:
+	pass
+
+
+## Sonido (ver Sfx) al reventar.
+func _destroy_sound() -> String:
+	return "shatter"
+
+
+## Lanza `count` pedazos de `mesh` desde `center` hacia fuera y algo hacia
+## arriba: salen a `spread` del centro con una velocidad entre `speed_min` y
+## `speed_max` y una escala entre `size_min` y `size_max`.
+static func _burst(debris: EnemyDebris, mesh: Mesh, material: Material, center: Vector3,
+		count: int, size_min: float, size_max: float, radius: float, spread: float,
+		speed_min: float, speed_max: float, organic: bool) -> void:
+	for i in count:
+		var dir := Vector3(randf_range(-1, 1), randf_range(-0.3, 1), randf_range(-1, 1)).normalized()
+		var vel := dir * randf_range(speed_min, speed_max) + Vector3.UP * randf_range(0.8, 2.0)
+		debris.add_piece(mesh, material, center + dir * spread, vel,
+			randf_range(size_min, size_max), radius, organic)
 
 
 ## Casillas que ocupa ahora mismo (dos mientras se mueve).

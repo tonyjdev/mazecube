@@ -12,7 +12,8 @@ extends RefCounted
 ## door, crack (golpe a un muro destructible), break (muro roto), button,
 ## bars, powerup, reverse (media vuelta), explode (muerte del cubo), goal,
 ## alert (un perseguidor ha visto al cubo), fall (caída al vacío), dash,
-## stomp (pisotón), smash (enemigo destruido) y click
+## stomp (pisotón), splat (perseguidor reventado), shatter (enemigo
+## sintético roto) y click
 ## (botones de la interfaz).
 
 const POOL_SIZE := 10

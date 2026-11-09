@@ -30,6 +30,8 @@ const BOUNCE_SPEED := 9.0
 const ALERT_TIME := 0.5
 const ALERT_SHAKE := 0.05
 const ALERT_SHAKE_SPEED := 70.0
+## Gotas en las que revienta al destruirlo (ver _add_debris).
+const DEBRIS_DROPS := 26
 
 var is_chasing := false
 
@@ -135,6 +137,24 @@ func _build_visual() -> Node3D:
 		eye.add_child(pupil)
 	_set_chasing(is_chasing)
 	return root
+
+
+## Criatura orgánica: revienta en muchas gotitas de su color (y sus dos ojos)
+## que se aplastan al caer, con un estallido acuoso.
+func _add_debris(debris: EnemyDebris, center: Vector3) -> void:
+	var drop := SphereMesh.new()
+	drop.radius = 1.0
+	drop.height = 2.0
+	drop.radial_segments = 12
+	drop.rings = 6
+	_burst(debris, drop, _body_mat, center, DEBRIS_DROPS, RADIUS * 0.15, RADIUS * 0.38, 1.0,
+		RADIUS * 0.5, 1.2, 3.2, true)
+	_burst(debris, drop, _make_material(Color(0.97, 0.97, 0.97)), center, 2, RADIUS * 0.28,
+		RADIUS * 0.3, 1.0, RADIUS * 0.6, 1.5, 2.5, true)
+
+
+func _destroy_sound() -> String:
+	return "splat"
 
 
 func _animate(delta: float) -> void:

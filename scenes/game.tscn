@@ -7,6 +7,7 @@
 [ext_resource type="Texture2D" path="res://ui/pause_play.svg" id="10_play"]
 [ext_resource type="Texture2D" path="res://ui/pause_restart.svg" id="11_restart"]
 [ext_resource type="Texture2D" path="res://ui/pause_exit.svg" id="12_exit"]
+[ext_resource type="Script" path="res://scripts/strength_bar.gd" id="13_strength"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sgp6g"]
 
@@ -99,6 +100,14 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 30
 text = "HINT_LEFT"
+
+[node name="StrengthBar" type="Control" parent="UI/Margin/VBox/BottomBar"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(200, 26)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+script = ExtResource("13_strength")
 
 [node name="RightHint" type="Label" parent="UI/Margin/VBox/BottomBar"]
 unique_name_in_owner = true

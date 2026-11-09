@@ -31,6 +31,8 @@ const COLOR := Color(0.22, 0.62, 0.55)
 const PARKED_COLOR := Color(0.15, 0.46, 0.41)
 ## Giro (rad/s) mientras se mueve.
 const SPIN_SPEED := 3.0
+## Pedazos en los que se rompe al destruirlo (ver _add_debris).
+const DEBRIS_PIECES := 12
 ## Paciencia: segundos que aguanta quieto en una misma casilla (al azar entre
 ## estos dos valores) antes de irse a dar una vuelta.
 const MIN_PATIENCE := 3.0
@@ -177,6 +179,12 @@ func _build_visual() -> Node3D:
 	_mesh.mesh = _build_dodecahedron(RADIUS, _mat)
 	root.add_child(_mesh)
 	return root
+
+
+## Sintético: se rompe en dodecaedros pequeños (su misma forma) con un sonido
+## de cristal y metal.
+func _add_debris(debris: EnemyDebris, center: Vector3) -> void:
+	_burst(debris, _mesh.mesh, null, center, DEBRIS_PIECES, 0.2, 0.42, RADIUS, RADIUS * 0.4, 1.8, 3.8, false)
 
 
 func _animate(delta: float) -> void:

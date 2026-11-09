@@ -2,13 +2,13 @@
 
 importer="wav"
 type="AudioStreamWAV"
-uid="uid://tgdxg7dllpp4"
-path="res://.godot/imported/smash.wav-b13968d2390943b5a042a47e8f40e754.sample"
+uid="uid://bteacs3tm8cy3"
+path="res://.godot/imported/shatter.wav-ccf4bc49f539d2db10186ac61b61bdf5.sample"
 
 [deps]
 
-source_file="res://audio/sfx/smash.wav"
-dest_files=["res://.godot/imported/smash.wav-b13968d2390943b5a042a47e8f40e754.sample"]
+source_file="res://audio/sfx/shatter.wav"
+dest_files=["res://.godot/imported/shatter.wav-ccf4bc49f539d2db10186ac61b61bdf5.sample"]
 
 [params]
 

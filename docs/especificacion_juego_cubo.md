@@ -199,7 +199,9 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pantalla (apartado 7.5).
 
 - **Momento en que se aplican:** como los giros (apartado 2.7), en el **siguiente límite entre casillas**. Giro, media vuelta, dash y pisotón comparten una sola petición pendiente: **cuenta la última**.
-- **Sin recarga:** se pueden usar siempre y encadenar (se quitó la recarga de 1,5 s porque estorbaba a los giros).
+- **Fuerza:** las dos gastan la misma **fuerza**. Hacer cualquiera de ellas la **vacía del todo** y no se puede volver a pedir ninguna hasta que esté **llena**. Se recarga en **2 s** (sin contar lo que dura la acción); más adelante habrá habilidades que cambien ese tiempo.
+- **Indicador de fuerza:** una barra redondeada **abajo en el centro**, entre «← Izquierda» y «Derecha →». Mientras se recarga se llena con un color apagado; llena se ve **dorada**, late suavemente y da un **destello** al llenarse.
+- **Sin fuerza:** si se pide un dash o un pisotón sin la fuerza llena, se descarta con el aviso de giro descartado (sonido y vibración leve), la barra **tiembla y se tiñe de rojo** y **no se gira** (ver apartado 7.5).
 - **Invulnerable:** mientras dura el dash o el pisotón, los enemigos no matan al cubo.
 - **Dash (deslizar hacia arriba):** el cubo **se arrastra sin volcar** hasta la casilla de delante en ≈0,14 s, estirándose en el rumbo, y sigue con el mismo rumbo.
   - Destruye a **cualquier enemigo** (perseguidor, patrullero u obstáculo) que ocupe esa casilla.
@@ -211,6 +213,9 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
   - Afecta a la **zona de radio 2** alrededor del cubo (cuadrado de 5×5 casillas, diagonales incluidas; las paredes **no** lo frenan). El radio podrá aumentar en el futuro con otras habilidades.
   - Destruye a **todos los enemigos** que ocupen alguna casilla de la zona.
   - Quita **2 golpes** a cada muro destructible de la zona.
+- **Enemigos destruidos:** revientan en pedazos que salen despedidos, caen y desaparecen en ≈1,6 s.
+  - **Perseguidor** (criatura orgánica): se deshace en **muchas gotitas** de su color, y sus dos ojos salen volando. Las gotas se **aplastan como un charquito** al caer, sin rebotar. Suena un **estallido acuoso**, como una explosión en agua.
+  - **Patrullero y obstáculo** (sintéticos): se rompen en **piezas con su misma forma** (octaedros o dodecaedros pequeños) que giran deprisa y **rebotan**. Suena una **rotura de cristal y metal**.
 - Los enemigos destruidos **no vuelven** al morir el cubo (el tablero se queda como estaba); sí al reiniciar el nivel.
 - El resolvedor de niveles **no las usa**, como la media vuelta.
 
@@ -395,8 +400,13 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 - **Tocar la mitad izquierda de la pantalla** gira a la izquierda y **tocar la mitad derecha** gira a la derecha (relativo al rumbo, como en el apartado 2.3).
 - Toda la mitad de la pantalla es zona de toque, sin botones pequeños; cada toque cuenta como una pulsación. Tocar el botón de pausa no cuenta como giro.
 - **Media vuelta:** tocar las dos mitades a la vez, con un dedo en cada una (en el teclado, las dos flechas a la vez). Se resaltan las dos indicaciones.
-- **Dash:** deslizar el dedo **hacia arriba**; **pisotón:** deslizar **hacia abajo** (apartado 2.16). Vale en cualquier mitad de la pantalla. Un deslizamiento es un recorrido vertical de al menos el **6 % del alto de la pantalla**, claramente más vertical que horizontal (1,5 veces), en menos de 0,35 s.
-- **Toque frente a deslizamiento:** para poder distinguirlos, el giro de un toque se pide **al levantar el dedo** o, si se deja apoyado sin moverse (menos del 2 % del alto), a los **80 ms**. Si el dedo se mueve más, se espera a ver si llega a deslizamiento; si no llega, cuenta como toque. El dedo que desliza no gira ni cuenta para la media vuelta.
+- **Dash:** deslizar el dedo **hacia arriba**; **pisotón:** deslizar **hacia abajo** (apartado 2.16). Vale en cualquier mitad de la pantalla. Un deslizamiento es un recorrido vertical de al menos el **6 % del alto de la pantalla**, claramente más vertical que horizontal (1,5 veces), en **0,5 s o menos** desde que se apoya el dedo.
+- **Toque frente a deslizamiento:** un deslizamiento **nunca gira** el cubo.
+  - El giro de un toque se pide **al levantar el dedo** o, si se deja apoyado sin moverse (menos del 2 % del alto), a los **80 ms**.
+  - Si ese dedo apoyado acaba deslizando, **se anula el giro** que había pedido (salvo que el cubo ya lo haya hecho al llegar a una casilla en ese instante).
+  - Un dedo que se mueve **en vertical** sin llegar a deslizamiento no hace nada; si se mueve en horizontal, cuenta como toque.
+  - Sin fuerza, el deslizamiento se descarta, pero tampoco gira.
+  - El dedo que desliza no cuenta para la media vuelta.
 - Las indicaciones de las esquinas inferiores («← Izquierda» y «Derecha →») se resaltan al tocar cada lado.
 - El botón **Atrás** de Android pausa y reanuda la partida; en los menús vuelve a la pantalla anterior y, desde el menú principal, cierra el juego.
 - En PC se mantienen los controles de teclado (←/A, →/D, ↑/W dash, ↓/S pisotón, R reiniciar, Esc pausa/atrás, Intro/N siguiente nivel) y el clic del ratón se trata como un toque.

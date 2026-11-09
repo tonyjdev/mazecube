@@ -179,10 +179,27 @@ def main():
     save("stomp", mix(tone(65, 0.55, decay=0.18, sweep_to=38), tone(130, 0.2, decay=0.05, sweep_to=70, volume=0.6),
                       noise(0.45, decay=0.14, lowpass=0.2, volume=0.8), noise(0.05, decay=0.01, lowpass=0.9, volume=0.5)),
          peak=0.9)
-    # Enemigo destruido: estallido corto que sube de tono.
-    save("smash", mix(tone(300, 0.14, "square", decay=0.05, sweep_to=900, volume=0.4),
-                      noise(0.12, decay=0.035, lowpass=0.7), tone(90, 0.12, decay=0.04, sweep_to=60, volume=0.6)),
-         peak=0.6)
+    # Perseguidor reventado (criatura orgánica): golpe húmedo y grave,
+    # salpicadura y burbujas que suben de tono, como una explosión en agua.
+    splash = [tone(85, 0.3, decay=0.09, sweep_to=50), noise(0.35, decay=0.1, lowpass=0.18, volume=0.9),
+              noise(0.04, decay=0.01, lowpass=0.6, volume=0.5)]
+    for i in range(14):
+        f = rng.uniform(280, 900)
+        splash.append(offset(tone(f, 0.05, decay=0.025, sweep_to=f * rng.uniform(1.6, 2.4),
+                                  volume=rng.uniform(0.25, 0.5)), 0.03 + rng.uniform(0, 0.38)))
+    for i in range(6):
+        splash.append(offset(noise(0.06, decay=0.02, lowpass=0.12, volume=0.4), 0.08 + i * 0.06))
+    save("splat", mix(*splash), peak=0.75)
+    # Enemigo sintético roto (patrullero y obstáculo): chasquido de rotura y
+    # esquirlas de cristal y metal que tintinean al caer.
+    shards = [noise(0.05, decay=0.012, lowpass=1.0), tone(1900, 0.2, "bell", decay=0.07, volume=0.5),
+              tone(2650, 0.25, "bell", decay=0.09, volume=0.4), tone(180, 0.1, decay=0.03, sweep_to=110, volume=0.5)]
+    for i in range(16):
+        start = 0.02 + rng.uniform(0, 0.5) ** 1.4
+        f = rng.uniform(2200, 6200)
+        shards.append(offset(mix(tone(f, 0.12, "bell", decay=0.035, volume=rng.uniform(0.15, 0.4)),
+                                 noise(0.015, decay=0.004, lowpass=1.0, volume=0.25)), start))
+    save("shatter", mix(*shards), peak=0.7)
     print("Sonidos generados en", OUT)
 
 
