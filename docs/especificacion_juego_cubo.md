@@ -248,6 +248,7 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 
 - Son **trampas de una casilla**: en el suelo hay una **placa de metal con cuatro agujeros**, lejos de las esquinas de la casilla, por donde salen cuatro **lanzas** pequeñas.
 - Las lanzas esperan escondidas un tiempo **al azar entre 3 y 8 s** (cada casilla el suyo), **salen de golpe** con un sonido metálico de lanza, se quedan **fuera 1 s** y **vuelven a esconderse** (0,3 s). Después vuelven a esperar otro tiempo al azar.
+- **Aviso:** durante los últimos **250 ms** de la espera la placa **tiembla**, desplazándose al azar 1 o 2 píxeles de pantalla en cada fotograma.
 - **Solo matan al cubo mientras están fuera**: si el cubo está encima (o volcando hacia la casilla o desde ella, lo bastante cerca) cuando salen, o entra en la casilla con ellas fuera, explota y vuelve a la salida, como con los enemigos. Con las lanzas escondidas la casilla es normal.
 - Respetan las mismas inmunidades que los enemigos: no hacen daño durante el dash, el pisotón, el teletransporte ni la invulnerabilidad de después de reaparecer.
 - Mientras aparece el tablero las lanzas no se mueven.

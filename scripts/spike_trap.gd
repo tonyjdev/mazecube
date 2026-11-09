@@ -4,7 +4,10 @@ extends Node3D
 ## metal sobre la baldosa con cuatro agujeros (lejos de las esquinas) de los
 ## que salen cuatro lanzas. Esperan escondidas un tiempo al azar entre
 ## MIN_WAIT y MAX_WAIT segundos, salen de golpe (RISE_TIME), se quedan fuera
-## OUT_TIME segundos y vuelven a esconderse (RETRACT_TIME).
+## OUT_TIME segundos y vuelven a esconderse (RETRACT_TIME). Los últimos
+## WARN_TIME segundos de la espera la placa tiembla como aviso: cada
+## fotograma se desplaza al azar entre TREMBLE_MIN_PX y TREMBLE_MAX_PX
+## píxeles de pantalla (se calcula con la cámara).
 ##
 ## Level llama a update() en cada fotograma (no mientras aparece el tablero) y
 ## pregunta is_dangerous(): solo matan al cubo cuando están fuera. Emite
@@ -18,6 +21,9 @@ const MAX_WAIT := 8.0
 const RISE_TIME := 0.09
 const OUT_TIME := 1.0
 const RETRACT_TIME := 0.3
+const WARN_TIME := 0.25
+const TREMBLE_MIN_PX := 1.0
+const TREMBLE_MAX_PX := 2.0
 ## Parte de la subida a partir de la cual (y hasta la misma parte de la
 ## bajada) las lanzas matan.
 const DANGER_FROM := 0.45
@@ -44,6 +50,10 @@ var _time_left := 0.0
 ## 0 = escondidas, 1 = fuera del todo.
 var _extension := 0.0
 var _spears: Node3D
+var _plate: MeshInstance3D
+## Unidades del mundo que mide un píxel de pantalla junto a la trampa (se
+## calcula al empezar cada aviso; 0 = aún no).
+var _units_per_pixel := 0.0
 
 
 static func create() -> SpikeTrap:
@@ -62,6 +72,7 @@ func _ready() -> void:
 	plate.material_override = _plate_material
 	plate.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(plate)
+	_plate = plate
 	_spears = Node3D.new()
 	add_child(_spears)
 	for sx in [-1, 1]:
@@ -83,7 +94,11 @@ func update(delta: float) -> void:
 	_time_left -= delta
 	match _phase:
 		Phase.HIDDEN:
+			if _time_left <= WARN_TIME and _time_left > 0.0:
+				_tremble()
 			if _time_left <= 0.0:
+				_units_per_pixel = 0.0
+				_plate.position = Vector3(0.0, PLATE_HEIGHT, 0.0)
 				_phase = Phase.RISING
 				_time_left += RISE_TIME
 				extended.emit()
@@ -104,6 +119,26 @@ func update(delta: float) -> void:
 				_time_left += randf_range(MIN_WAIT, MAX_WAIT)
 				_extension = 0.0
 	_apply_extension()
+
+
+## Aviso de que van a salir: desplaza la placa al azar 1-2 píxeles.
+func _tremble() -> void:
+	if _units_per_pixel <= 0.0:
+		_units_per_pixel = _measure_units_per_pixel()
+	var angle := randf() * TAU
+	var amount := randf_range(TREMBLE_MIN_PX, TREMBLE_MAX_PX) * _units_per_pixel
+	_plate.position = Vector3(cos(angle) * amount, PLATE_HEIGHT, sin(angle) * amount)
+
+
+## Cuánto mide en el mundo un píxel de pantalla en la casilla de la trampa.
+func _measure_units_per_pixel() -> float:
+	var camera := get_viewport().get_camera_3d() if is_inside_tree() else null
+	if camera == null or camera.is_position_behind(global_position):
+		return 0.01
+	var a := camera.unproject_position(global_position)
+	var b := camera.unproject_position(global_position + Vector3(0.5, 0.0, 0.0))
+	var pixels := a.distance_to(b)
+	return 0.5 / pixels if pixels > 0.5 else 0.01
 
 
 ## Las lanzas están fuera (lo bastante para matar al cubo).
