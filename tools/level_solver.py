@@ -68,7 +68,7 @@ Simula las reglas de scripts/rolling_cube.gd:
 - Cañones de bombas ('M'): son muros con un cañón encima que lanza bombas en
   tiempo real, así que el resolvedor no los simula y cuentan como muros.
   "validate" comprueba que cada cañón tiene alguna casilla libre a su
-  alcance (20 casillas hacia delante y 5 a cada lado, o lo que diga el campo
+  alcance (10 casillas hacia delante y 5 a cada lado, o lo que diga el campo
   "mortars" del nivel).
 - Al llegar a la meta B termina el nivel.
 
@@ -117,7 +117,7 @@ SPIKE_CHAR = "^"
 LASER_CHAR = "L"
 MORTAR_CHAR = "M"
 # Alcance por defecto de los cañones de bombas: hacia delante y a cada lado.
-MORTAR_RANGE = (20, 5)
+MORTAR_RANGE = (10, 5)
 # Salidas del cubo que aguanta cada casilla de puente colgante.
 BRIDGE_STABILITY = 4
 ENEMY_CHARS = CHASER_CHAR + BLOCKER_CHAR + PATROL_CHARS

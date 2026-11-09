@@ -48,8 +48,8 @@ extends Node3D
 ##   barrotes cerrados, un enemigo o el cubo (al que mata). Pasa por encima
 ##   del vacío. Ver LaserCannon y LaserBolt.
 ##   Cañón de bombas: 'M' = muro con un cañón encima. Mira hacia `facing` y
-##   solo dispara (cada 5-8 s, al azar) si el cubo está a su alcance: hasta
-##   20 casillas hacia delante y 5 a cada lado. Lanza bombas con una
+##   solo dispara (cada 15-20 s, al azar) si el cubo está a su alcance: hasta
+##   10 casillas hacia delante y 5 a cada lado. Lanza bombas con una
 ##   trayectoria calculada para que caigan en una casilla libre del camino
 ##   del cubo; las bombas se mueven con físicas, rebotan un poco y explotan a
 ##   los 2-3 s de tocar el suelo, matando al cubo si está a 2 casillas o
