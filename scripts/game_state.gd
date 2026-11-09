@@ -34,6 +34,7 @@ const VIBRATION_DASH := Vector2(35, 0.5)
 const VIBRATION_TELEPORT := Vector2(45, 0.45)
 const VIBRATION_STOMP := Vector2(110, 0.9)
 const VIBRATION_DEATH := Vector2(160, 1.0)
+const VIBRATION_BOMB := Vector2(70, 0.6)
 ## Al activar la vibración en Opciones, para notar que funciona.
 const VIBRATION_PREVIEW := Vector2(60, 0.6)
 

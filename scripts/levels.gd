@@ -64,6 +64,15 @@ extends RefCounted
 ## cuyos disparos cruzan el camino: el 65 con un perseguidor; el 66 con una
 ## llave lejana, un perseguidor y una «galería» de tres cañones que cruzan el
 ## último pasillo largo.
+## Cañones de bombas (niveles 67-68): 'M' = muro con un cañón encima que, si
+## el cubo está a su alcance (20 casillas hacia delante y 5 a cada lado, o lo
+## que diga "mortars"), lanza cada 5-8 s una bomba que cae en el camino
+## previsto del cubo, rebota y explota a los 2-3 s. El resolvedor los trata
+## como muros. Los dos niveles parten de laberintos de tools/level_solver.py
+## generate con salas abiertas, con los cañones en los bordes y en muros
+## gruesos del interior: el 67 con tres cañones; el 68 con seis (uno con el
+## alcance recortado), una llave escondida en un recoveco del centro, la
+## puerta junto a la meta y un perseguidor.
 ##
 ## Los niveles crecen de forma progresiva (en torno a un 15-20% más de
 ## casillas cada uno) y alternan forma apaisada y vertical. Los pequeños
@@ -3316,6 +3325,61 @@ const LIST: Array[Dictionary] = [
 			"#.........#.#.......#.........#",
 			"########L#############L####L###",
 		],
+	},
+	{
+		"name": "Bombas",
+		"turns": 27,
+		"start_heading": Vector2i(1, 0),
+		"layout": [
+			"#############################",
+			"#.#..........A..#.......#...#",
+			"#.#.###.###.#.###.#.###.#.#.#",
+			"#...#.....#.#.#...#.#.....#.#",
+			"#.###.###.#.###.###.#######.#",
+			"#.......#...#...#...#...#...M",
+			"#.#####.#.###.###.###.#.#.###",
+			"#.....#...#.....#.....#.#...#",
+			"#.#.#.#.###.###.#######.###.#",
+			"#...#.#...#...#.......#...#.#",
+			"#.#.#.###M##....#.###.###.###",
+			"#.................#.#.#.#...#",
+			"###.#####.#....##.#.#.#.###.#",
+			"#...#.............#.......#.#",
+			"#.###.###.#...###.#########.#",
+			"#...#.#...#...#.#.#.......#.#",
+			"###.###.#.###.#.###B#####.#.#",
+			"#.......#.....#.....#.......#",
+			"######################M######",
+		],
+	},
+	{
+		"name": "Lluvia de bombas",
+		"turns": 36,
+		"start_heading": Vector2i(1, 0),
+		"layout": [
+			"########################M########",
+			"#.#.........#...#..A............#",
+			"#.#.#####.#.#.#.#.#.###.#.#######",
+			"#.#...#...#...#.#.#.....#.......#",
+			"#.###.#.#.#####.#.###.#.#####.#.#",
+			"#.....#.........#...#.......#.#.#",
+			"#.#######.#.#.#.###.#####...#.#.#",
+			"#...#...#...#.#...#.....#.x.#.#.#",
+			"###.#.###M###.#.#####.#.#...#.#.#",
+			"#...#.#...#...#.#y..#...#.#...#.M",
+			"#.###.#.#.#.#.###.#.#.#.#.#####.#",
+			"M.#.....#.#.#.#...#...#.#.#...#.#",
+			"#.#######.#.#.#.###M###...#.#.#.#",
+			"#...#.....#...#...#...#...#.....#",
+			"###.#.###.###.###.#.###...#.###.#",
+			"#...#.......#.#...#.........#...#",
+			"#.#####.###.#.#.#######.###.#.###",
+			"#...........#.#.#.....#.....#...#",
+			"#####.#####.#.#.###.#.###.#####.#",
+			"#B..Y.......#.......#...........#",
+			"################M################",
+		],
+		"mortars": {Vector2i(19, 12): {"facing": Vector2i(0, 1), "range": Vector2i(8, 5)}},
 	},
 ]
 

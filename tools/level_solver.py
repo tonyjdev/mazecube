@@ -65,6 +65,11 @@ Simula las reglas de scripts/rolling_cube.gd:
   real, así que el resolvedor no los simula y cuentan como muros. "validate"
   comprueba que cada cañón tiene exactamente una casilla libre al lado (hacia
   donde dispara).
+- Cañones de bombas ('M'): son muros con un cañón encima que lanza bombas en
+  tiempo real, así que el resolvedor no los simula y cuentan como muros.
+  "validate" comprueba que cada cañón tiene alguna casilla libre a su
+  alcance (20 casillas hacia delante y 5 a cada lado, o lo que diga el campo
+  "mortars" del nivel).
 - Al llegar a la meta B termina el nivel.
 
 La dificultad de un nivel es el mínimo de giros necesarios (búsqueda 0-1 BFS),
@@ -110,6 +115,9 @@ BRIDGE_CHAR = "="
 TELEPORT_CHARS = "6789"
 SPIKE_CHAR = "^"
 LASER_CHAR = "L"
+MORTAR_CHAR = "M"
+# Alcance por defecto de los cañones de bombas: hacia delante y a cada lado.
+MORTAR_RANGE = (20, 5)
 # Salidas del cubo que aguanta cada casilla de puente colgante.
 BRIDGE_STABILITY = 4
 ENEMY_CHARS = CHASER_CHAR + BLOCKER_CHAR + PATROL_CHARS
@@ -118,7 +126,7 @@ ROUTE_DIRS = {"R": (1, 0), "L": (-1, 0), "U": (0, -1), "D": (0, 1)}
 PATROL_MIN_EXITS = 3
 LEVEL_CHARS = ("#.AB" + KEY_CHARS + DOOR_CHARS + POWERUP_CHARS + BREAKABLE_CHARS
                + BAR_CHARS + BAR_CHARS.upper() + BUTTON_CHARS + ENEMY_CHARS + VOID_CHAR + BRIDGE_CHAR
-               + TELEPORT_CHARS + SPIKE_CHAR + LASER_CHAR)
+               + TELEPORT_CHARS + SPIKE_CHAR + LASER_CHAR + MORTAR_CHAR)
 
 
 def turn_left(h):
@@ -138,7 +146,7 @@ def parse(layout):
     free, start, goal = set(), None, None
     for z, row in enumerate(layout):
         for x, c in enumerate(row):
-            if c not in "#" + VOID_CHAR + BUTTON_CHARS + BLOCKER_CHAR + LASER_CHAR:
+            if c not in "#" + VOID_CHAR + BUTTON_CHARS + BLOCKER_CHAR + LASER_CHAR + MORTAR_CHAR:
                 free.add((x, z))
             if c == "A":
                 start = (x, z)
@@ -423,9 +431,18 @@ def read_levels(path=LEVELS_GD):
         block = re.search(r'"patrols":\s*\{(.*?)\}', extra, re.S)
         if block:
             patrols = dict(re.findall(r'"(\w)":\s*"([^"]*)"', block.group(1)))
+        # "mortars": {Vector2i(x, z): {"facing": Vector2i(a, b), "range": Vector2i(f, s)}}
+        mortars = {}
+        block = re.search(r'"mortars":\s*\{((?:[^{}]|\{[^{}]*\})*)\}', extra, re.S)
+        if block:
+            for mx, mz, body_m in re.findall(r'Vector2i\((\d+),\s*(\d+)\):\s*\{([^}]*)\}', block.group(1)):
+                settings = {}
+                for key, a, b in re.findall(r'"(facing|range)":\s*Vector2i\((-?\d+),\s*(-?\d+)\)', body_m):
+                    settings[key] = (int(a), int(b))
+                mortars[(int(mx), int(mz))] = settings
         levels.append({"name": name, "turns": int(turns),
                        "heading": (int(hx), int(hz)), "layout": rows, "buttons": buttons,
-                       "patrols": patrols})
+                       "patrols": patrols, "mortars": mortars})
     declared = len(re.findall(r'^\t\t"name":', source, re.M))
     if declared != len(levels):
         raise SystemExit(f"Solo se han podido leer {len(levels)} de los {declared} niveles de "
@@ -444,7 +461,7 @@ def check_buttons(rows, buttons):
     def wall(x, z):
         if z < 0 or z >= len(rows) or x < 0 or x >= len(rows[z]):
             return True
-        return rows[z][x] in "#" + LASER_CHAR or rows[z][x] in BUTTON_CHARS or rows[z][x] in BREAKABLE_CHARS
+        return rows[z][x] in "#" + LASER_CHAR + MORTAR_CHAR or rows[z][x] in BUTTON_CHARS or rows[z][x] in BREAKABLE_CHARS
 
     fronts = set()
     for z, row in enumerate(rows):
@@ -534,7 +551,7 @@ def check_teleports(rows):
     def edge(x, z):
         if z < 0 or z >= len(rows) or x < 0 or x >= len(rows[z]):
             return True
-        return rows[z][x] in "#" + VOID_CHAR + BUTTON_CHARS + BREAKABLE_CHARS + LASER_CHAR
+        return rows[z][x] in "#" + VOID_CHAR + BUTTON_CHARS + BREAKABLE_CHARS + LASER_CHAR + MORTAR_CHAR
 
     free, _, _ = parse(rows)
     for c, group in sorted(cells.items()):
@@ -566,6 +583,36 @@ def check_lasers(rows):
                 sides = [(x + dx, z + dz) for dx, dz in DIRS if (x + dx, z + dz) in free]
                 if len(sides) != 1:
                     problems.append(f"el cañón láser en {(x, z)} debe tener exactamente una casilla libre al lado")
+    return problems
+
+
+def check_mortars(rows, mortars):
+    """Problemas de los cañones de bombas (lista de textos): cada uno debe
+    tener alguna casilla libre a su alcance mirando hacia donde mira (la de
+    "mortars" o, si no se indica, la que tiene más casillas libres)."""
+    problems = []
+    free, _, _ = parse(rows)
+
+    def in_reach(cell, facing, reach, target):
+        ox, oz = target[0] - cell[0], target[1] - cell[1]
+        forward = ox * facing[0] + oz * facing[1]
+        side = ox * facing[1] - oz * facing[0]
+        return 1 <= forward <= reach[0] and abs(side) <= reach[1]
+
+    for z, row in enumerate(rows):
+        for x, c in enumerate(row):
+            if c != MORTAR_CHAR:
+                continue
+            settings = mortars.get((x, z), {})
+            reach = settings.get("range", MORTAR_RANGE)
+            facings = [settings["facing"]] if "facing" in settings else DIRS
+            best = max(sum(1 for t in free if in_reach((x, z), f, reach, t)) for f in facings)
+            if best == 0:
+                problems.append(f"el cañón de bombas en {(x, z)} no tiene ninguna casilla libre a su alcance")
+    for cell in mortars:
+        x, z = cell
+        if z >= len(rows) or x >= len(rows[z]) or rows[z][x] != MORTAR_CHAR:
+            problems.append(f'"mortars" habla de {cell}, que no es un cañón de bombas')
     return problems
 
 
@@ -603,8 +650,8 @@ def check_bridges(rows):
             along = (bridge[1][0] - first[0], bridge[1][1] - first[1])
         else:
             x, z = first
-            along = (0, 1) if at(x, z - 1) not in "#" + VOID_CHAR + LASER_CHAR \
-                and at(x, z + 1) not in "#" + VOID_CHAR + LASER_CHAR \
+            along = (0, 1) if at(x, z - 1) not in "#" + VOID_CHAR + LASER_CHAR + MORTAR_CHAR \
+                and at(x, z + 1) not in "#" + VOID_CHAR + LASER_CHAR + MORTAR_CHAR \
                 else (1, 0)
         side = (along[1], along[0])
         for x, z in bridge:
@@ -614,7 +661,8 @@ def check_bridges(rows):
                                     f"a un lado (debe tener vacío a ambos lados)")
         for end in ((first[0] - along[0], first[1] - along[1]), (last[0] + along[0], last[1] + along[1])):
             c = at(*end)
-            if c in "#" + VOID_CHAR + BRIDGE_CHAR + LASER_CHAR or c in BUTTON_CHARS or c in BREAKABLE_CHARS:
+            if c in "#" + VOID_CHAR + BRIDGE_CHAR + LASER_CHAR + MORTAR_CHAR or c in BUTTON_CHARS \
+                    or c in BREAKABLE_CHARS:
                 problems.append(f"el puente de {first} no acaba en suelo en {end}")
     return problems
 
@@ -679,6 +727,7 @@ def cmd_validate(_args):
         problems += check_bridges(rows)
         problems += check_teleports(rows)
         problems += check_lasers(rows)
+        problems += check_mortars(rows, lvl["mortars"])
         result = None if problems else solve(rows, lvl["heading"], buttons=lvl["buttons"])
         if not problems and result is None:
             problems.append("sin solución")

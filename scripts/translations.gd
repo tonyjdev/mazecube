@@ -77,6 +77,7 @@ const MESSAGES := {
 		"TIP_TELEPORT": "Los portales del mismo color están conectados: el cubo sale por el otro con el mismo rumbo. Los enemigos no pueden seguirte.",
 		"TIP_SPIKES": "Las placas con cuatro agujeros esconden pinchos que salen cada pocos segundos. Justo antes, la placa tiembla: gira o da media vuelta.",
 		"TIP_LASER": "Cuando las luces rojas de un cañón parpadean y pitan, va a disparar: el láser avanza hasta chocar con algo. No te cruces en su camino.",
+		"TIP_BOMBS": "Los cañones de encima de los muros te lanzan bombas cuando estás a su alcance. Caen en tu camino y explotan a los pocos segundos: sal de las casillas rojas antes de que estallen.",
 	},
 	"en": {
 		"MENU_PLAY": "Play",
@@ -148,6 +149,7 @@ const MESSAGES := {
 		"TIP_TELEPORT": "Portals of the same colour are linked: the cube comes out of the other one heading the same way. Enemies can't follow you.",
 		"TIP_SPIKES": "Plates with four holes hide spikes that shoot up every few seconds. Just before, the plate shakes: turn or reverse.",
 		"TIP_LASER": "When a cannon's red lights blink and beep, it's about to fire: the laser flies until it hits something. Stay out of its way.",
+		"TIP_BOMBS": "Cannons on top of walls lob bombs at you when you're in range. They land in your path and go off a few seconds later: get off the red tiles before they blow.",
 		"Primer giro": "First Turn",
 		"El muro": "The Wall",
 		"La llave": "The Key",
@@ -214,6 +216,8 @@ const MESSAGES := {
 		"El corredor de lanzas": "The Spear Corridor",
 		"Láseres": "Lasers",
 		"La galería de tiro": "The Shooting Gallery",
+		"Bombas": "Bombs",
+		"Lluvia de bombas": "Raining Bombs",
 	},
 }
 

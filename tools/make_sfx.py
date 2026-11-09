@@ -261,6 +261,38 @@ def main():
         crackle.append(offset(tone(rng.uniform(3000, 6500), 0.03, "sine", attack=0.001, decay=0.006,
                                    volume=0.3 - k * 0.025), start))
     save("laser_hit", mix(*crackle), peak=0.45)
+    # Cañón de bombas (al final para no cambiar el azar de los anteriores).
+    # Disparo: estampido grave y hueco de mortero con un soplo de pólvora.
+    boom = [tone(70, 0.5, decay=0.14, sweep_to=42, volume=1.0),
+            tone(140, 0.25, decay=0.06, sweep_to=80, volume=0.5),
+            noise(0.35, decay=0.09, lowpass=0.12, volume=0.9),
+            noise(0.05, decay=0.012, lowpass=0.7, volume=0.5)]
+    save("mortar", mix(*boom), peak=0.8)
+    # Bote de la bomba: golpe metálico pesado y apagado contra el suelo.
+    save("bomb_bounce", mix(tone(110, 0.18, decay=0.045, sweep_to=75, volume=0.9),
+                            tone(620, 0.12, "bell", attack=0.001, decay=0.03, volume=0.2),
+                            noise(0.06, decay=0.015, lowpass=0.35, volume=0.6)), peak=0.6)
+    # Mecha: siseo chisporroteante que dura lo que la cuenta atrás más corta.
+    fizz = [noise(2.0, decay=4.0, lowpass=0.9, volume=0.25, attack=0.05)]
+    for k in range(60):
+        start = rng.uniform(0.0, 1.95)
+        fizz.append(offset(noise(0.012, decay=0.003, lowpass=1.0, volume=rng.uniform(0.3, 0.7)), start))
+    fuse = mix(*fizz)
+    fade = int(0.3 * RATE)
+    for i in range(fade):
+        fuse[-fade + i] *= 1.0 - i / fade
+    save("bomb_fuse", fuse, peak=0.3)
+    # Explosión: estallido grave con un rugido de fuego que se apaga despacio
+    # y restos que crepitan.
+    blast = [tone(55, 0.9, decay=0.3, sweep_to=30, volume=1.0),
+             tone(95, 0.4, decay=0.1, sweep_to=50, volume=0.6),
+             noise(1.2, decay=0.35, lowpass=0.08, volume=1.0),
+             noise(0.3, decay=0.06, lowpass=0.5, volume=0.7),
+             noise(0.04, decay=0.01, lowpass=1.0, volume=0.6)]
+    for k in range(14):
+        start = 0.1 + rng.uniform(0, 0.8) ** 1.3
+        blast.append(offset(noise(0.02, decay=0.005, lowpass=0.9, volume=rng.uniform(0.15, 0.35)), start))
+    save("bomb_explode", mix(*blast), peak=0.9)
     print("Sonidos generados en", OUT)
 
 

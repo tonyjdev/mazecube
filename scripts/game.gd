@@ -86,6 +86,9 @@ const SWIPE_VERTICAL_RATIO := 1.5
 const RESUME_RAMP_TIME := 1.0
 ## Tiempo máximo que el cubo espera a la cámara para reaparecer tras morir.
 const RESPAWN_CAMERA_WAIT := 3.0
+## Distancia (en casillas) del cubo a una bomba que explota a partir de la cual
+## no tiembla la cámara.
+const BOMB_SHAKE_DISTANCE := 4.0
 
 var current_level := 0
 var _hint_tweens := {}
@@ -135,6 +138,11 @@ func _ready() -> void:
 
 	cube.reached_goal.connect(_on_reached_goal)
 	level.cube = cube
+	level.bomb_exploded.connect(func(distance: float) -> void:
+		# Las explosiones cercanas al cubo hacen temblar la cámara y el móvil.
+		if distance <= BOMB_SHAKE_DISTANCE:
+			camera.shake()
+			GameState.vibrate(GameState.VIBRATION_BOMB))
 	cube.respawned.connect(_appear_after_camera)
 	cube.died.connect(func(_cell: Vector2i) -> void:
 		Sfx.play("explode")

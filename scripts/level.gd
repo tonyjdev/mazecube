@@ -47,6 +47,19 @@ extends Node3D
 ##   avanza en línea recta hasta chocar con un muro, una puerta, unos
 ##   barrotes cerrados, un enemigo o el cubo (al que mata). Pasa por encima
 ##   del vacío. Ver LaserCannon y LaserBolt.
+##   Cañón de bombas: 'M' = muro con un cañón encima. Mira hacia `facing` y
+##   solo dispara (cada 5-8 s, al azar) si el cubo está a su alcance: hasta
+##   20 casillas hacia delante y 5 a cada lado. Lanza bombas con una
+##   trayectoria calculada para que caigan en una casilla libre del camino
+##   del cubo; las bombas se mueven con físicas, rebotan un poco y explotan a
+##   los 2-3 s de tocar el suelo, matando al cubo si está a 2 casillas o
+##   menos (en cuadrado, diagonales incluidas; esas casillas se ven rojas
+##   mientras arde la mecha). A los enemigos no les hacen nada. `mortar_settings` (campo "mortars" del
+##   nivel) fija hacia dónde mira y el alcance de cada cañón:
+##   {Vector2i(10, 0): {"facing": Vector2i(0, 1), "range": Vector2i(14, 4)}}
+##   ("range" = casillas hacia delante y a cada lado). Si no se indica, mira
+##   hacia donde tiene más casillas libres a su alcance. Ver MortarCannon y
+##   Bomb.
 ## Materiales (ver BlockCatalog): el campo "theme" del nivel elige el bloque
 ## del suelo ("floor"), de los muros ("wall") y, opcionalmente, de la roca de
 ## debajo ("foundation"; si no se da, la que va bajo el suelo). Lo que falte
@@ -63,6 +76,8 @@ extends Node3D
 ## quietos (ver set_enemies_frozen). Al acabar emite reveal_finished.
 
 signal reveal_finished
+## Ha explotado una bomba a `distance` casillas del cubo (INF si no está).
+signal bomb_exploded(distance: float)
 
 const CELL_SIZE := 1.0
 const WALL_HEIGHT := 0.5
@@ -97,6 +112,24 @@ const LASER_ENEMY_RADIUS := 0.38
 ## cada casilla más lejos suenan LASER_SOUND_FALLOFF dB más bajo.
 const LASER_SOUND_RADIUS := 9.0
 const LASER_SOUND_FALLOFF := 1.6
+const MORTAR_CHAR := "M"
+## Alcance de la explosión: casillas alrededor de la de la bomba (en
+## cuadrado, diagonales incluidas, sin que lo frenen los muros). Mata al cubo
+## si está en alguna de ellas; Bomb las marca en rojo mientras arde la mecha.
+const BOMB_BLAST_CELLS := 2
+## Al explotar, empuja a las demás bombas que estén a esta distancia o menos.
+const BOMB_PUSH_RADIUS := 1.6
+## Inclinaciones del cañón que se prueban para que la bomba no choque con los
+## muros por el camino (de la más baja a la más alta).
+const MORTAR_PITCHES: Array[float] = [55.0, 62.0, 69.0, 75.0, 80.0]
+## Las bombas y los cañones solo se oyen a esta distancia del cubo o menos;
+## cada casilla más lejos suenan MORTAR_SOUND_FALLOFF dB más bajo.
+const MORTAR_SOUND_RADIUS := 14.0
+const MORTAR_SOUND_FALLOFF := 1.2
+## Tamaño (en casillas) de las cajas con las que chocan las bombas: el cubo y
+## los enemigos.
+const BOMB_CUBE_BOX := Vector3(0.96, 0.96, 0.96)
+const BOMB_ENEMY_BOX := Vector3(0.6, 0.7, 0.6)
 ## Color de cada pareja de teletransporte.
 const TELEPORT_COLORS := {
 	"6": Color(0.25, 0.85, 1.0),
@@ -176,6 +209,9 @@ const REVEAL_FADE_TIME := 0.45
 ## leyenda del principio.
 @export var spawner_settings := {}
 @export var block_regions: Array = []
+## Hacia dónde mira y alcance de los cañones de bombas (campo "mortars"). Ver
+## la leyenda del principio.
+@export var mortar_settings := {}
 ## Cubo del jugador: los enemigos lo buscan y lo matan.
 var cube: RollingCube:
 	set(value):
@@ -220,6 +256,13 @@ var _spikes := {}
 var _cannons := {}
 ## Láseres en vuelo.
 var _lasers: Array[LaserBolt] = []
+## casilla -> MortarCannon
+var _mortars := {}
+## Bombas en juego.
+var _bombs: Array[Bomb] = []
+## Posición (en el tablero) del cubo y de cada enemigo en el fotograma
+## anterior, para saber a qué velocidad empujan a las bombas.
+var _body_positions := {}
 ## casilla -> HangingBridge (solo los que siguen en pie)
 var _bridges := {}
 ## Aparición en curso: tiempo transcurrido, retraso de cada casilla,
@@ -246,6 +289,7 @@ func configure(data: Dictionary) -> void:
 	spawner_settings = data.get("spawners", {})
 	block_theme = data.get("theme", {})
 	block_regions = data.get("theme_regions", [])
+	mortar_settings = data.get("mortars", {})
 
 
 func build() -> void:
@@ -271,7 +315,11 @@ func build() -> void:
 	_spikes.clear()
 	_cannons.clear()
 	_lasers.clear()
+	_mortars.clear()
+	_bombs.clear()
+	_body_positions.clear()
 	var enemy_cells := {}
+	var mortar_cells: Array[Vector2i] = []
 	## símbolo -> casillas de teletransporte
 	var teleport_cells := {}
 	var bridge_cells := {}
@@ -298,10 +346,12 @@ func build() -> void:
 				wall_cells.append(cell)
 				_add_cannon(cell)
 				continue
-			if symbol == "#" or BUTTON_CHARS.contains(symbol):
+			if symbol == "#" or BUTTON_CHARS.contains(symbol) or symbol == MORTAR_CHAR:
 				wall_cells.append(cell)
 				_group(wall_groups, _block_at(cell, "wall"), cell)
-				if symbol != "#":
+				if symbol == MORTAR_CHAR:
+					mortar_cells.append(cell)
+				elif symbol != "#":
 					_add_button(cell, symbol)
 				continue
 			_walkable[cell] = true
@@ -349,6 +399,8 @@ func build() -> void:
 	_add_teleports(teleport_cells)
 	for cell: Vector2i in enemy_cells:
 		_add_spawner(cell, enemy_cells[cell])
+	for cell in mortar_cells:
+		_add_mortar(cell)
 	for button in _buttons.values():
 		button["near"] = _cells_within(button["front"], BUTTON_APPROACH_CELLS)
 
@@ -364,6 +416,8 @@ func _process(delta: float) -> void:
 		for item: Dictionary in _cannons.values():
 			item["node"].update(delta)
 		_update_lasers(delta)
+		_update_mortars(delta)
+		_update_bombs(delta)
 	_check_enemy_hits()
 	_check_spike_hits()
 	for item in _keys.values():
@@ -579,7 +633,7 @@ func _free_side(cell: Vector2i) -> Vector2i:
 		var n := cell + dir
 		if n.y >= 0 and n.y < layout.size() and n.x >= 0 and n.x < layout[n.y].length() \
 				and not "#~".contains(layout[n.y][n.x]) and not BUTTON_CHARS.contains(layout[n.y][n.x]) \
-				and layout[n.y][n.x] != LASER_CHAR:
+				and layout[n.y][n.x] != LASER_CHAR and layout[n.y][n.x] != MORTAR_CHAR:
 			return dir
 	return Vector2i.ZERO
 
@@ -698,6 +752,322 @@ func _laser_stop(cell: Vector2i) -> float:
 	if bars_closed(cell):
 		return 0.06
 	return -1.0
+
+
+# --- Cañones de bombas -------------------------------------------------------
+
+func is_mortar(cell: Vector2i) -> bool:
+	return _mortars.has(cell)
+
+
+## Cañón de bombas encima del muro de `cell`, con lo que diga mortar_settings
+## o, si no, mirando hacia donde tiene más casillas libres a su alcance.
+func _add_mortar(cell: Vector2i) -> void:
+	var settings: Dictionary = mortar_settings.get(cell, {})
+	var reach: Vector2i = settings.get("range", Vector2i(MortarCannon.RANGE_FORWARD, MortarCannon.RANGE_SIDE))
+	var facing: Vector2i = settings.get("facing", Vector2i.ZERO)
+	if facing == Vector2i.ZERO:
+		var best := -1
+		for dir: Vector2i in [Vector2i.DOWN, Vector2i.RIGHT, Vector2i.UP, Vector2i.LEFT]:
+			var count := 0
+			for c: Vector2i in _walkable:
+				if _in_reach(cell, dir, reach, c):
+					count += 1
+			if count > best:
+				best = count
+				facing = dir
+	var cannon := MortarCannon.create(facing, reach)
+	cannon.position = Vector3(cell.x * CELL_SIZE, WALL_HEIGHT, cell.y * CELL_SIZE)
+	add_child(cannon)
+	_mortars[cell] = cannon
+	cannon.fired.connect(_on_mortar_fired.bind(cell))
+
+
+## La casilla `target` está al alcance de un cañón en `cell` que mira hacia
+## `facing` con alcance `reach` (hacia delante, a cada lado).
+static func _in_reach(cell: Vector2i, facing: Vector2i, reach: Vector2i, target: Vector2i) -> bool:
+	var offset := target - cell
+	var forward := offset.x * facing.x + offset.y * facing.y
+	var side := offset.x * facing.y - offset.y * facing.x
+	return forward >= 1 and forward <= reach.x and absi(side) <= reach.y
+
+
+## El cubo está en el tablero y se le puede apuntar.
+func _cube_targetable() -> bool:
+	return cube != null and cube.is_alive() and not cube.is_finished and not cube.is_appearing() \
+		and not cube.is_teleporting()
+
+
+func _update_mortars(delta: float) -> void:
+	for cell: Vector2i in _mortars:
+		var cannon: MortarCannon = _mortars[cell]
+		cannon.update(delta)
+		if cannon.wants_to_fire() and _cube_targetable() \
+				and _in_reach(cell, cannon.facing, cannon.reach, cube.cell):
+			var target := _mortar_target(cell, cannon)
+			if target == NO_CELL:
+				continue
+			var shot := _plan_mortar_shot(cell, target)
+			if not shot.is_empty():
+				cannon.aim(shot["yaw"], shot["pitch"], shot["velocity"])
+
+
+## Casilla donde caerá la bomba: la del camino previsto del cubo en la que
+## estará más o menos cuando la bomba lleve un rato en el suelo (o un poco
+## antes), siempre libre y al alcance del cañón. NO_CELL si no hay ninguna.
+func _mortar_target(cell: Vector2i, cannon: MortarCannon) -> Vector2i:
+	var path := _predict_cube_path(24)
+	var step := cube.step_time()
+	var extra := randf_range(-0.6, 1.4)
+	var index := 0
+	# Dos pasadas: el tiempo de vuelo depende de la casilla elegida.
+	var flight := 1.5
+	for i in 2:
+		index = clampi(roundi((MortarCannon.AIM_TIME + flight + extra) / step), 0, path.size() - 1)
+		var shot := _plan_mortar_shot(cell, path[index])
+		if not shot.is_empty():
+			flight = shot["time"]
+	for k in range(index, -1, -1):
+		var c: Vector2i = path[k]
+		if _bomb_target_ok(c) and _in_reach(cell, cannon.facing, cannon.reach, c):
+			return c
+	return NO_CELL
+
+
+## Casilla en la que puede caer una bomba: libre (por donde pasan el cubo y
+## los enemigos), sin ser la salida ni la meta.
+func _bomb_target_ok(cell: Vector2i) -> bool:
+	return is_terrain_walkable(cell) and cell != start_cell and cell != goal_cell and not _void.has(cell)
+
+
+## Casillas por las que pasará el cubo si nadie gira, empezando por la suya:
+## sigue recto y, al chocar, rebota (hasta `count` casillas).
+func _predict_cube_path(count: int) -> Array[Vector2i]:
+	var path: Array[Vector2i] = [cube.cell]
+	var dir := cube.heading
+	var current := cube.cell
+	while path.size() < count:
+		var next := current + dir
+		if not is_terrain_walkable(next):
+			dir = -dir
+			next = current + dir
+			if not is_terrain_walkable(next):
+				break
+		path.append(next)
+		current = next
+	return path
+
+
+## Trayectoria de una bomba desde el cañón de `cell` hasta el centro de
+## `target`: giro, inclinación, velocidad de salida y tiempo de vuelo
+## ({ "yaw", "pitch", "velocity", "time" }), con la inclinación más baja de
+## MORTAR_PITCHES que no choca con ningún muro por el camino (o la más alta si
+## todas chocan). Vacío si no hay trayectoria.
+func _plan_mortar_shot(cell: Vector2i, target: Vector2i) -> Dictionary:
+	var origin := Vector3(cell.x * CELL_SIZE, WALL_HEIGHT, cell.y * CELL_SIZE)
+	var land := Vector3(target.x * CELL_SIZE, Bomb.INRADIUS, target.y * CELL_SIZE)
+	var yaw := atan2(land.x - origin.x, land.z - origin.z)
+	var result := {}
+	for degrees in MORTAR_PITCHES:
+		var pitch := deg_to_rad(degrees)
+		var muzzle := origin + MortarCannon.muzzle_offset(yaw, pitch)
+		var flat := Vector2(land.x - muzzle.x, land.z - muzzle.z)
+		var d := flat.length()
+		var drop := muzzle.y - land.y
+		var denom := 2.0 * cos(pitch) * cos(pitch) * (d * tan(pitch) + drop)
+		if d < 0.05 or denom <= 0.0:
+			continue
+		# Tiro parabólico con ese ángulo: v² = g·d² / (2·cos²θ·(d·tanθ + h)).
+		var speed := sqrt(Bomb.GRAVITY * d * d / denom)
+		var dir := flat / d
+		var velocity := Vector3(dir.x * speed * cos(pitch), speed * sin(pitch), dir.y * speed * cos(pitch))
+		result = {"yaw": yaw, "pitch": pitch, "velocity": velocity, "time": d / (speed * cos(pitch))}
+		if _arc_clear(cell, muzzle, velocity, result["time"]):
+			break
+	return result
+
+
+## La bomba que sale de `muzzle` con `velocity` no choca con nada en los
+## primeros `time` segundos (salvo con el muro de su propio cañón).
+func _arc_clear(cell: Vector2i, muzzle: Vector3, velocity: Vector3, time: float) -> bool:
+	const SAMPLES := 24
+	for i in range(1, SAMPLES):
+		var t := time * i / SAMPLES
+		var p := muzzle + velocity * t + Vector3.DOWN * Bomb.GRAVITY * t * t * 0.5
+		for dz in range(-1, 2):
+			for dx in range(-1, 2):
+				var c := Vector2i(roundi(p.x / CELL_SIZE), roundi(p.z / CELL_SIZE)) + Vector2i(dx, dz)
+				if c == cell:
+					continue
+				for box: AABB in bomb_boxes(c):
+					if box.end.y > 0.01 and _point_box_distance(p, box) < Bomb.INRADIUS:
+						return false
+	return true
+
+
+static func _point_box_distance(p: Vector3, box: AABB) -> float:
+	return p.distance_to(p.clamp(box.position, box.end))
+
+
+## El cañón de `cell` ha disparado: sale la bomba.
+func _on_mortar_fired(muzzle: Vector3, velocity: Vector3, cell: Vector2i) -> void:
+	var bomb := Bomb.create(self, muzzle, velocity)
+	add_child(bomb)
+	_bombs.append(bomb)
+	bomb.touched_ground.connect(func() -> void: _bomb_sound(bomb, "bomb_fuse", 0.05))
+	bomb.bounced.connect(func(speed: float) -> void:
+		_bomb_sound(bomb, "bomb_bounce", 0.12, clampf((speed - 6.0) * 1.5, -14.0, 0.0)))
+	var volume := _mortar_volume(Vector2(cell))
+	if not is_nan(volume):
+		Sfx.play("mortar", 0.08, volume)
+
+
+## Volumen (dB) de un sonido de cañón o bomba según lo lejos que esté del
+## cubo, o NAN si está demasiado lejos para oírse.
+func _mortar_volume(at: Vector2) -> float:
+	if cube == null:
+		return NAN
+	var distance := Vector2(cube.cell).distance_to(at)
+	return -MORTAR_SOUND_FALLOFF * distance if distance <= MORTAR_SOUND_RADIUS else NAN
+
+
+func _bomb_sound(bomb: Bomb, sound: String, jitter: float, extra_db := 0.0) -> void:
+	if not is_instance_valid(bomb):
+		return
+	var volume := _mortar_volume(Vector2(bomb.position.x, bomb.position.z) / CELL_SIZE)
+	if not is_nan(volume):
+		Sfx.play(sound, jitter, volume + extra_db)
+
+
+## Mueve las bombas, las hace chocar entre ellas y hace explotar las que
+## han agotado la mecha.
+func _update_bombs(delta: float) -> void:
+	if _bombs.is_empty():
+		_body_positions.clear()
+		return
+	var bodies := _bomb_bodies(delta)
+	for bomb: Bomb in _bombs.duplicate():
+		bomb.update(delta, bodies)
+		if bomb.is_lost():
+			_bombs.erase(bomb)
+			bomb.queue_free()
+		elif bomb.fuse_left <= 0.0:
+			_explode_bomb(bomb)
+	# Choques entre bombas: se separan y se pasan la velocidad que llevan la
+	# una hacia la otra.
+	for i in _bombs.size():
+		for j in range(i + 1, _bombs.size()):
+			var a := _bombs[i]
+			var b := _bombs[j]
+			var diff := b.position - a.position
+			var dist := diff.length()
+			if dist >= Bomb.INRADIUS * 2.0 or dist < 1e-5:
+				continue
+			var normal := diff / dist
+			var push := (Bomb.INRADIUS * 2.0 - dist) * 0.5
+			a.position -= normal * push
+			b.position += normal * push
+			var closing := (a.velocity - b.velocity).dot(normal)
+			if closing > 0.0:
+				var impulse := normal * closing * (1.0 + Bomb.BOUNCE) * 0.5
+				a.velocity -= impulse
+				b.velocity += impulse
+
+
+## Cajas del cubo y de los enemigos para los choques de las bombas, con su
+## velocidad: [{ "box": AABB, "velocity": Vector3 }].
+func _bomb_bodies(delta: float) -> Array:
+	var bodies := []
+	var seen := {}
+	if cube and cube.is_alive() and not cube.is_appearing() and not cube.is_teleporting():
+		var anchor := to_local(cube.get_trail_anchor())
+		_add_bomb_body(bodies, seen, "cube", Vector2(anchor.x, anchor.z), BOMB_CUBE_BOX, delta)
+	for enemy in _enemies:
+		if not enemy.is_appearing():
+			_add_bomb_body(bodies, seen, enemy.get_instance_id(), enemy.board_position() * CELL_SIZE,
+				BOMB_ENEMY_BOX, delta)
+	_body_positions = seen
+	return bodies
+
+
+func _add_bomb_body(bodies: Array, seen: Dictionary, id: Variant, at: Vector2, size: Vector3,
+		delta: float) -> void:
+	var velocity := Vector3.ZERO
+	if _body_positions.has(id) and delta > 0.0:
+		var moved: Vector2 = (at - _body_positions[id]) / delta
+		# Un salto grande (reaparecer, teletransporte) no es velocidad.
+		if moved.length() < 12.0:
+			velocity = Vector3(moved.x, 0.0, moved.y)
+	seen[id] = at
+	var box := AABB(Vector3(at.x - size.x * 0.5, 0.0, at.y - size.z * 0.5), size)
+	bodies.append({"box": box, "velocity": velocity})
+
+
+## La bomba explota: si el cubo está cerca, muere (con las inmunidades de
+## siempre); las bombas de alrededor salen despedidas.
+func _explode_bomb(bomb: Bomb) -> void:
+	_bombs.erase(bomb)
+	var at := bomb.position
+	var flat := Vector2(at.x, at.z)
+	var distance := INF
+	if cube and cube.is_alive():
+		var anchor := to_local(cube.get_trail_anchor())
+		distance = Vector2(anchor.x, anchor.z).distance_to(flat) / CELL_SIZE
+		var offset := Vector2i(roundi(anchor.x / CELL_SIZE), roundi(anchor.z / CELL_SIZE)) - bomb.board_cell()
+		if maxi(absi(offset.x), absi(offset.y)) <= BOMB_BLAST_CELLS and at.y < WALL_HEIGHT + 0.8 \
+				and not cube.is_above(0.6):
+			cube.die()
+	for other in _bombs:
+		var offset := other.position - at
+		var d := offset.length()
+		if d < BOMB_PUSH_RADIUS:
+			var away := Vector3(offset.x, 0.0, offset.z).normalized() if d > 0.01 else Vector3.ZERO
+			other.velocity += away * (BOMB_PUSH_RADIUS - d) * 3.0 + Vector3.UP * (BOMB_PUSH_RADIUS - d) * 2.5
+	bomb.explode()
+	var volume := _mortar_volume(flat / CELL_SIZE)
+	if not is_nan(volume):
+		Sfx.play("bomb_explode", 0.08, volume * 0.6)
+	bomb_exploded.emit(distance)
+
+
+## Cajas (en el tablero) con las que chocan las bombas en `cell`: el suelo
+## (hasta y = 0), los muros (hasta WALL_HEIGHT, con el cañón de bombas
+## encima si lo hay), las puertas y los barrotes cerrados. En el vacío y
+## fuera del mapa, ninguna.
+func bomb_boxes(cell: Vector2i) -> Array[AABB]:
+	var boxes: Array[AABB] = []
+	if cell.y < 0 or cell.y >= layout.size() or cell.x < 0 or cell.x >= layout[cell.y].length() \
+			or _void.has(cell):
+		return boxes
+	var corner := Vector3((cell.x - 0.5) * CELL_SIZE, -1.0, (cell.y - 0.5) * CELL_SIZE)
+	var symbol := layout[cell.y][cell.x]
+	if (_is_wall(cell) and not BREAKABLE_CHARS.contains(symbol)) or _breakables.has(cell):
+		boxes.append(AABB(corner, Vector3(CELL_SIZE, 1.0 + WALL_HEIGHT, CELL_SIZE)))
+		if _mortars.has(cell):
+			var r := MortarCannon.BASE_RADIUS * 0.8
+			boxes.append(AABB(Vector3(cell.x * CELL_SIZE - r, WALL_HEIGHT, cell.y * CELL_SIZE - r),
+				Vector3(r * 2.0, MortarCannon.PIVOT_HEIGHT, r * 2.0)))
+		return boxes
+	boxes.append(AABB(corner, Vector3(CELL_SIZE, 1.0, CELL_SIZE)))
+	var center := Vector3(cell.x * CELL_SIZE, 0.0, cell.y * CELL_SIZE)
+	if _doors.has(cell):
+		var size: Vector3 = (_doors[cell]["node"].mesh as BoxMesh).size
+		boxes.append(AABB(center - Vector3(size.x * 0.5, 0.0, size.z * 0.5), size))
+	elif bars_closed(cell):
+		var across_x: bool = is_zero_approx(_bars[cell]["node"].rotation.y)
+		var size := Vector3(CELL_SIZE, 0.55, 0.16) if across_x else Vector3(0.16, 0.55, CELL_SIZE)
+		boxes.append(AABB(center - Vector3(size.x * 0.5, 0.0, size.z * 0.5), size))
+	return boxes
+
+
+## Altura del suelo (o de la cara de arriba del muro) de la casilla para las
+## bombas, o NAN si es vacío.
+func bomb_floor_height(cell: Vector2i) -> float:
+	var top := NAN
+	for box in bomb_boxes(cell):
+		if box.size.x >= CELL_SIZE * 0.99 and box.size.z >= CELL_SIZE * 0.99:
+			top = box.end.y if is_nan(top) else maxf(top, box.end.y)
+	return top
 
 
 ## Hay barrotes cerrados en la casilla.
@@ -1265,7 +1635,7 @@ func _add_button(cell: Vector2i, symbol: String) -> void:
 		var n := cell + dir
 		if n.y >= 0 and n.y < layout.size() and n.x >= 0 and n.x < layout[n.y].length() \
 				and not "#~".contains(layout[n.y][n.x]) and not BUTTON_CHARS.contains(layout[n.y][n.x]) \
-				and layout[n.y][n.x] != LASER_CHAR:
+				and layout[n.y][n.x] != LASER_CHAR and layout[n.y][n.x] != MORTAR_CHAR:
 			facing = dir
 			break
 	if facing == Vector2i.ZERO:
@@ -1363,7 +1733,7 @@ func _is_wall(cell: Vector2i) -> bool:
 		return true
 	var symbol := layout[cell.y][cell.x]
 	return symbol == "#" or BREAKABLE_CHARS.contains(symbol) or BUTTON_CHARS.contains(symbol) \
-		or symbol == LASER_CHAR
+		or symbol == LASER_CHAR or symbol == MORTAR_CHAR
 
 
 func _make_material(color: Color) -> StandardMaterial3D:

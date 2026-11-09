@@ -263,6 +263,17 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 - Si alcanza al cubo, el cubo **explota** y vuelve a la salida, con las mismas inmunidades que con los enemigos (dash, invulnerabilidad de después de reaparecer…: en esos casos el láser choca con el cubo sin hacerle daño). Durante el teletransporte, la aparición y la parte alta del **pisotón** el láser pasa sin tocarlo. Los enemigos lo paran, pero no les hace daño.
 - Mientras aparece el tablero los cañones no disparan. Solo se oyen los que están a 9 casillas del cubo o menos (más bajo cuanto más lejos).
 
+### 2.20. Cañones de bombas — En pruebas en el prototipo
+
+- Un **cañón de bombas** (mortero) está **encima de un muro**: una base redonda de hierro con una cureña que gira y un cañón corto que apunta hacia arriba. Para el cubo y los enemigos la casilla es un muro.
+- Mira hacia una dirección y solo dispara si el **cubo está a su alcance**: hasta **20 casillas hacia delante** y **5 a cada lado** (el nivel puede recortarlo por cañón). Si no se indica hacia dónde mira, mira hacia donde tiene más casillas libres a su alcance.
+- Entre disparo y disparo pasan **5-8 s** (al azar, cada cañón el suyo). Cuando le toca y el cubo está a su alcance, **gira e inclina el cañón** hacia el blanco (0,55 s) y dispara con un **retroceso**, un destello y una **bocanada de humo**.
+- La **trayectoria se calcula antes del disparo**: la bomba cae en una **casilla libre del camino previsto del cubo** (recto y rebotando en los muros, como si no girara), más o menos donde estará cuando la bomba lleve un rato en el suelo, o un poco antes; nunca en la salida ni en la meta. Es un tiro parabólico con la inclinación más baja (de 55° a 80°) que no choca con los muros por el camino.
+- La **bomba** es un **dodecaedro negro** con una **mecha blanca** corta que echa **chispas**. Se mueve con **físicas**: gravedad, choques con el suelo, los muros, las puertas y los barrotes cerrados, y con el cubo y los enemigos, que la **empujan**. Es muy pesada: **rebota poco** (se nota el bote), rueda frenándose deprisa y se asienta sobre una cara. Si cae al vacío, se pierde.
+- La primera vez que **toca el suelo** se enciende la mecha: **explota a los 2-3 s** (al azar). La mecha se va consumiendo y la bomba se hincha un poco justo antes. Mientras arde la mecha, las **casillas con suelo a las que llega la explosión se tiñen de rojo** con un latido cada vez más rápido (si la bomba rueda a otra casilla, la zona roja la sigue). La explosión tiene un **destello**, una **bola de fuego**, **humo** oscuro que sube, chispas y deja una **mancha de quemado** que se borra en unos segundos; las bombas de alrededor salen despedidas.
+- La explosión llega a **2 casillas alrededor** de la de la bomba en todas direcciones (un cuadrado de 5×5 casillas, diagonales incluidas, sin que la frenen los muros) y **mata al cubo** si está en alguna de ellas (con las mismas inmunidades que con los enemigos: dash, pisotón, invulnerabilidad de después de reaparecer, teletransporte). A los **enemigos no les hace nada**.
+- Si explota a 4 casillas del cubo o menos, la cámara tiembla y el móvil vibra. Los disparos, botes, mechas y explosiones solo se oyen a 14 casillas del cubo o menos (más bajo cuanto más lejos). Mientras aparece el tablero los cañones no disparan.
+
 ## 3. Escenario y objetivo — Confirmados
 
 - El escenario es un **laberinto**.
@@ -322,6 +333,7 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 - Teletransporte: `6`, `7`, `8`, `9` (apartado 2.17). Las dos casillas con el mismo número forman una pareja; cada número debe aparecer exactamente dos veces.
 - Pinchos: `^` (apartado 2.18).
 - Cañón láser: `L` (apartado 2.19). Debe tener exactamente una casilla libre al lado, hacia la que dispara.
+- Cañón de bombas: `M` (apartado 2.20). Opcional: `mortars`, hacia dónde mira y el alcance de cada cañón, p. ej. `{Vector2i(19, 12): {"facing": Vector2i(0, 1), "range": Vector2i(8, 5)}}` (`range` = casillas hacia delante y a cada lado, como mucho 20 y 5).
 - Opcional: `theme`, los bloques del catálogo (apartado 5) del suelo, los muros y la roca de debajo, p. ej. `"theme": {"floor": "snow", "wall": "ice"}` (la roca, si no se indica, es la que corresponde al suelo). Y `theme_regions`, zonas rectangulares del mapa con otros bloques, para transiciones: `[{"rect": Rect2i(x, z, ancho, alto), "floor": "grass"}]`. Los niveles sin `theme` toman el de su tramo de `Levels.THEMES`, que sigue las zonas del mapa: en la zona I praderas, aldeas y ruinas (hierba, tierra, sillería, tronco, ladrillo) y en la zona II islas que suben desde los prados en flor (hierba con flores y piedra con musgo) por la hierba seca y el granito hasta la nieve y el hielo de las cumbres.
 - Opcional: `camera_distance`, la distancia de la cámara para ese nivel (por defecto, la máxima; ver apartado 5).
 - Los mapas pueden ser más grandes que la pantalla, apaisados o verticales: la cámara sigue al cubo (apartado 5).
@@ -333,6 +345,7 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 - Caer al vacío devuelve el cubo a la salida; el resolvedor descarta esos movimientos (nunca usa una caída como atajo).
 - Los **pinchos** salen en tiempo real y el resolvedor no los simula: cuentan como casillas libres. Sí comprueba que las rutas de los patrulleros no pasan por ellos.
 - Los **cañones láser** disparan en tiempo real y el resolvedor no los simula: cuentan como muros. Sí comprueba que cada cañón tiene exactamente una casilla libre al lado.
+- Los **cañones de bombas** tampoco se simulan: cuentan como muros. El resolvedor comprueba que cada uno tiene alguna casilla libre a su alcance.
 - El resolvedor simula el **teletransporte**: al entrar en una casilla de teletransporte el cubo pasa a la otra con el mismo rumbo, y allí no puede girar. También comprueba que cada pareja está completa, que cada casilla tiene un muro o el borde al lado y que el cubo no puede quedar encajonado al salir por ninguna.
 - El resolvedor sí simula el **desgaste de los puentes colgantes** (las salidas que le quedan a cada casilla forman parte del estado): nunca usa un puente más veces de las que aguanta. También comprueba su forma (recta, con vacío a los lados y suelo en los extremos).
 - Ese mínimo se calcula con un **resolvedor automático** que también comprueba que todos los niveles tienen solución.
@@ -347,6 +360,7 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 - Los niveles **61 y 62** (principio de la zona III, *El mundo desconocido*, con suelo de arena y muros de arenisca) presentan el **teletransporte**, diseñados a mano. Son zonas cerradas unidas **solo por teletransportes**, y cada pareja es imprescindible. **61 «Portales»** (25×15, 27 giros): tres zonas en fila; uno de los portales lleva a un recoveco cerrado con la llave de la puerta de la meta, y hay un perseguidor en la última zona. **62 «Los cuatro portales»** (31×21, 39 giros): seis zonas en dos filas, cuatro parejas de portales, un muro destructible, un botón con sus barrotes delante de un portal, llave y puerta, dos perseguidores y un obstáculo.
 - Los niveles **63 y 64** (zona III) presentan los **pinchos**. Parten de laberintos del generador del resolvedor retocados a mano. **63 «Pinchos»** (27×17, 28 giros): la llave de la puerta de la meta está en la esquina opuesta; cuatro casillas de pinchos en el camino y otras fuera de él, y un perseguidor. **64 «El corredor de lanzas»** (33×23, 30 giros): un pasillo largo con tres casillas de pinchos que hay que recorrer varias veces y otras doce repartidas; un muro destructible en un paso obligado, dos parejas llave/puerta (la naranja abre el paso hacia el botón y la amarilla la meta), un botón que abre los barrotes de la llave amarilla al que **solo se llega saliendo de un teletransporte**, un perseguidor y un patrullero.
 - Los niveles **65 y 66** (zona III) presentan los **cañones láser**. Parten de laberintos del generador del resolvedor con los cañones en los bordes y en muros sueltos, colocados para que sus disparos **crucen** el camino (casi nunca a lo largo de él, porque el cubo no puede pararse). **65 «Láseres»** (27×17, 26 giros): ocho cañones, dos de ellos juntos en el borde derecho, y un perseguidor. **66 «La galería de tiro»** (31×21, 34 giros): diez cañones; la llave de la puerta de la meta está en un recoveco lejano, hay un perseguidor y el último pasillo largo es una **galería** que cruzan tres cañones (dos desde abajo y uno desde arriba).
+- Los niveles **67 y 68** (zona III) presentan los **cañones de bombas**. Parten de laberintos del generador del resolvedor con salas abiertas (donde las bombas ruedan), con los cañones en los bordes y en muros gruesos del interior. **67 «Bombas»** (29×19, 27 giros): tres cañones, uno en un muro del centro y dos en los bordes. **68 «Lluvia de bombas»** (33×21, 36 giros): seis cañones (uno del centro mirando hacia abajo con el alcance recortado a 8×5), la llave de la puerta de la meta en un recoveco del centro, la meta en un fondo de saco tras la puerta y un perseguidor en una sala.
 
 | Nivel | Nombre | Tamaño | Forma | Parejas llave/puerta | Muros destructibles | Power ups | Botones y barrotes | Giros mínimos |
 |---|---|---|---|---|---|---|---|---|
@@ -416,6 +430,8 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 | 64 | El corredor de lanzas | 33×23 | laberinto, 15 casillas de pinchos, 1 pareja de teletransporte | naranja, amarilla | 1 (2 golpes) | — | 1 botón, 1 barrote cerrado | 30 (1 perseguidor, 1 patrullero) |
 | 65 | Láseres | 27×17 | laberinto, 8 cañones láser | — | — | — | — | 26 (1 perseguidor) |
 | 66 | La galería de tiro | 31×21 | laberinto, 10 cañones láser | amarilla | — | — | — | 34 (1 perseguidor) |
+| 67 | Bombas | 29×19 | laberinto con salas, 3 cañones de bombas | — | — | — | — | 27 |
+| 68 | Lluvia de bombas | 33×21 | laberinto con salas, 6 cañones de bombas | amarilla | — | — | — | 36 (1 perseguidor) |
 
 ## 7. Menús y controles — Confirmada
 
