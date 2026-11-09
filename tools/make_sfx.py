@@ -282,16 +282,18 @@ def main():
     for i in range(fade):
         fuse[-fade + i] *= 1.0 - i / fade
     save("bomb_fuse", fuse, peak=0.3)
-    # Explosión: estallido grave con un rugido de fuego que se apaga despacio
-    # y restos que crepitan.
-    blast = [tone(55, 0.9, decay=0.3, sweep_to=30, volume=1.0),
-             tone(95, 0.4, decay=0.1, sweep_to=50, volume=0.6),
-             noise(1.2, decay=0.35, lowpass=0.08, volume=1.0),
-             noise(0.3, decay=0.06, lowpass=0.5, volume=0.7),
-             noise(0.04, decay=0.01, lowpass=1.0, volume=0.6)]
+    # Explosión: estallido muy grave y retumbante, con un rugido sordo que se
+    # apaga despacio y restos que crepitan apagados.
+    # (Con armónicos: el altavoz del móvil no da los graves de verdad, pero así
+    # el oído los sigue notando.)
+    blast = [tone(42, 1.4, "rich", decay=0.45, sweep_to=22, volume=1.0),
+             tone(65, 0.7, "rich", decay=0.18, sweep_to=32, volume=0.7),
+             noise(1.6, decay=0.5, lowpass=0.03, volume=1.2),
+             noise(0.3, decay=0.06, lowpass=0.18, volume=0.5),
+             noise(0.04, decay=0.01, lowpass=0.5, volume=0.4)]
     for k in range(14):
         start = 0.1 + rng.uniform(0, 0.8) ** 1.3
-        blast.append(offset(noise(0.02, decay=0.005, lowpass=0.9, volume=rng.uniform(0.15, 0.35)), start))
+        blast.append(offset(noise(0.02, decay=0.005, lowpass=0.35, volume=rng.uniform(0.08, 0.18)), start))
     save("bomb_explode", mix(*blast), peak=0.9)
     print("Sonidos generados en", OUT)
 

@@ -19,8 +19,8 @@ extends Node3D
 
 signal fired(muzzle: Vector3, velocity: Vector3)
 
-const MIN_WAIT := 15.0
-const MAX_WAIT := 20.0
+const MIN_WAIT := 10.0
+const MAX_WAIT := 15.0
 ## Espera antes del primer disparo (para que no disparen todos a la vez).
 const FIRST_WAIT := Vector2(1.5, 4.0)
 ## Alcance (en casillas) por defecto y máximo: hacia delante y a cada lado.
