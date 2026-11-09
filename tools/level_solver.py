@@ -402,6 +402,11 @@ def read_levels(path=LEVELS_GD):
         levels.append({"name": name, "turns": int(turns),
                        "heading": (int(hx), int(hz)), "layout": rows, "buttons": buttons,
                        "patrols": patrols})
+    declared = len(re.findall(r'^\t\t"name":', source, re.M))
+    if declared != len(levels):
+        raise SystemExit(f"Solo se han podido leer {len(levels)} de los {declared} niveles de "
+                         f"{path.name}: \"name\", \"turns\", \"start_heading\" y \"layout\" "
+                         f"deben ir en ese orden y al principio de cada nivel.")
     return levels
 
 
