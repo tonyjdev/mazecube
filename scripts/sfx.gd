@@ -14,7 +14,7 @@ extends RefCounted
 ## alert (un perseguidor ha visto al cubo), fall (caída al vacío), dash,
 ## stomp (pisotón), splat (perseguidor reventado), shatter (enemigo
 ## sintético roto), teleport (el cubo entra en un portal), teleport_in (sale
-## por el otro) y click
+## por el otro), spikes (salen los pinchos) y click
 ## (botones de la interfaz).
 
 const POOL_SIZE := 10

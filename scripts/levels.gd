@@ -50,6 +50,13 @@ extends RefCounted
 ## '8' '9' = parejas de casillas conectadas; al entrar en una, el cubo sale
 ## por la otra con el mismo rumbo (sin poder girar en ella). Son zonas
 ## cerradas unidas solo por teletransportes; cada pareja es imprescindible.
+## Pinchos (niveles 63-64): '^' = trampa de pinchos que sale del suelo cada
+## 3-8 s (al azar) durante 1 s; solo mata al cubo mientras está fuera. El
+## resolvedor los trata como casillas libres. Los dos niveles parten de
+## laberintos de tools/level_solver.py generate retocados a mano: el 63 con
+## una llave lejana; el 64 con un pasillo largo de pinchos, dos llaves, un
+## muro destructible, un botón al que solo se llega por un teletransporte,
+## un perseguidor y un patrullero.
 ##
 ## Los niveles crecen de forma progresiva (en torno a un 15-20% más de
 ## casillas cada uno) y alternan forma apaisada y vertical. Los pequeños
@@ -3194,6 +3201,62 @@ const LIST: Array[Dictionary] = [
 			"###############################",
 		],
 		"buttons": {"p": "c"},
+	},
+	{
+		"name": "Pinchos",
+		"turns": 28,
+		"start_heading": Vector2i(1, 0),
+		"layout": [
+			"###########################",
+			"#.......#...#...#A..#....y#",
+			"#.#.#.#^#.#.#.#.#.#.#.#.#.#",
+			"#.#...#.#.#.....#.#^#.#.#.#",
+			"###.###.#.#####.#.#.#.#.#.#",
+			"#...#...#.#...^...#...#.#.#",
+			"#.###.###.#.########....#.#",
+			"#...#.#.....#.....^.....#.#",
+			"###.#.#.#.###.#####....##.#",
+			"#...#.#.......#........x..#",
+			"#.###.#.#####^#...#####.#.#",
+			"#...#.#.#...#.#...#.....#.#",
+			"###.#.###.#.#.#.#.#.#.###.#",
+			"###Y#.#...#...#..^#.....#.#",
+			"#...#.#.#######.#######.#.#",
+			"#B..#...#....^....^.......#",
+			"###########################",
+		],
+	},
+	{
+		"name": "El corredor de lanzas",
+		"turns": 30,
+		"start_heading": Vector2i(-1, 0),
+		"layout": [
+			"#################################",
+			"#........A#...^.#.........#...6.#",
+			"#.###.#####.###.#.###.#.#.#.###.#",
+			"#.........#.#.#.#...#^...^#.....#",
+			"#.###.#.#.#.#.#.#^###.#.###.#.###",
+			"#.#.........#^#.#.#...#...#.....#",
+			"#.#.#########.#.#.#.#.###.#####.#",
+			"#...#...#.......#.#.#o#...#...#^#",
+			"#.#.#.#.#.###.#.#.#.###.###.#.#.#",
+			"#....^#...#.#.#...#.....#...#.#.#",
+			"###########.#2###########.###.#.#",
+			"#y#.......#...#.....#.......#.#^#",
+			"#C#.#.#...#.###.###.#.#.###.#.#.#",
+			"#.....#.....#...#.^.#.#.#...#.#.#",
+			"#.###.#^#.###.#.#.x.#.#.#.###.#.#",
+			"#.#...#.#......^#...#.#.#...#..^#",
+			"#....##.#########.#.###.#.#.###.#",
+			"#...^...#.i.......#.#...#.#.#...#",
+			"#....####.#.###.###.#.###.#.###Y#",
+			"#O#...#...#.........#.#.....#.B.#",
+			"#.###.#.###.#####.###.#.#########",
+			"p.6.#.....#..........^#....^....#",
+			"#################################",
+		],
+		"buttons": {"p": "c"},
+		"patrols": {"i": "R6"},
 	},
 ]
 

@@ -39,6 +39,9 @@ extends Node3D
 ##   teletransporta a la otra y sigue con el mismo rumbo (ver RollingCube).
 ##   Los enemigos no las pisan. Cada casilla debe tener al lado (no en
 ##   diagonal) un muro o el borde del suelo. Ver TeleportPad.
+##   Pinchos: '^' = casilla con una trampa de pinchos. Salen del suelo cada
+##   3-8 s (al azar), se quedan fuera 1 s y vuelven a esconderse; solo matan
+##   al cubo mientras están fuera. Los enemigos no las pisan. Ver SpikeTrap.
 ## Materiales (ver BlockCatalog): el campo "theme" del nivel elige el bloque
 ## del suelo ("floor"), de los muros ("wall") y, opcionalmente, de la roca de
 ## debajo ("foundation"; si no se da, la que va bajo el suelo). Lo que falte
@@ -69,6 +72,15 @@ const PATROL_CHARS := "ijkmn"
 const VOID_CHAR := "~"
 const BRIDGE_CHAR := "="
 const TELEPORT_CHARS := "6789"
+const SPIKE_CHAR := "^"
+## Distancia (en casillas, en x y en z) entre el centro del cubo y el de una
+## casilla con los pinchos fuera a partir de la cual el cubo muere (las
+## lanzas están a SpikeTrap.SPEAR_OFFSET del centro).
+const SPIKE_HIT_DISTANCE := 0.7
+## Los pinchos solo se oyen a esta distancia del cubo o menos (en casillas);
+## cada casilla más lejos suenan SPIKE_SOUND_FALLOFF dB más bajo.
+const SPIKE_SOUND_RADIUS := 7.0
+const SPIKE_SOUND_FALLOFF := 2.2
 ## Color de cada pareja de teletransporte.
 const TELEPORT_COLORS := {
 	"6": Color(0.25, 0.85, 1.0),
@@ -186,6 +198,8 @@ var _spawners: Array[EnemySpawner] = []
 var _enemies_frozen := false
 ## casilla -> { "partner": Vector2i, "symbol": String, "node": TeleportPad }
 var _teleports := {}
+## casilla -> SpikeTrap
+var _spikes := {}
 ## casilla -> HangingBridge (solo los que siguen en pie)
 var _bridges := {}
 ## Aparición en curso: tiempo transcurrido, retraso de cada casilla,
@@ -234,6 +248,7 @@ func build() -> void:
 	_spawners.clear()
 	_bridges.clear()
 	_teleports.clear()
+	_spikes.clear()
 	var enemy_cells := {}
 	## símbolo -> casillas de teletransporte
 	var teleport_cells := {}
@@ -291,6 +306,8 @@ func build() -> void:
 				enemy_cells[cell] = symbol
 			elif TELEPORT_CHARS.contains(symbol):
 				_group(teleport_cells, symbol, cell)
+			elif symbol == SPIKE_CHAR:
+				_add_spikes(cell)
 	for id: String in wall_groups:
 		_add_multimesh(wall_groups[id], id, Vector3(CELL_SIZE, WALL_HEIGHT, CELL_SIZE),
 			WALL_HEIGHT * 0.5, Color.WHITE)
@@ -315,7 +332,10 @@ func _process(delta: float) -> void:
 	else:
 		for spawner in _spawners:
 			spawner.update(delta)
+		for trap: SpikeTrap in _spikes.values():
+			trap.update(delta)
 	_check_enemy_hits()
+	_check_spike_hits()
 	for item in _keys.values():
 		item["node"].rotate_y(KEY_SPIN_SPEED * delta)
 	for item in _power_ups.values():
@@ -388,7 +408,7 @@ func has_floor(cell: Vector2i) -> bool:
 ## que no sea la salida, la meta ni un puente colgante.
 func enemy_can_pass(cell: Vector2i) -> bool:
 	return is_terrain_walkable(cell) and cell != start_cell and cell != goal_cell \
-		and not is_bridge(cell) and not _teleports.has(cell)
+		and not is_bridge(cell) and not _teleports.has(cell) and not _spikes.has(cell)
 
 
 ## Casilla de teletransporte conectada con `cell`, o NO_CELL si `cell` no es
@@ -461,6 +481,45 @@ func _check_enemy_hits() -> void:
 		if enemy.can_hurt() and enemy.board_position().distance_to(cube_pos) < ENEMY_HIT_DISTANCE:
 			cube.die()
 			return
+
+
+func is_spikes(cell: Vector2i) -> bool:
+	return _spikes.has(cell)
+
+
+## Si el cubo está sobre una casilla con los pinchos fuera (o volcando hacia
+## ella o desde ella lo bastante cerca), el cubo explota.
+func _check_spike_hits() -> void:
+	if _spikes.is_empty() or cube == null or not cube.is_vulnerable():
+		return
+	var anchor := to_local(cube.get_trail_anchor())
+	var cube_pos := Vector2(anchor.x, anchor.z) / CELL_SIZE
+	for c: Vector2i in [cube.cell, cube.roll_target()]:
+		var trap: SpikeTrap = _spikes.get(c)
+		if trap == null or not trap.is_dangerous():
+			continue
+		var d := (cube_pos - Vector2(c)).abs()
+		if maxf(d.x, d.y) < SPIKE_HIT_DISTANCE:
+			cube.die()
+			return
+
+
+func _add_spikes(cell: Vector2i) -> void:
+	var trap := SpikeTrap.create()
+	trap.position = Vector3(cell.x * CELL_SIZE, 0.0, cell.y * CELL_SIZE)
+	add_child(trap)
+	_spikes[cell] = trap
+	trap.extended.connect(_on_spikes_extended.bind(cell))
+
+
+## Sonido de los pinchos al salir, más bajo cuanto más lejos del cubo (y nada
+## si están lejos, para que no suenen todos los del mapa).
+func _on_spikes_extended(cell: Vector2i) -> void:
+	if cube == null:
+		return
+	var distance := Vector2(cube.cell).distance_to(Vector2(cell))
+	if distance <= SPIKE_SOUND_RADIUS:
+		Sfx.play("spikes", 0.08, -SPIKE_SOUND_FALLOFF * distance)
 
 
 ## Hay barrotes cerrados en la casilla.

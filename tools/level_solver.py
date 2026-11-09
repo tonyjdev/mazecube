@@ -57,6 +57,10 @@ Simula las reglas de scripts/rolling_cube.gd:
   casillas, que cada una tiene al lado un muro o el borde del suelo y que,
   entre por donde entre, el cubo no queda encajonado en la otra (sin poder
   seguir ni rebotar).
+- Pinchos ('^'): salen del suelo de vez en cuando (en tiempo real), así que
+  el resolvedor no los simula y cuentan como casillas libres. "validate"
+  comprueba que las rutas de los patrulleros no pasan por ellos (los
+  enemigos no los pisan).
 - Al llegar a la meta B termina el nivel.
 
 La dificultad de un nivel es el mínimo de giros necesarios (búsqueda 0-1 BFS),
@@ -100,6 +104,7 @@ PATROL_CHARS = "ijkmn"
 VOID_CHAR = "~"
 BRIDGE_CHAR = "="
 TELEPORT_CHARS = "6789"
+SPIKE_CHAR = "^"
 # Salidas del cubo que aguanta cada casilla de puente colgante.
 BRIDGE_STABILITY = 4
 ENEMY_CHARS = CHASER_CHAR + BLOCKER_CHAR + PATROL_CHARS
@@ -108,7 +113,7 @@ ROUTE_DIRS = {"R": (1, 0), "L": (-1, 0), "U": (0, -1), "D": (0, 1)}
 PATROL_MIN_EXITS = 3
 LEVEL_CHARS = ("#.AB" + KEY_CHARS + DOOR_CHARS + POWERUP_CHARS + BREAKABLE_CHARS
                + BAR_CHARS + BAR_CHARS.upper() + BUTTON_CHARS + ENEMY_CHARS + VOID_CHAR + BRIDGE_CHAR
-               + TELEPORT_CHARS)
+               + TELEPORT_CHARS + SPIKE_CHAR)
 
 
 def turn_left(h):
@@ -620,9 +625,9 @@ def check_enemies(rows, patrols):
                 for _ in range(int(part[1:])):
                     cell = (cell[0] + d[0], cell[1] + d[1])
                     if cell not in free or cell in (start, goal) \
-                            or rows[cell[1]][cell[0]] in BRIDGE_CHAR + TELEPORT_CHARS:
+                            or rows[cell[1]][cell[0]] in BRIDGE_CHAR + TELEPORT_CHARS + SPIKE_CHAR:
                         problems.append(f"la ruta de {c} pasa por {cell}, que no es libre o es la salida, "
-                                        f"la meta, un puente colgante o un teletransporte")
+                                        f"la meta, un puente colgante, un teletransporte o pinchos")
                         break
                 else:
                     continue

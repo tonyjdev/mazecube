@@ -223,6 +223,26 @@ def main():
               offset(tone(523.25, 0.5, "bell", decay=0.2, volume=0.25), 0.5),
               noise(0.4, decay=0.15, lowpass=0.08, volume=0.3, attack=0.05)]
     save("teleport_in", mix(*arrive), peak=0.55)
+    # Pinchos (al final para no cambiar el azar de los anteriores): las
+    # lanzas salen de golpe con un siseo metálico corto y chocan contra el
+    # tope con un tañido de acero (parciales inarmónicos que se apagan
+    # deprisa) y un golpe seco del mecanismo.
+    swish = []
+    last = 0.0
+    n = int(0.07 * RATE)
+    for i in range(n):
+        t = i / n
+        last += 0.85 * (rng.uniform(-1, 1) - last)
+        swish.append(last * t ** 1.5)
+    clang = [offset(tone(f, 0.45, "sine", attack=0.001, decay=d, volume=v), 0.065)
+             for f, d, v in ((1870, 0.16, 0.55), (2960, 0.11, 0.45), (4410, 0.07, 0.35),
+                             (6120, 0.05, 0.25), (1245, 0.2, 0.3))]
+    for k in range(3):
+        clang.append(offset(tone(rng.uniform(2500, 5200), 0.2, "sine", attack=0.001, decay=0.04,
+                                 volume=0.2), 0.066 + k * 0.006))
+    thud = offset(mix(tone(150, 0.12, decay=0.03, sweep_to=90, volume=0.7),
+                      noise(0.04, decay=0.008, lowpass=0.7, volume=0.6)), 0.06)
+    save("spikes", mix([v * 0.5 for v in swish], *clang, thud), peak=0.7)
     print("Sonidos generados en", OUT)
 
 

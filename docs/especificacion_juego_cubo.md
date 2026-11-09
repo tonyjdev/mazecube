@@ -244,6 +244,16 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 - Los **enemigos no se teletransportan** ni pisan las casillas de teletransporte, y los puntos de origen nunca hacen aparecer enemigos en ellas.
 - **Regla de diseño:** entre por donde entre el cubo en una casilla, al salir por la otra con ese rumbo no puede quedar **encajonado** (sin poder seguir ni rebotar), porque allí no puede girar. Lo comprueba el resolvedor.
 
+### 2.18. Pinchos — En pruebas en el prototipo
+
+- Son **trampas de una casilla**: en el suelo hay una **placa de metal con cuatro agujeros**, lejos de las esquinas de la casilla, por donde salen cuatro **lanzas** pequeñas.
+- Las lanzas esperan escondidas un tiempo **al azar entre 3 y 8 s** (cada casilla el suyo), **salen de golpe** con un sonido metálico de lanza, se quedan **fuera 1 s** y **vuelven a esconderse** (0,3 s). Después vuelven a esperar otro tiempo al azar.
+- **Solo matan al cubo mientras están fuera**: si el cubo está encima (o volcando hacia la casilla o desde ella, lo bastante cerca) cuando salen, o entra en la casilla con ellas fuera, explota y vuelve a la salida, como con los enemigos. Con las lanzas escondidas la casilla es normal.
+- Respetan las mismas inmunidades que los enemigos: no hacen daño durante el dash, el pisotón, el teletransporte ni la invulnerabilidad de después de reaparecer.
+- Mientras aparece el tablero las lanzas no se mueven.
+- Solo se oyen las que están a 7 casillas del cubo o menos (más bajo cuanto más lejos), para que no suenen todas las del mapa.
+- Los **enemigos no pisan** las casillas con pinchos, y los puntos de origen nunca hacen aparecer enemigos en ellas.
+
 ## 3. Escenario y objetivo — Confirmados
 
 - El escenario es un **laberinto**.
@@ -301,6 +311,7 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 - Vacío: `~` (ni suelo ni pared; apartado 2.14).
 - Puente colgante: `=` (apartado 2.15). Las casillas `=` seguidas forman un puente recto; debe tener vacío a ambos lados y suelo en los dos extremos.
 - Teletransporte: `6`, `7`, `8`, `9` (apartado 2.17). Las dos casillas con el mismo número forman una pareja; cada número debe aparecer exactamente dos veces.
+- Pinchos: `^` (apartado 2.18).
 - Opcional: `theme`, los bloques del catálogo (apartado 5) del suelo, los muros y la roca de debajo, p. ej. `"theme": {"floor": "snow", "wall": "ice"}` (la roca, si no se indica, es la que corresponde al suelo). Y `theme_regions`, zonas rectangulares del mapa con otros bloques, para transiciones: `[{"rect": Rect2i(x, z, ancho, alto), "floor": "grass"}]`. Los niveles sin `theme` toman el de su tramo de `Levels.THEMES`, que sigue las zonas del mapa: en la zona I praderas, aldeas y ruinas (hierba, tierra, sillería, tronco, ladrillo) y en la zona II islas que suben desde los prados en flor (hierba con flores y piedra con musgo) por la hierba seca y el granito hasta la nieve y el hielo de las cumbres.
 - Opcional: `camera_distance`, la distancia de la cámara para ese nivel (por defecto, la máxima; ver apartado 5).
 - Los mapas pueden ser más grandes que la pantalla, apaisados o verticales: la cámara sigue al cubo (apartado 5).
@@ -310,6 +321,7 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 - La dificultad de un nivel se mide como el **mínimo número de giros** necesario para resolverlo con las reglas del apartado 2 (incluido el rebote, el descarte de giros bloqueados, la ausencia de giro en la casilla de salida, las llaves y puertas y los muros destructibles).
 - Los **enemigos** se mueven en tiempo real y el resolvedor no los simula: los perseguidores y patrulleros no cuentan y el obstáculo cuenta como un **muro fijo** en su punto de origen (aunque aparece en una casilla al azar cerca de él). El resolvedor sí comprueba que las rutas de los patrulleros solo pasan por casillas libres y no tocan la salida ni la meta y que cumplen la regla de las tres salidas (apartado 2.13).
 - Caer al vacío devuelve el cubo a la salida; el resolvedor descarta esos movimientos (nunca usa una caída como atajo).
+- Los **pinchos** salen en tiempo real y el resolvedor no los simula: cuentan como casillas libres. Sí comprueba que las rutas de los patrulleros no pasan por ellos.
 - El resolvedor simula el **teletransporte**: al entrar en una casilla de teletransporte el cubo pasa a la otra con el mismo rumbo, y allí no puede girar. También comprueba que cada pareja está completa, que cada casilla tiene un muro o el borde al lado y que el cubo no puede quedar encajonado al salir por ninguna.
 - El resolvedor sí simula el **desgaste de los puentes colgantes** (las salidas que le quedan a cada casilla forman parte del estado): nunca usa un puente más veces de las que aguanta. También comprueba su forma (recta, con vacío a los lados y suelo en los extremos).
 - Ese mínimo se calcula con un **resolvedor automático** que también comprueba que todos los niveles tienen solución.
@@ -322,6 +334,7 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 - Los niveles 17 a 30 los crea el **generador de niveles** `tools/build_levels.py` (determinista: con las mismas semillas sale siempre lo mismo), que los valida con el resolvedor y elige, para cada nivel, el candidato cuyo mínimo de giros se acerca más al objetivo.
 - Los niveles **36 a 60** (zona II, *Las tierras salvajes*) son **archipiélagos de islas flotantes** que combinan el vacío, los puentes colgantes y todos los mecanismos y enemigos, con dificultad creciente de **23 a 73 giros** (de 37×20 a 89×42 casillas). Hay cuatro tipos de isla: **ruinas** amuralladas (una sala con algún pilar o tabique), **pequeños laberintos** amurallados, **mesetas** sin muros (esquinas recortadas, pilares y **grietas** de vacío dentro que obligan a girar a tiempo) e **islotes** de 2×2 o 3×3, normalmente fondos de saco donde se esconde una llave. Las islas se unen con **puentes de tierra** de una casilla, rectos o en **zigzag** sobre el vacío (hay que girar en el aire en el momento justo), y algunos puentes rectos son **colgantes**. Las puertas y los barrotes están en casillas de paso obligado con muro a ambos lados (las entradas de las islas amuralladas y los pasillos de los laberintos); los power ups de velocidad, a ser posible sobre los puentes. El suelo cambia de los prados en flor (36-40) a la hierba (41-44), la hierba seca (45-48), la piedra y el granito de la montaña (49-52) y la nieve y el hielo de las cumbres (53-60); las islas amuralladas y los puentes de tierra llevan su propio suelo (`theme_regions`). Los crea `tools/build_islands.py` (determinista, como el generador anterior, cuyas funciones de colocación reutiliza).
 - Los niveles **61 y 62** (principio de la zona III, *El mundo desconocido*, con suelo de arena y muros de arenisca) presentan el **teletransporte**, diseñados a mano. Son zonas cerradas unidas **solo por teletransportes**, y cada pareja es imprescindible. **61 «Portales»** (25×15, 27 giros): tres zonas en fila; uno de los portales lleva a un recoveco cerrado con la llave de la puerta de la meta, y hay un perseguidor en la última zona. **62 «Los cuatro portales»** (31×21, 39 giros): seis zonas en dos filas, cuatro parejas de portales, un muro destructible, un botón con sus barrotes delante de un portal, llave y puerta, dos perseguidores y un obstáculo.
+- Los niveles **63 y 64** (zona III) presentan los **pinchos**. Parten de laberintos del generador del resolvedor retocados a mano. **63 «Pinchos»** (27×17, 28 giros): la llave de la puerta de la meta está en la esquina opuesta; cuatro casillas de pinchos en el camino y otras fuera de él, y un perseguidor. **64 «El corredor de lanzas»** (33×23, 30 giros): un pasillo largo con tres casillas de pinchos que hay que recorrer varias veces y otras doce repartidas; un muro destructible en un paso obligado, dos parejas llave/puerta (la naranja abre el paso hacia el botón y la amarilla la meta), un botón que abre los barrotes de la llave amarilla al que **solo se llega saliendo de un teletransporte**, un perseguidor y un patrullero.
 
 | Nivel | Nombre | Tamaño | Forma | Parejas llave/puerta | Muros destructibles | Power ups | Botones y barrotes | Giros mínimos |
 |---|---|---|---|---|---|---|---|---|
@@ -385,6 +398,10 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 | 58 | Glaciar | 76×42 | islas flotantes, 3 puentes colgantes | amarilla, naranja, roja, azul | — | 2 velocidad | 2 botones, 2 barrotes cerrados | 68 (2 perseguidores, 3 patrulleros, 1 obstáculo) |
 | 59 | El paso helado | 82×42 | islas flotantes, 4 puentes colgantes | amarilla, naranja, roja, azul | 1 (3 golpes) | 2 velocidad | 2 botones, 2 barrotes cerrados | 73 (2 perseguidores, 3 patrulleros, 1 obstáculo) |
 | 60 | El techo del mundo | 89×42 | islas flotantes, 4 puentes colgantes | amarilla, naranja, roja, azul | 1 (3 golpes) | 3 velocidad | 2 botones, 2 barrotes cerrados | 71 (3 perseguidores, 4 patrulleros, 1 obstáculo) |
+| 61 | Portales | 25×15 | zonas unidas por 3 parejas de teletransporte | amarilla | — | — | — | 27 (1 perseguidor) |
+| 62 | Los cuatro portales | 31×21 | zonas unidas por 4 parejas de teletransporte | amarilla | 1 (3 golpes) | — | 1 botón, 1 barrote cerrado | 39 (2 perseguidores, 1 obstáculo) |
+| 63 | Pinchos | 27×17 | laberinto, 8 casillas de pinchos | amarilla | — | — | — | 28 (1 perseguidor) |
+| 64 | El corredor de lanzas | 33×23 | laberinto, 15 casillas de pinchos, 1 pareja de teletransporte | naranja, amarilla | 1 (2 golpes) | — | 1 botón, 1 barrote cerrado | 30 (1 perseguidor, 1 patrullero) |
 
 ## 7. Menús y controles — Confirmada
 
