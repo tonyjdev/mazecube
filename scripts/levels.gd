@@ -57,6 +57,13 @@ extends RefCounted
 ## una llave lejana; el 64 con un pasillo largo de pinchos, dos llaves, un
 ## muro destructible, un botón al que solo se llega por un teletransporte,
 ## un perseguidor y un patrullero.
+## Cañones láser (niveles 65-66): 'L' = muro con un cañón incrustado que
+## dispara cada 2,5-4,5 s un láser hacia su única casilla libre. El
+## resolvedor los trata como muros. Los dos niveles parten de laberintos de
+## tools/level_solver.py generate con cañones en los bordes y en muros sueltos
+## cuyos disparos cruzan el camino: el 65 con un perseguidor; el 66 con una
+## llave lejana, un perseguidor y una «galería» de tres cañones que cruzan el
+## último pasillo largo.
 ##
 ## Los niveles crecen de forma progresiva (en torno a un 15-20% más de
 ## casillas cada uno) y alternan forma apaisada y vertical. Los pequeños
@@ -3257,6 +3264,58 @@ const LIST: Array[Dictionary] = [
 		],
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R6"},
+	},
+	{
+		"name": "Láseres",
+		"turns": 26,
+		"start_heading": Vector2i(1, 0),
+		"layout": [
+			"#########L#################",
+			"#...#..A....#...#.#.....#.#",
+			"#.#.#.###.###.#.#.#.#.#.#.#",
+			"#.#.....#.....#.#...#.#...L",
+			"#.###.#.###.###.#.#.#.#.#.#",
+			"L.....#...#.#...#...#.#...L",
+			"#####.#.###.#.##L####.L##.#",
+			"#.....#.#...#.#.......#...#",
+			"#.##L##.#####.#.#######.###",
+			"#...#.#.......#.#...#...#.#",
+			"###.#.#########.#.#.#.###.#",
+			"#.#...#.........#.#...#...#",
+			"#.###.#.###.#.#.#####.#.#.#",
+			"#...#.#...#.#.#...x.#...#.#",
+			"#.###.###.#.#######.#####.#",
+			"#...................#...B.#",
+			"#########L#################",
+		],
+	},
+	{
+		"name": "La galería de tiro",
+		"turns": 34,
+		"start_heading": Vector2i(0, 1),
+		"layout": [
+			"###############################",
+			"#..A#.............#.#.........#",
+			"#.#.#.#############.#.#####.#.#",
+			"#.#.............#.....#.....#.#",
+			"#.#.#####.#.###.#.#.###.#######",
+			"#.#.....#...#...#...#...#.....#",
+			"###.#########.##L####.###.###.#",
+			"#...#.....#...#.......#.......#",
+			"#.###.#.###.###.###.#.#.##....#",
+			"L.....#.#.x.#...#...#...#.....L",
+			"#.#####.#.###.#.#.#######.###.#",
+			"#.#...#...#...#.#.#.......#...#",
+			"#.#.#.####L####.#.#.#######.###",
+			"#...#.#.....#...#...#.#.....#.#",
+			"####L.#.#.#.#.#######.#.#####.#",
+			"#..y#.#...#...#.......#.......#",
+			"#.###.###.#####.#.#######.###.#",
+			"#.......#.#...#...#.Y...#...#.L",
+			"#.#.###.#.#.#.#.#.#B#.##L##.#.#",
+			"#.........#.#.......#.........#",
+			"########L#############L####L###",
+		],
 	},
 ]
 

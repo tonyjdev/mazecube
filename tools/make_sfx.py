@@ -243,6 +243,24 @@ def main():
     thud = offset(mix(tone(150, 0.12, decay=0.03, sweep_to=90, volume=0.7),
                       noise(0.04, decay=0.008, lowpass=0.7, volume=0.6)), 0.06)
     save("spikes", mix([v * 0.5 for v in swish], *clang, thud), peak=0.7)
+    # Cañón láser (al final para no cambiar el azar de los anteriores).
+    # Aviso: un pitido muy corto y agudo por cada parpadeo de las luces (el
+    # silencio entre pitidos lo deja el propio parpadeo).
+    save("laser_beep", mix(tone(2350, 0.045, "triangle", attack=0.002, volume=0.8),
+                           tone(4700, 0.045, "sine", attack=0.002, volume=0.15)), peak=0.35)
+    # Disparo: «piu» que baja de tono deprisa, con un armónico y un soplo.
+    zap = [tone(2600, 0.2, "square", attack=0.001, decay=0.07, sweep_to=320, volume=0.5),
+           tone(5200, 0.12, "sine", attack=0.001, decay=0.04, sweep_to=900, volume=0.35),
+           noise(0.08, decay=0.02, lowpass=0.9, volume=0.25)]
+    save("laser", mix(*zap), peak=0.55)
+    # Choque: chisporroteo de chasquidos agudos que se apagan.
+    crackle = [noise(0.05, decay=0.012, lowpass=0.95, volume=0.7)]
+    for k in range(9):
+        start = 0.008 + k * 0.022 + rng.uniform(0, 0.012)
+        crackle.append(offset(noise(0.03, decay=0.005, lowpass=0.95, volume=0.65 - k * 0.06), start))
+        crackle.append(offset(tone(rng.uniform(3000, 6500), 0.03, "sine", attack=0.001, decay=0.006,
+                                   volume=0.3 - k * 0.025), start))
+    save("laser_hit", mix(*crackle), peak=0.45)
     print("Sonidos generados en", OUT)
 
 

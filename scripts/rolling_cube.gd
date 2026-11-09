@@ -788,6 +788,11 @@ func is_teleporting() -> bool:
 	return _teleport_phase != 0
 
 
+## Está en el aire (en el pisotón) con la base por encima de `height`.
+func is_above(height: float) -> bool:
+	return _stomping and _body.position.y - HALF > height
+
+
 func _start_teleport(to: Vector2i) -> void:
 	_clear_pending()
 	_teleport_phase = 1

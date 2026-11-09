@@ -42,6 +42,11 @@ extends Node3D
 ##   Pinchos: '^' = casilla con una trampa de pinchos. Salen del suelo cada
 ##   3-8 s (al azar), se quedan fuera 1 s y vuelven a esconderse; solo matan
 ##   al cubo mientras están fuera. Los enemigos no las pisan. Ver SpikeTrap.
+##   Cañón láser: 'L' = muro con un cañón incrustado en la cara que da a su
+##   única casilla libre. Dispara cada 2,5-4,5 s (al azar) un láser que
+##   avanza en línea recta hasta chocar con un muro, una puerta, unos
+##   barrotes cerrados, un enemigo o el cubo (al que mata). Pasa por encima
+##   del vacío. Ver LaserCannon y LaserBolt.
 ## Materiales (ver BlockCatalog): el campo "theme" del nivel elige el bloque
 ## del suelo ("floor"), de los muros ("wall") y, opcionalmente, de la roca de
 ## debajo ("foundation"; si no se da, la que va bajo el suelo). Lo que falte
@@ -81,6 +86,17 @@ const SPIKE_HIT_DISTANCE := 0.7
 ## cada casilla más lejos suenan SPIKE_SOUND_FALLOFF dB más bajo.
 const SPIKE_SOUND_RADIUS := 7.0
 const SPIKE_SOUND_FALLOFF := 2.2
+const LASER_CHAR := "L"
+## Velocidad del láser (casillas por segundo; el cubo va a 2,5).
+const LASER_SPEED := 5.0
+## Distancia (en casillas, de lado) entre el eje del láser y el centro del
+## cubo o de un enemigo a partir de la cual chocan.
+const LASER_CUBE_RADIUS := 0.42
+const LASER_ENEMY_RADIUS := 0.38
+## Los cañones solo se oyen a esta distancia del cubo o menos (en casillas);
+## cada casilla más lejos suenan LASER_SOUND_FALLOFF dB más bajo.
+const LASER_SOUND_RADIUS := 9.0
+const LASER_SOUND_FALLOFF := 1.6
 ## Color de cada pareja de teletransporte.
 const TELEPORT_COLORS := {
 	"6": Color(0.25, 0.85, 1.0),
@@ -200,6 +216,10 @@ var _enemies_frozen := false
 var _teleports := {}
 ## casilla -> SpikeTrap
 var _spikes := {}
+## casilla -> { "node": LaserCannon, "facing": Vector2i }
+var _cannons := {}
+## Láseres en vuelo.
+var _lasers: Array[LaserBolt] = []
 ## casilla -> HangingBridge (solo los que siguen en pie)
 var _bridges := {}
 ## Aparición en curso: tiempo transcurrido, retraso de cada casilla,
@@ -249,6 +269,8 @@ func build() -> void:
 	_bridges.clear()
 	_teleports.clear()
 	_spikes.clear()
+	_cannons.clear()
+	_lasers.clear()
 	var enemy_cells := {}
 	## símbolo -> casillas de teletransporte
 	var teleport_cells := {}
@@ -270,6 +292,11 @@ func build() -> void:
 			var symbol := row[x]
 			if symbol == VOID_CHAR:
 				_void[cell] = true
+				continue
+			if symbol == LASER_CHAR:
+				# El muro recortado lo dibuja el propio cañón.
+				wall_cells.append(cell)
+				_add_cannon(cell)
 				continue
 			if symbol == "#" or BUTTON_CHARS.contains(symbol):
 				wall_cells.append(cell)
@@ -334,6 +361,9 @@ func _process(delta: float) -> void:
 			spawner.update(delta)
 		for trap: SpikeTrap in _spikes.values():
 			trap.update(delta)
+		for item: Dictionary in _cannons.values():
+			item["node"].update(delta)
+		_update_lasers(delta)
 	_check_enemy_hits()
 	_check_spike_hits()
 	for item in _keys.values():
@@ -520,6 +550,154 @@ func _on_spikes_extended(cell: Vector2i) -> void:
 	var distance := Vector2(cube.cell).distance_to(Vector2(cell))
 	if distance <= SPIKE_SOUND_RADIUS:
 		Sfx.play("spikes", 0.08, -SPIKE_SOUND_FALLOFF * distance)
+
+
+func is_cannon(cell: Vector2i) -> bool:
+	return _cannons.has(cell)
+
+
+## El cañón se mete en el muro y apunta a su única casilla libre (como los
+## botones).
+func _add_cannon(cell: Vector2i) -> void:
+	var facing := _free_side(cell)
+	if facing == Vector2i.ZERO:
+		push_warning("Cañón láser en %s sin casilla libre al lado" % cell)
+		facing = Vector2i.DOWN
+	var cannon := LaserCannon.create(_block_at(cell, "wall"), _block_at(cell, "floor"))
+	cannon.position = Vector3(cell.x * CELL_SIZE, 0.0, cell.y * CELL_SIZE)
+	cannon.rotation.y = atan2(facing.x, facing.y)
+	add_child(cannon)
+	_cannons[cell] = {"node": cannon, "facing": facing}
+	cannon.fired.connect(_on_cannon_fired.bind(cell))
+	cannon.beeped.connect(_on_cannon_beeped.bind(cell))
+
+
+## Primera casilla de al lado (no en diagonal) que no es muro, botón, cañón
+## ni vacío, o Vector2i.ZERO si no hay.
+func _free_side(cell: Vector2i) -> Vector2i:
+	for dir: Vector2i in [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
+		var n := cell + dir
+		if n.y >= 0 and n.y < layout.size() and n.x >= 0 and n.x < layout[n.y].length() \
+				and not "#~".contains(layout[n.y][n.x]) and not BUTTON_CHARS.contains(layout[n.y][n.x]) \
+				and layout[n.y][n.x] != LASER_CHAR:
+			return dir
+	return Vector2i.ZERO
+
+
+## Volumen (dB) de un sonido de cañón según lo lejos que esté del cubo, o NAN
+## si está demasiado lejos para oírse.
+func _cannon_volume(cell: Vector2i) -> float:
+	if cube == null:
+		return NAN
+	var distance := Vector2(cube.cell).distance_to(Vector2(cell))
+	return -LASER_SOUND_FALLOFF * distance if distance <= LASER_SOUND_RADIUS else NAN
+
+
+func _on_cannon_beeped(cell: Vector2i) -> void:
+	var volume := _cannon_volume(cell)
+	if not is_nan(volume):
+		Sfx.play("laser_beep", 0.0, volume)
+
+
+## Sale un láser por la boca del cañón (en el borde de su casilla).
+func _on_cannon_fired(cell: Vector2i) -> void:
+	var dir := Vector2(_cannons[cell]["facing"])
+	var bolt := LaserBolt.create(Vector2(cell) + dir * 0.5, dir)
+	add_child(bolt)
+	_lasers.append(bolt)
+	var volume := _cannon_volume(cell)
+	if not is_nan(volume):
+		Sfx.play("laser", 0.06, volume)
+
+
+## Mueve los láseres y hace chocar los que tocan algo.
+func _update_lasers(delta: float) -> void:
+	if _lasers.is_empty():
+		return
+	var grid := get_grid_size()
+	for bolt: LaserBolt in _lasers.duplicate():
+		bolt.board_pos += bolt.direction * LASER_SPEED * delta
+		var p := bolt.board_pos
+		if p.x < -2.0 or p.y < -2.0 or p.x > grid.x + 1.0 or p.y > grid.y + 1.0:
+			# Se ha ido por el vacío de fuera del mapa.
+			_lasers.erase(bolt)
+			bolt.queue_free()
+			continue
+		var impact := _laser_impact(bolt)
+		if is_nan(impact.x):
+			continue
+		_lasers.erase(bolt)
+		bolt.explode(impact)
+		var volume := _cannon_volume(Vector2i(roundi(impact.x), roundi(impact.y)))
+		if not is_nan(volume):
+			Sfx.play("laser_hit", 0.1, volume)
+
+
+## Punto (en casillas) donde choca el láser en este fotograma, o (NAN, NAN)
+## si no choca con nada. Si toca al cubo y es vulnerable, el cubo explota.
+func _laser_impact(bolt: LaserBolt) -> Vector2:
+	var dir := bolt.direction
+	var front := bolt.board_pos + dir * LaserBolt.LENGTH * 0.5
+	var best := Vector2(NAN, NAN)
+	var best_along := INF
+	# Lo que haya en la casilla de la punta: muro, puerta o barrotes.
+	var cell := Vector2i(roundi(front.x), roundi(front.y))
+	var stop := _laser_stop(cell)
+	if stop >= 0.0:
+		var face := Vector2(cell) - dir * stop
+		if (front - face).dot(dir) >= 0.0:
+			best = face
+			best_along = (face - bolt.board_pos).dot(dir)
+	# El cubo (salvo si está cayendo del cielo, saltando por encima o
+	# teletransportándose).
+	var hit_cube := false
+	if cube and cube.is_alive() and not cube.is_appearing() and not cube.is_teleporting() \
+			and not cube.is_above(LaserCannon.HEIGHT + LaserBolt.CORE_RADIUS):
+		var anchor := to_local(cube.get_trail_anchor())
+		var along := _laser_touch(bolt, Vector2(anchor.x, anchor.z) / CELL_SIZE, LASER_CUBE_RADIUS)
+		if along < best_along:
+			best_along = along
+			best = bolt.board_pos + dir * along
+			hit_cube = true
+	for enemy in _enemies:
+		if enemy.is_appearing():
+			continue
+		var along := _laser_touch(bolt, enemy.board_position(), LASER_ENEMY_RADIUS)
+		if along < best_along:
+			best_along = along
+			best = bolt.board_pos + dir * along
+			hit_cube = false
+	if hit_cube:
+		cube.die()
+	return best
+
+
+## Si el láser toca un cuerpo de radio `radius` con centro en `center`
+## (casillas), la distancia a lo largo del láser desde su centro hasta el
+## punto de choque; si no, INF.
+func _laser_touch(bolt: LaserBolt, center: Vector2, radius: float) -> float:
+	var offset := center - bolt.board_pos
+	var along := offset.dot(bolt.direction)
+	if absf(offset.cross(bolt.direction)) >= radius or absf(along) >= radius + LaserBolt.LENGTH * 0.5:
+		return INF
+	return maxf(along - radius, -LaserBolt.LENGTH * 0.5)
+
+
+## Distancia desde el centro de la casilla hasta la cara contra la que choca
+## un láser que entra en ella, o -1 si el láser la atraviesa (casillas libres,
+## vacío, puentes y fuera del mapa).
+func _laser_stop(cell: Vector2i) -> float:
+	if cell.y < 0 or cell.y >= layout.size() or cell.x < 0 or cell.x >= layout[cell.y].length():
+		return -1.0
+	if _is_wall(cell) and not BREAKABLE_CHARS.contains(layout[cell.y][cell.x]):
+		return CELL_SIZE * 0.5
+	if _breakables.has(cell):
+		return CELL_SIZE * 0.5
+	if _doors.has(cell):
+		return DOOR_THICKNESS * 0.5
+	if bars_closed(cell):
+		return 0.06
+	return -1.0
 
 
 ## Hay barrotes cerrados en la casilla.
@@ -1086,7 +1264,8 @@ func _add_button(cell: Vector2i, symbol: String) -> void:
 	for dir: Vector2i in [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
 		var n := cell + dir
 		if n.y >= 0 and n.y < layout.size() and n.x >= 0 and n.x < layout[n.y].length() \
-				and not "#~".contains(layout[n.y][n.x]) and not BUTTON_CHARS.contains(layout[n.y][n.x]):
+				and not "#~".contains(layout[n.y][n.x]) and not BUTTON_CHARS.contains(layout[n.y][n.x]) \
+				and layout[n.y][n.x] != LASER_CHAR:
 			facing = dir
 			break
 	if facing == Vector2i.ZERO:
@@ -1183,7 +1362,8 @@ func _is_wall(cell: Vector2i) -> bool:
 	if cell.y < 0 or cell.y >= layout.size() or cell.x < 0 or cell.x >= layout[cell.y].length():
 		return true
 	var symbol := layout[cell.y][cell.x]
-	return symbol == "#" or BREAKABLE_CHARS.contains(symbol) or BUTTON_CHARS.contains(symbol)
+	return symbol == "#" or BREAKABLE_CHARS.contains(symbol) or BUTTON_CHARS.contains(symbol) \
+		or symbol == LASER_CHAR
 
 
 func _make_material(color: Color) -> StandardMaterial3D:

@@ -76,6 +76,7 @@ const MESSAGES := {
 		"TIP_BRIDGE": "Los puentes colgantes se gastan cada vez que pasas: cuanto más polvo sueltan, menos aguantan. Si una tabla cede, el puente entero se cae.",
 		"TIP_TELEPORT": "Los portales del mismo color están conectados: el cubo sale por el otro con el mismo rumbo. Los enemigos no pueden seguirte.",
 		"TIP_SPIKES": "Las placas con cuatro agujeros esconden pinchos que salen cada pocos segundos. Justo antes, la placa tiembla: gira o da media vuelta.",
+		"TIP_LASER": "Cuando las luces rojas de un cañón parpadean y pitan, va a disparar: el láser avanza hasta chocar con algo. No te cruces en su camino.",
 	},
 	"en": {
 		"MENU_PLAY": "Play",
@@ -146,6 +147,7 @@ const MESSAGES := {
 		"TIP_BRIDGE": "Rope bridges wear out every time you cross them: the more dust they shed, the less they'll hold. If one plank gives way, the whole bridge falls.",
 		"TIP_TELEPORT": "Portals of the same colour are linked: the cube comes out of the other one heading the same way. Enemies can't follow you.",
 		"TIP_SPIKES": "Plates with four holes hide spikes that shoot up every few seconds. Just before, the plate shakes: turn or reverse.",
+		"TIP_LASER": "When a cannon's red lights blink and beep, it's about to fire: the laser flies until it hits something. Stay out of its way.",
 		"Primer giro": "First Turn",
 		"El muro": "The Wall",
 		"La llave": "The Key",
@@ -210,6 +212,8 @@ const MESSAGES := {
 		"Los cuatro portales": "The Four Portals",
 		"Pinchos": "Spikes",
 		"El corredor de lanzas": "The Spear Corridor",
+		"Láseres": "Lasers",
+		"La galería de tiro": "The Shooting Gallery",
 	},
 }
 
