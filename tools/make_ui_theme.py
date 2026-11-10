@@ -52,11 +52,6 @@ def write_svg(name, w, h, body):
 
 
 def make_svgs():
-    # Logo del menú: el cubo del juego con la flecha de rumbo y su sombra.
-    write_svg("logo_cube.svg", 160, 166,
-              '<ellipse cx="80" cy="150" rx="58" ry="12" fill="#000" fill-opacity="0.28"/>'
-              + cube(80, 76, 60, sw=6)
-              + '<polygon points="64,40 98,44 74,56" fill="#fff"/>')
     # Tirador de los deslizadores: un cubito.
     write_svg("slider_grabber.svg", 44, 44, cube(22, 22, 19, sw=2.5))
 
@@ -81,6 +76,17 @@ def make_svgs():
               f'fill="{RIGHT}" stroke="{OUTLINE}" stroke-width="3" stroke-linejoin="round"/>'
               '<ellipse cx="12.5" cy="11" rx="4" ry="3" fill="#ffffff" fill-opacity="0.45"/>')
     write_svg("hud_gold_cube.svg", 40, 40, cube(20, 20, 17, "#ffe27a", "#f0b429", "#c98a12", OUTLINE, 3))
+
+    # Redes sociales de los créditos (glifos de Instagram y X, del color de
+    # los iconos).
+    write_svg("social_instagram.svg", 48, 48,
+              f'<rect x="5" y="5" width="38" height="38" rx="11" fill="none" stroke="{ICON}" stroke-width="4"/>'
+              f'<circle cx="24" cy="24" r="8.5" fill="none" stroke="{ICON}" stroke-width="4"/>'
+              f'<circle cx="35" cy="13" r="2.6" fill="{ICON}"/>')
+    write_svg("social_x.svg", 48, 48,
+              f'<g transform="translate(4 4) scale(1.6667)"><path fill="{ICON}" d="M18.244 2.25h3.308l-7.227 '
+              '8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231z'
+              'm-1.161 17.52h1.833L7.084 4.126H5.117z"/></g>')
 
     # Icono de pausa del juego (dos barras, como los de los botones de pausa).
     write_svg("pause_pause.svg", 48, 48,

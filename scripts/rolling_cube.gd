@@ -93,7 +93,8 @@ signal reversed(cell: Vector2i)
 ## Se ha pedido un giro hacia una casilla bloqueada y se ha descartado.
 signal turn_rejected(direction: Vector2i)
 ## Se ha aplicado un giro pedido (a la izquierda o a la derecha): cuenta para
-## la estrella de giros. Los descartados, los rebotes y la media vuelta no.
+## la estrella de giros (la media vuelta también cuenta, como dos: ver
+## reversed). Los descartados y los rebotes no.
 signal turn_applied(direction: Vector2i)
 ## Ha cogido el cubito dorado del nivel.
 signal collectible_picked

@@ -2,8 +2,9 @@ class_name CubeBackdrop
 extends Control
 ## Fondo de los menús: degradado marrón, una rejilla isométrica muy tenue y
 ## unos pocos cubos isométricos que suben flotando despacio y se balancean.
-## Casi todos son del color de los muros; alguno tiene los colores del cubo
-## del juego. Al salir por arriba vuelven a entrar por abajo.
+## Son el cubo del juego (caras blancas con una franja gris en los bordes,
+## como RollingCube), medio transparentes. Al salir por arriba vuelven a
+## entrar por abajo.
 
 const TOP_COLOR := Color(0.27, 0.225, 0.18)
 const BOTTOM_COLOR := Color(0.17, 0.14, 0.11)
@@ -19,11 +20,12 @@ const SPEED_MAX := 22.0
 ## Balanceo horizontal: amplitud (px) y frecuencia (rad/s).
 const SWAY := 18.0
 const SWAY_SPEED := 0.5
-## Caras (arriba, izquierda, derecha): muro y cubo del juego.
-const WALL_FACES := [Color(0.42, 0.47, 0.58), Color(0.32, 0.36, 0.45), Color(0.25, 0.28, 0.36)]
-const GAME_FACES := [Color(0.98, 0.85, 0.3), Color(0.3, 0.7, 0.95), Color(0.9, 0.3, 0.3)]
-## Uno de cada GAME_EVERY cubos tiene los colores del cubo del juego.
-const GAME_EVERY := 5
+## Caras (arriba, izquierda, derecha): blanco y franja gris del borde, con
+## un sombreado suave por cara (como el icono, ver tools/make_icon.py).
+const FACES := [Color(1.0, 1.0, 1.0), Color(0.89, 0.9, 0.92), Color(0.79, 0.8, 0.83)]
+const EDGES := [Color(0.75, 0.76, 0.78), Color(0.66, 0.67, 0.71), Color(0.57, 0.58, 0.63)]
+## Ancho de la franja gris (fracción del lado, RollingCube.EDGE_WIDTH).
+const EDGE := 0.07
 
 var _cubes: Array[Dictionary] = []
 var _time := 0.0
@@ -47,9 +49,8 @@ func _ready() -> void:
 			"y": (rows[i] + rng.randf()) / CUBE_COUNT,
 			"size": lerpf(SIZE_MIN, SIZE_MAX, depth),
 			"speed": lerpf(SPEED_MIN, SPEED_MAX, depth),
-			"alpha": lerpf(0.10, 0.28, depth),
+			"alpha": lerpf(0.18, 0.4, depth),
 			"phase": rng.randf() * TAU,
-			"game": i % GAME_EVERY == 2,
 		})
 	_cubes.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.size < b.size)
 
@@ -72,7 +73,7 @@ func _draw() -> void:
 		var span := size.y + r * 4.0
 		var y := fposmod(cube.y * span - _time * cube.speed, span) - r * 2.0
 		var x: float = cube.x * size.x + sin(_time * SWAY_SPEED + cube.phase) * SWAY
-		_draw_cube(Vector2(x, y), r, GAME_FACES if cube.game else WALL_FACES, cube.alpha)
+		_draw_cube(Vector2(x, y), r, cube.alpha)
 
 
 ## Rejilla isométrica: dos familias de líneas a ±30°.
@@ -87,18 +88,24 @@ func _draw_grid() -> void:
 		c += step
 
 
-func _draw_cube(center: Vector2, r: float, faces: Array, alpha: float) -> void:
+## Cubo isométrico. Los colores se mezclan a mano con el fondo (en vez de
+## dibujar con transparencia) para que la franja gris y la cara blanca no se
+## sumen donde se solapan.
+func _draw_cube(center: Vector2, r: float, alpha: float) -> void:
 	var k := r * 0.866
-	var top := center + Vector2(0, -r)
-	var left := center + Vector2(-k, -r * 0.5)
-	var right := center + Vector2(k, -r * 0.5)
-	var bottom := center + Vector2(0, r)
-	var left_low := center + Vector2(-k, r * 0.5)
-	var right_low := center + Vector2(k, r * 0.5)
-	draw_colored_polygon(PackedVector2Array([top, right, center, left]), _with_alpha(faces[0], alpha))
-	draw_colored_polygon(PackedVector2Array([left, center, bottom, left_low]), _with_alpha(faces[1], alpha))
-	draw_colored_polygon(PackedVector2Array([right, center, bottom, right_low]), _with_alpha(faces[2], alpha))
-
-
-func _with_alpha(color: Color, alpha: float) -> Color:
-	return Color(color, alpha)
+	var h := r * 0.5
+	var back := TOP_COLOR.lerp(BOTTOM_COLOR, clampf(center.y / maxf(size.y, 1.0), 0.0, 1.0))
+	# Cada cara: esquina de origen y los dos lados que salen de ella.
+	var frames := [
+		[center + Vector2(-k, -h), Vector2(k, -h), Vector2(k, h)],
+		[center + Vector2(-k, -h), Vector2(k, h), Vector2(0, r)],
+		[center, Vector2(k, -h), Vector2(0, r)],
+	]
+	for i in 3:
+		var o: Vector2 = frames[i][0]
+		var a: Vector2 = frames[i][1]
+		var b: Vector2 = frames[i][2]
+		var f := 1.0 - EDGE
+		draw_colored_polygon(PackedVector2Array([o, o + a, o + a + b, o + b]), back.lerp(EDGES[i], alpha))
+		draw_colored_polygon(PackedVector2Array([o + (a + b) * EDGE, o + a * f + b * EDGE,
+			o + (a + b) * f, o + a * EDGE + b * f]), back.lerp(FACES[i], alpha))

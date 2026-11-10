@@ -74,7 +74,7 @@ Simula las reglas de scripts/rolling_cube.gd:
 - Cubito dorado (campo "collectible", lo colocan place_collectibles.py): con
   solve(..., collectible=casilla) solo vale llegar a la meta tras pasar por
   él. "validate" comprueba que se puede coger y que "star_turns" (los giros de
-  la estrella) es el mínimo cogiéndolo más un 25 % (al menos 2).
+  la estrella) es el mínimo cogiéndolo más un 30 % (al menos 3).
 
 La dificultad de un nivel es el mínimo de giros necesarios (búsqueda 0-1 BFS),
 y como desempate el número de pasos del recorrido óptimo.
@@ -745,7 +745,7 @@ def check_collectible(lvl):
     if result is None:
         return [f"el coleccionable {cell} no se puede coger"]
     turns = result[0]
-    expected = turns + max(2, -(-turns // 4))
+    expected = turns + max(3, -(-turns * 3 // 10))
     if star != expected:
         return [f"star_turns es {star} pero debería ser {expected} ({turns} giros con el coleccionable)"]
     return []

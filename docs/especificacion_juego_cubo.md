@@ -134,7 +134,7 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 - Se aplica en el **siguiente límite entre casillas**, como los giros (apartado 2.7): el cubo termina el vuelco en curso y da la media vuelta al llegar a la casilla.
 - Es un movimiento **grande y costoso**: el cubo se queda **parado unos 200 ms**; por sus **cuatro lados sale humo gris** que se expande y se desvanece (≈0,8 s); la **cámara tiembla** levemente (≈0,25 s) y el móvil **vibra** (si la vibración está activada). En el futuro podría penalizar puntos.
 - Para los power ups cuenta como un rebote contra una **pared** (se pierde la velocidad).
-- El resolvedor de niveles **no la usa**: los niveles se diseñan y miden sin media vuelta, que queda como ayuda extra para el jugador.
+- El resolvedor de niveles **no la usa**: los niveles se diseñan y miden sin media vuelta, que queda como ayuda extra para el jugador. Para la estrella de giros cuenta como **2 giros** (apartado 2.21).
 
 ### 2.13. Enemigos — Implementada en el prototipo
 
@@ -278,7 +278,7 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 
 - Cada partida de un nivel puede ganar hasta **tres estrellas**, una por cada reto (se pueden conseguir en cualquier combinación):
   1. **Sin morir:** se pierde con cualquier muerte (enemigos, vacío, pinchos, láser o bombas).
-  2. **En X giros o menos:** solo cuentan los **giros aplicados**. No cuentan los giros descartados contra un muro, los rebotes, la media vuelta, el dash ni el pisotón. Morir no reinicia la cuenta. X (`star_turns`) es el **mínimo de giros cogiendo el cubito dorado más un 25 %** (al menos +2), así que las tres estrellas siempre se pueden conseguir a la vez.
+  2. **En X giros o menos:** cuentan los **giros aplicados**, y la **media vuelta cuenta como 2 giros**. No cuentan los giros descartados contra un muro, los rebotes, el dash ni el pisotón. Morir no reinicia la cuenta. X (`star_turns`) es el **mínimo de giros cogiendo el cubito dorado más un 30 %** (al menos +3), así que las tres estrellas siempre se pueden conseguir a la vez y queda algo de margen para alguna media vuelta.
   3. **Cubito dorado:** coger el coleccionable del nivel.
 - **Cubito dorado:** uno por nivel. Es un cubo **dorado** metálico apoyado sobre un vértice, como una gema. **Flota** subiendo y bajando suavemente y **gira despacio**. Detrás tiene un resplandor de **rayos de luz dorada** que giran y cambian de intensidad, y una **luz dorada que late** ilumina el suelo y los muros de alrededor.
   - Se coge al llegar a su casilla: sube, gira deprisa, destella y se encoge con una lluvia de chispas, con sonido de campanas y una vibración breve.
@@ -335,13 +335,13 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
   - **Cambios de tema:** con un fundido cruzado de 1,5 s. Al pasar a otro nivel del mismo tramo, el tema sigue sin cortarse; también durante la pantalla de carga, y el nuevo tema empieza mientras se prepara el nivel.
   - **Amortiguado:** en la **pausa** y al **completar el nivel**, la música baja de volumen y pierde los agudos (filtro paso bajo); al continuar, reiniciar o repetir vuelve a la normalidad.
 
-- **Icono de la aplicación:** un cubo isométrico con los colores de las caras del cubo del juego (amarillo, azul y rojo) y la flecha de rumbo, sobre el fondo marrón del menú con trozos de muro de laberinto. En Android se usa también como icono adaptativo (primer plano, fondo y versión monocromática). Se genera con `tools/make_icon.py`.
+- **Icono de la aplicación:** el **cubo del juego** en isométrico (caras blancas con una franja gris en cada borde y un sombreado suave por cara), sobre el fondo marrón del menú con trozos de muro de laberinto. En Android se usa también como icono adaptativo (primer plano, fondo y versión monocromática). Se genera con `tools/make_icon.py`.
 - **Estilo de la interfaz — «Bloques»:** los menús y la interfaz de juego imitan bloques de vóxel, sin recargar la pantalla:
   - **Botones y paneles** son bloques vistos de frente: esquinas poco redondeadas, un brillo en el canto de arriba y un canto inferior más oscuro (el grosor del bloque) que **se hunde al pulsar**. El botón principal de cada pantalla (Jugar, Siguiente nivel, Continuar en la pantalla de carga) es **amarillo**; el resto, marrón. Los botones con icono (pausa, atrás y los del menú de pausa) son bloques cuadrados.
   - **Colores:** el marrón del menú y del icono como base y, de acento, los colores de las caras del cubo: **amarillo** (títulos, botón principal, foco), **azul** (relleno de deslizadores e interruptores activos) y **rojo**.
   - **Tipografía:** Russo One (geométrica, de esquinas cuadradas; licencia SIL Open Font), en `ui/fonts`. Los títulos van en amarillo con un canto oscuro debajo, como si fueran bloques.
   - **Controles:** el tirador de los deslizadores y el de los interruptores es un **cubito isométrico** con los colores del cubo (gris en los interruptores apagados). El número de nivel del juego va sobre una placa translúcida.
-  - **Fondo de los menús** (principal, opciones y créditos): degradado marrón con una **rejilla isométrica** muy tenue y unos pocos **cubos isométricos** que suben flotando despacio (casi todos del color de los muros; alguno con los colores del cubo). En el menú principal, el **logotipo** del cubo (el del icono) va junto al título «MAZE CUBE».
+  - **Fondo de los menús** (principal, opciones y créditos): degradado marrón con una **rejilla isométrica** muy tenue y unos pocos **cubos isométricos** que suben flotando despacio: son el **cubo blanco** del juego, con sus bordes grises, medio transparentes. En el menú principal, el título «MAZE CUBE» va centrado, sin logotipo.
   - El tema (`ui/theme.tres`) y sus SVG se generan con `tools/make_ui_theme.py`.
 - Juego en **3D**, con cubo y laberinto visibles desde arriba.
 - **Materiales del escenario — Implementada en el prototipo:** el suelo, los muros y la roca bajo el tablero usan un **catálogo de bloques** de colores casi planos y tonos suaves (solo los rasgos grandes de cada material: juntas, unas pocas grietas, vetas que brillan) (hierba, hierba con flores, hierba seca, tierra, piedra, sillería, piedra con musgo, granito, arena, arenisca, nieve, hielo, lava, roca volcánica, fuego, tablones, tronco, ladrillo, metal, obsidiana, cristal y tierra corrompida). Cada bloque tiene una textura para la cara de arriba y otra para los lados (p. ej. césped encima que cuelga sobre la tierra, nieve sobre la piedra). Sirven para dar a cada zona del juego su estética, pero **todos están disponibles en cualquier nivel** y se pueden mezclar por zonas del mapa para hacer transiciones. Las texturas se generan con `tools/make_block_textures.py` y se revisan en `scenes/block_catalog_preview.tscn`. La salida, la meta, las puertas, los muros destructibles y los puentes mantienen su aspecto propio.
@@ -543,7 +543,7 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 
 - **Jugar:** abre el selector de niveles.
 - **Opciones:** volumen de **efectos de sonido** y de **música** (0-100%; canales de audio «SFX» y «Music»), **antialiasing** (activado/desactivado), **vibración** (activada/desactivada; al activarla vibra brevemente como prueba) e **idioma** (español o inglés). Los cambios se aplican al momento y se guardan en el dispositivo. Por defecto se usa el idioma del sistema si es español o inglés, y si no, inglés.
-- **Créditos:** equipo de desarrollo, gráficos, sonido, tipografía, herramientas y licencia del motor, en una lista que se puede desplazar.
+- **Créditos:** equipo de desarrollo, gráficos, sonido, tipografía, herramientas y licencia del motor, en una lista que se puede desplazar. Al final, tras «¡Gracias por jugar!», un apartado «Sígueme» con los **iconos de Instagram y X**, que abren los perfiles (instagram.com/tonyjdev y x.com/tonyjdev) en el navegador o en su aplicación, y debajo «@tonyjdev».
 - **Salir:** cierra el juego (igual que pulsar Atrás en la pantalla principal).
 
 ### 7.2. Selector de niveles

@@ -32,8 +32,8 @@ extends Node3D
 ## (RollingCube.appear); los enemigos no se mueven hasta que el cubo empieza
 ## a rodar.
 ## Estrellas: cada partida tiene tres retos, una estrella por cada uno: no
-## morir, usar «star_turns» giros o menos (solo cuentan los giros aplicados:
-## no los descartados, los rebotes ni la media vuelta) y coger el cubito
+## morir, usar «star_turns» giros o menos (cuentan los giros aplicados y la
+## media vuelta, que vale REVERSE_TURNS; no los descartados ni los rebotes) y coger el cubito
 ## dorado. Arriba, junto al número de nivel, se ve cómo van: el corazón se
 ## apaga al morir, los giros («12/20») se ponen rojos al pasarse y el cubito
 ## se enciende al cogerlo. Reiniciar o repetir empieza la cuenta de cero.
@@ -89,6 +89,8 @@ const COMPLETE_MENU_DELAY := 0.5
 const STAR_FIRST_DELAY := 0.35
 const STAR_INTERVAL := 0.4
 const STAR_PITCHES := [1.0, 1.12, 1.26]
+## Giros que cuenta una media vuelta para la estrella de giros.
+const REVERSE_TURNS := 2
 ## Iconos del HUD de los retos: apagados (corazón tras morir, cubito sin coger).
 const STAT_OFF := Color(0.45, 0.42, 0.4, 0.55)
 const TURNS_OVER_COLOR := Color(1.0, 0.45, 0.4)
@@ -195,6 +197,8 @@ func _ready() -> void:
 		if hits_left == 0:
 			GameState.vibrate(GameState.VIBRATION_WALL_BROKEN))
 	cube.reversed.connect(func(_cell: Vector2i) -> void:
+		_run_turns += REVERSE_TURNS
+		_update_stats()
 		Sfx.play("reverse")
 		camera.shake()
 		GameState.vibrate(GameState.VIBRATION_REVERSE))

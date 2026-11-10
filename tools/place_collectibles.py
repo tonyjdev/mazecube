@@ -16,15 +16,14 @@ Dónde se pone el cubito:
 - Si no hay ninguna casilla fuera del recorrido (niveles diminutos), se pone
   en el propio recorrido.
 
-star_turns = mínimo de giros recogiendo el cubito + un margen del 25 % (al
-menos 2), así que las tres estrellas siempre se pueden conseguir.
+star_turns = mínimo de giros recogiendo el cubito + un margen del 30 % (al
+menos 3; la media vuelta cuenta como 2 giros en el juego), así que las tres estrellas siempre se pueden conseguir.
 
 Es determinista. Ejecutarlo de nuevo tras cambiar o regenerar los niveles
 (sustituye los valores anteriores) y después "level_solver.py validate".
 
 Uso (desde la raíz del repositorio): python3 tools/place_collectibles.py [primer_nivel último_nivel]
 """
-import math
 import re
 import sys
 from collections import deque
@@ -36,12 +35,13 @@ EXTRA_MIN = 1
 EXTRA_MAX = 6
 # Candidatos que se prueban con el resolvedor (los mejores según la forma del mapa).
 MAX_CANDIDATES = 8
-STAR_MARGIN = 0.25
-STAR_MARGIN_MIN = 2
+# Margen en décimas (30 %), con aritmética entera para no redondear mal.
+STAR_MARGIN_TENTHS = 3
+STAR_MARGIN_MIN = 3
 
 
 def star_turns(min_turns):
-    return min_turns + max(STAR_MARGIN_MIN, math.ceil(min_turns * STAR_MARGIN))
+    return min_turns + max(STAR_MARGIN_MIN, -(-min_turns * STAR_MARGIN_TENTHS // 10))
 
 
 def walkable(rows, cell):

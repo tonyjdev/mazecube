@@ -27,6 +27,14 @@ const CREDITS := [
 	["CREDITS_TOOLS", "Godot Engine 4.7 · Godot AI (MCP)\nPython · Git · Android SDK · Ubuntu"],
 	["CREDITS_ENGINE", "CREDITS_ENGINE_LICENSE"],
 ]
+## Redes sociales al final de los créditos: (icono, enlace). Se abren en el
+## navegador o en su aplicación al tocarlas.
+const SOCIAL_HANDLE := "@tonyjdev"
+const SOCIAL := [
+	["res://ui/social_instagram.svg", "https://www.instagram.com/tonyjdev"],
+	["res://ui/social_x.svg", "https://x.com/tonyjdev"],
+]
+const SOCIAL_ICON_SIZE := 52
 
 var _screens: Dictionary
 var _current := "main"
@@ -45,6 +53,10 @@ func _ready() -> void:
 	%OptionsButton.pressed.connect(_show.bind("options"))
 	%CreditsButton.pressed.connect(_show.bind("credits"))
 	%QuitButton.pressed.connect(get_tree().quit)
+	%CreditsText.meta_underlined = false
+	%CreditsText.meta_clicked.connect(func(meta: Variant) -> void:
+		Sfx.play("click")
+		OS.shell_open(str(meta)))
 	%LevelMap.level_chosen.connect(func(index: int) -> void:
 		Sfx.play("click")
 		GameState.play_level(index))
@@ -161,7 +173,13 @@ func _build_credits() -> void:
 	for entry in CREDITS:
 		text += "[font_size=22][color=#d9b98a]%s[/color][/font_size]\n" % tr(entry[0])
 		text += "[font_size=30]%s[/font_size]\n\n" % tr(entry[1])
-	text += "[font_size=34][color=#fad98c]%s[/color][/font_size][/center]" % tr("CREDITS_THANKS")
+	text += "[font_size=34][color=#fad98c]%s[/color][/font_size]\n\n" % tr("CREDITS_THANKS")
+	text += "[font_size=22][color=#d9b98a]%s[/color][/font_size]\n" % tr("CREDITS_FOLLOW")
+	var icons: Array[String] = []
+	for entry in SOCIAL:
+		icons.append("[url=%s][img=%dx%d]%s[/img][/url]" % [entry[1], SOCIAL_ICON_SIZE, SOCIAL_ICON_SIZE, entry[0]])
+	text += "      ".join(icons) + "\n"
+	text += "[font_size=28]%s[/font_size][/center]" % SOCIAL_HANDLE
 	var label: RichTextLabel = %CreditsText
 	label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
 	label.text = text

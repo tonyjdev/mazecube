@@ -4,7 +4,6 @@
 [ext_resource type="Script" path="res://scripts/level_map.gd" id="2_map"]
 [ext_resource type="Texture2D" path="res://ui/back_arrow.svg" id="3_back"]
 [ext_resource type="Script" path="res://scripts/cube_backdrop.gd" id="4_backdrop"]
-[ext_resource type="Texture2D" path="res://ui/logo_cube.svg" id="5_logo"]
 
 [node name="Menu" type="Control"]
 layout_mode = 3
@@ -42,14 +41,6 @@ theme_override_constants/separation = 20
 layout_mode = 2
 alignment = 1
 theme_override_constants/separation = 24
-
-[node name="Logo" type="TextureRect" parent="MainScreen/VBox/Header"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(112, 116)
-layout_mode = 2
-texture = ExtResource("5_logo")
-expand_mode = 1
-stretch_mode = 5
 
 [node name="Title" type="Label" parent="MainScreen/VBox/Header"]
 layout_mode = 2
@@ -246,7 +237,7 @@ horizontal_scroll_mode = 0
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-mouse_filter = 2
+mouse_filter = 1
 bbcode_enabled = true
 fit_content = true
 scroll_active = false

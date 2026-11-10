@@ -98,7 +98,7 @@ extends RefCounted
 ##
 ## "collectible" es la casilla del cubito dorado (GoldenCube) y "star_turns"
 ## los giros máximos para la estrella de giros: el mínimo de giros cogiendo el
-## cubito más un 25 % (al menos 2). Los calcula tools/place_collectibles.py;
+## cubito más un 30 % (al menos 3). Los calcula tools/place_collectibles.py;
 ## hay que volver a ejecutarlo si se cambia o regenera un nivel.
 ##
 ## Estos niveles sirven para probar las mecánicas; los definitivos se
@@ -117,7 +117,7 @@ const LIST: Array[Dictionary] = [
 			"#########",
 		],
 		"collectible": Vector2i(6, 1),
-		"star_turns": 3,
+		"star_turns": 4,
 	},
 	{
 		"name": "El muro",
@@ -135,7 +135,7 @@ const LIST: Array[Dictionary] = [
 			"#######",
 		],
 		"collectible": Vector2i(3, 5),
-		"star_turns": 7,
+		"star_turns": 8,
 	},
 	{
 		"name": "La llave",
@@ -151,7 +151,7 @@ const LIST: Array[Dictionary] = [
 			"###########",
 		],
 		"collectible": Vector2i(9, 2),
-		"star_turns": 7,
+		"star_turns": 8,
 	},
 	{
 		"name": "A toda prisa",
@@ -191,7 +191,7 @@ const LIST: Array[Dictionary] = [
 			"#############",
 		],
 		"collectible": Vector2i(3, 3),
-		"star_turns": 14,
+		"star_turns": 15,
 	},
 	{
 		"name": "Dos llaves",
@@ -235,7 +235,7 @@ const LIST: Array[Dictionary] = [
 			"###############",
 		],
 		"collectible": Vector2i(11, 1),
-		"star_turns": 18,
+		"star_turns": 19,
 	},
 	{
 		"name": "El atajo",
@@ -261,7 +261,7 @@ const LIST: Array[Dictionary] = [
 			"###########",
 		],
 		"collectible": Vector2i(9, 7),
-		"star_turns": 23,
+		"star_turns": 24,
 	},
 	{
 		"name": "Galerías",
@@ -283,7 +283,7 @@ const LIST: Array[Dictionary] = [
 			"#################",
 		],
 		"collectible": Vector2i(3, 1),
-		"star_turns": 23,
+		"star_turns": 24,
 	},
 	{
 		"name": "La gran travesía",
@@ -309,7 +309,7 @@ const LIST: Array[Dictionary] = [
 			"###############",
 		],
 		"collectible": Vector2i(5, 7),
-		"star_turns": 27,
+		"star_turns": 28,
 	},
 	{
 		"name": "El botón",
@@ -333,7 +333,7 @@ const LIST: Array[Dictionary] = [
 			"###################",
 		],
 		"collectible": Vector2i(7, 9),
-		"star_turns": 30,
+		"star_turns": 32,
 		"buttons": {"p": "c"},
 	},
 	{
@@ -366,7 +366,7 @@ const LIST: Array[Dictionary] = [
 			"###############",
 		],
 		"collectible": Vector2i(3, 15),
-		"star_turns": 33,
+		"star_turns": 34,
 		"buttons": {"p": "d", "q": "cd"},
 	},
 	{
@@ -393,7 +393,7 @@ const LIST: Array[Dictionary] = [
 			"###########q###########",
 		],
 		"collectible": Vector2i(7, 7),
-		"star_turns": 37,
+		"star_turns": 38,
 		"buttons": {"p": "e", "q": "cd"},
 	},
 	{
@@ -416,7 +416,7 @@ const LIST: Array[Dictionary] = [
 			"#################",
 		],
 		"collectible": Vector2i(11, 11),
-		"star_turns": 18,
+		"star_turns": 19,
 		"patrols": {"i": "D6", "j": "R4 D2 L4 U2", "k": "L4 U2"},
 	},
 	{
@@ -445,7 +445,7 @@ const LIST: Array[Dictionary] = [
 			"###############",
 		],
 		"collectible": Vector2i(9, 13),
-		"star_turns": 20,
+		"star_turns": 21,
 	},
 	{
 		"name": "El guardián",
@@ -460,7 +460,7 @@ const LIST: Array[Dictionary] = [
 			"###############",
 		],
 		"collectible": Vector2i(10, 1),
-		"star_turns": 7,
+		"star_turns": 8,
 		"buttons": {"p": "c"},
 	},
 	{
@@ -486,7 +486,7 @@ const LIST: Array[Dictionary] = [
 			"##########################################",
 		],
 		"collectible": Vector2i(10, 3),
-		"star_turns": 37,
+		"star_turns": 38,
 		"patrols": {"i": "D4"},
 		# Transición de la pradera (izquierda) a la nieve (derecha).
 		"theme": {"floor": "snow", "wall": "ice"},
@@ -521,7 +521,7 @@ const LIST: Array[Dictionary] = [
 			"###########################",
 		],
 		"collectible": Vector2i(1, 17),
-		"star_turns": 43,
+		"star_turns": 45,
 		"patrols": {"i": "R4"},
 	},
 	{
@@ -559,7 +559,7 @@ const LIST: Array[Dictionary] = [
 			"###############################",
 		],
 		"collectible": Vector2i(25, 25),
-		"star_turns": 47,
+		"star_turns": 49,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R7"},
 	},
@@ -591,7 +591,7 @@ const LIST: Array[Dictionary] = [
 			"#############################",
 		],
 		"collectible": Vector2i(9, 15),
-		"star_turns": 52,
+		"star_turns": 54,
 		"patrols": {"i": "R4", "j": "D4"},
 	},
 	{
@@ -626,7 +626,7 @@ const LIST: Array[Dictionary] = [
 			"##########################################",
 		],
 		"collectible": Vector2i(13, 21),
-		"star_turns": 53,
+		"star_turns": 55,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R5"},
 	},
@@ -660,7 +660,7 @@ const LIST: Array[Dictionary] = [
 			"#################################",
 		],
 		"collectible": Vector2i(13, 13),
-		"star_turns": 55,
+		"star_turns": 58,
 		"buttons": {"p": "c", "q": "d"},
 		"patrols": {"i": "D4"},
 	},
@@ -699,7 +699,7 @@ const LIST: Array[Dictionary] = [
 			"##########################################",
 		],
 		"collectible": Vector2i(1, 13),
-		"star_turns": 59,
+		"star_turns": 62,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R4"},
 	},
@@ -733,7 +733,7 @@ const LIST: Array[Dictionary] = [
 			"###############################",
 		],
 		"collectible": Vector2i(17, 17),
-		"star_turns": 62,
+		"star_turns": 64,
 		"patrols": {"i": "R6", "j": "R4"},
 	},
 	{
@@ -777,7 +777,7 @@ const LIST: Array[Dictionary] = [
 			"##########################################",
 		],
 		"collectible": Vector2i(34, 30),
-		"star_turns": 64,
+		"star_turns": 67,
 		"buttons": {"p": "c", "q": "d"},
 		"patrols": {"i": "R5", "j": "R5"},
 	},
@@ -813,7 +813,7 @@ const LIST: Array[Dictionary] = [
 			"###################################",
 		],
 		"collectible": Vector2i(29, 5),
-		"star_turns": 70,
+		"star_turns": 73,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R4"},
 		"spawners": {"x": {"count": 2}, "i": {"count": 2}},
@@ -853,7 +853,7 @@ const LIST: Array[Dictionary] = [
 			"#####################################################",
 		],
 		"collectible": Vector2i(44, 3),
-		"star_turns": 74,
+		"star_turns": 77,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R5 D2 L3", "j": "R4", "k": "R4"},
 		"spawners": {"x": {"count": 2}, "i": {"count": 2}, "j": {"count": 2}, "k": {"count": 2}},
@@ -892,7 +892,7 @@ const LIST: Array[Dictionary] = [
 			"#####################################",
 		],
 		"collectible": Vector2i(3, 21),
-		"star_turns": 82,
+		"star_turns": 85,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "L2 D6", "j": "R6"},
 		"spawners": {"x": {"count": 2}, "z": {"count": 2}, "i": {"count": 2}, "j": {"count": 2}},
@@ -938,7 +938,7 @@ const LIST: Array[Dictionary] = [
 			"#####################################################",
 		],
 		"collectible": Vector2i(2, 27),
-		"star_turns": 82,
+		"star_turns": 85,
 		"buttons": {"p": "c", "q": "d"},
 		"patrols": {"i": "R6", "j": "D4", "k": "R7"},
 		"spawners": {"x": {"count": 2}, "z": {"count": 2}, "i": {"count": 2}, "j": {"count": 2}, "k": {"count": 2}},
@@ -984,7 +984,7 @@ const LIST: Array[Dictionary] = [
 			"################################################################",
 		],
 		"collectible": Vector2i(15, 29),
-		"star_turns": 88,
+		"star_turns": 91,
 		"buttons": {"p": "c", "q": "d"},
 		"patrols": {"i": "R7", "j": "R4", "k": "R4"},
 		"spawners": {"x": {"count": 2}, "z": {"count": 2}, "i": {"count": 2}, "j": {"count": 2}, "k": {"count": 2}},
@@ -1022,7 +1022,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(2, 19),
-		"star_turns": 32,
+		"star_turns": 33,
 	},
 	{
 		"name": "El abismo",
@@ -1058,7 +1058,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(36, 20),
-		"star_turns": 47,
+		"star_turns": 49,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R6 D4 L6 U4"},
 	},
@@ -1078,7 +1078,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(6, 4),
-		"star_turns": 10,
+		"star_turns": 11,
 	},
 	{
 		"name": "Tablones gastados",
@@ -1096,7 +1096,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(22, 6),
-		"star_turns": 19,
+		"star_turns": 20,
 	},
 	{
 		"name": "Tres puentes",
@@ -1128,7 +1128,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(2, 8),
-		"star_turns": 32,
+		"star_turns": 33,
 	},
 	{
 		"name": "Islas flotantes",
@@ -1157,7 +1157,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(17, 13),
-		"star_turns": 32,
+		"star_turns": 33,
 		"theme_regions": [
 			{"rect": Rect2i(1, 1, 8, 5), "floor": "mossy_stone"},
 			{"rect": Rect2i(1, 12, 9, 5), "floor": "mossy_stone"},
@@ -1212,7 +1212,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(31, 28),
-		"star_turns": 37,
+		"star_turns": 38,
 		"theme_regions": [
 			{"rect": Rect2i(1, 13, 7, 5), "floor": "mossy_stone"},
 			{"rect": Rect2i(13, 3, 8, 5), "floor": "mossy_stone"},
@@ -1264,7 +1264,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(32, 2),
-		"star_turns": 37,
+		"star_turns": 38,
 		"theme_regions": [
 			{"rect": Rect2i(14, 13, 7, 8), "floor": "mossy_stone"},
 			{"rect": Rect2i(27, 1, 7, 6), "floor": "mossy_stone"},
@@ -1319,7 +1319,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(19, 14),
-		"star_turns": 44,
+		"star_turns": 46,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "D5"},
 		"theme_regions": [
@@ -1383,7 +1383,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(2, 22),
-		"star_turns": 45,
+		"star_turns": 47,
 		"theme_regions": [
 			{"rect": Rect2i(1, 2, 8, 5), "floor": "mossy_stone"},
 			{"rect": Rect2i(13, 13, 7, 5), "floor": "mossy_stone"},
@@ -1440,7 +1440,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(30, 4),
-		"star_turns": 48,
+		"star_turns": 50,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R6"},
 		"theme_regions": [
@@ -1508,7 +1508,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(19, 19),
-		"star_turns": 52,
+		"star_turns": 54,
 		"patrols": {"i": "D5"},
 		"theme_regions": [
 			{"rect": Rect2i(14, 14, 8, 7), "floor": "stone_bricks"},
@@ -1572,7 +1572,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(17, 3),
-		"star_turns": 53,
+		"star_turns": 55,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "D4"},
 		"theme_regions": [
@@ -1655,7 +1655,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(19, 37),
-		"star_turns": 58,
+		"star_turns": 60,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R7"},
 		"theme_regions": [
@@ -1736,7 +1736,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(8, 31),
-		"star_turns": 55,
+		"star_turns": 58,
 		"buttons": {"p": "c", "q": "d"},
 		"patrols": {"i": "D7", "j": "D6"},
 		"theme_regions": [
@@ -1825,7 +1825,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(2, 14),
-		"star_turns": 63,
+		"star_turns": 65,
 		"patrols": {"i": "R6"},
 		"theme_regions": [
 			{"rect": Rect2i(2, 28, 5, 7), "floor": "wood_planks"},
@@ -1918,7 +1918,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(3, 43),
-		"star_turns": 64,
+		"star_turns": 67,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "D7", "j": "R6"},
 		"theme_regions": [
@@ -1989,7 +1989,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(4, 28),
-		"star_turns": 70,
+		"star_turns": 73,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R7"},
 		"theme_regions": [
@@ -2083,7 +2083,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(42, 39),
-		"star_turns": 65,
+		"star_turns": 68,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "D6", "j": "R6"},
 		"theme_regions": [
@@ -2179,7 +2179,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(18, 5),
-		"star_turns": 74,
+		"star_turns": 77,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R5", "j": "R6"},
 		"theme_regions": [
@@ -2280,7 +2280,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(6, 28),
-		"star_turns": 77,
+		"star_turns": 80,
 		"buttons": {"p": "c", "q": "d"},
 		"patrols": {"i": "D6", "j": "R7"},
 		"theme_regions": [
@@ -2382,7 +2382,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(67, 4),
-		"star_turns": 78,
+		"star_turns": 81,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R4", "j": "D5"},
 		"theme_regions": [
@@ -2498,7 +2498,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(35, 20),
-		"star_turns": 79,
+		"star_turns": 82,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "D5", "j": "D4"},
 		"theme_regions": [
@@ -2602,7 +2602,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(15, 27),
-		"star_turns": 83,
+		"star_turns": 86,
 		"buttons": {"p": "c", "q": "d"},
 		"patrols": {"i": "D5", "j": "D4", "k": "R5"},
 		"theme_regions": [
@@ -2711,7 +2711,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(53, 25),
-		"star_turns": 85,
+		"star_turns": 89,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R7", "j": "D6"},
 		"theme_regions": [
@@ -2822,7 +2822,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(2, 28),
-		"star_turns": 90,
+		"star_turns": 94,
 		"buttons": {"p": "c", "q": "d"},
 		"patrols": {"i": "R5", "j": "R6", "k": "D5"},
 		"theme_regions": [
@@ -2922,7 +2922,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(31, 24),
-		"star_turns": 92,
+		"star_turns": 95,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "D5", "j": "D4", "k": "R4"},
 		"theme_regions": [
@@ -3031,7 +3031,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(45, 15),
-		"star_turns": 93,
+		"star_turns": 97,
 		"buttons": {"p": "c", "q": "d"},
 		"patrols": {"i": "R5 D2 L5 U2", "j": "D7", "k": "R4"},
 		"theme_regions": [
@@ -3137,7 +3137,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(41, 25),
-		"star_turns": 99,
+		"star_turns": 103,
 		"buttons": {"p": "c", "q": "d"},
 		"patrols": {"i": "R4", "j": "D7", "k": "R4"},
 		"theme_regions": [
@@ -3252,7 +3252,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(56, 28),
-		"star_turns": 97,
+		"star_turns": 101,
 		"buttons": {"p": "c", "q": "d"},
 		"patrols": {"i": "R7", "j": "R6 D3 L6 U3", "k": "R5", "m": "R6"},
 		"theme_regions": [
@@ -3321,7 +3321,7 @@ const LIST: Array[Dictionary] = [
 			"#########################",
 		],
 		"collectible": Vector2i(10, 13),
-		"star_turns": 37,
+		"star_turns": 38,
 	},
 	{
 		"name": "Los cuatro portales",
@@ -3351,7 +3351,7 @@ const LIST: Array[Dictionary] = [
 			"###############################",
 		],
 		"collectible": Vector2i(22, 11),
-		"star_turns": 57,
+		"star_turns": 59,
 		"buttons": {"p": "c"},
 	},
 	{
@@ -3378,7 +3378,7 @@ const LIST: Array[Dictionary] = [
 			"###########################",
 		],
 		"collectible": Vector2i(9, 15),
-		"star_turns": 40,
+		"star_turns": 42,
 	},
 	{
 		"name": "El corredor de lanzas",
@@ -3410,7 +3410,7 @@ const LIST: Array[Dictionary] = [
 			"#################################",
 		],
 		"collectible": Vector2i(19, 3),
-		"star_turns": 40,
+		"star_turns": 42,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R6"},
 	},
@@ -3438,7 +3438,7 @@ const LIST: Array[Dictionary] = [
 			"#########L#################",
 		],
 		"collectible": Vector2i(1, 11),
-		"star_turns": 35,
+		"star_turns": 37,
 	},
 	{
 		"name": "La galería de tiro",
@@ -3468,7 +3468,7 @@ const LIST: Array[Dictionary] = [
 			"########L#############L####L###",
 		],
 		"collectible": Vector2i(1, 5),
-		"star_turns": 48,
+		"star_turns": 50,
 	},
 	{
 		"name": "Bombas",
@@ -3496,7 +3496,7 @@ const LIST: Array[Dictionary] = [
 			"######################M######",
 		],
 		"collectible": Vector2i(21, 3),
-		"star_turns": 39,
+		"star_turns": 41,
 	},
 	{
 		"name": "Lluvia de bombas",
@@ -3526,7 +3526,7 @@ const LIST: Array[Dictionary] = [
 			"################M################",
 		],
 		"collectible": Vector2i(17, 17),
-		"star_turns": 50,
+		"star_turns": 52,
 		"mortars": {Vector2i(19, 12): {"facing": Vector2i(0, 1), "range": Vector2i(8, 5)}},
 	},
 	{
@@ -3561,7 +3561,7 @@ const LIST: Array[Dictionary] = [
 			"###################################",
 		],
 		"collectible": Vector2i(17, 1),
-		"star_turns": 50,
+		"star_turns": 52,
 	},
 	{
 		"name": "Dunas",
@@ -3598,7 +3598,7 @@ const LIST: Array[Dictionary] = [
 			"#####################################################",
 		],
 		"collectible": Vector2i(16, 12),
-		"star_turns": 53,
+		"star_turns": 55,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "D4"},
 		"mortars": {Vector2i(43, 0): {"facing": Vector2i(0, 1)}, Vector2i(32, 5): {"facing": Vector2i(1, 0)}, Vector2i(2, 6): {"facing": Vector2i(1, 0)}},
@@ -3637,7 +3637,7 @@ const LIST: Array[Dictionary] = [
 			"#####################################",
 		],
 		"collectible": Vector2i(21, 7),
-		"star_turns": 64,
+		"star_turns": 67,
 		"patrols": {"i": "R4"},
 	},
 	{
@@ -3675,7 +3675,7 @@ const LIST: Array[Dictionary] = [
 			"######p#####################L########################",
 		],
 		"collectible": Vector2i(35, 16),
-		"star_turns": 55,
+		"star_turns": 58,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R7"},
 		"mortars": {Vector2i(40, 0): {"facing": Vector2i(1, 0)}, Vector2i(31, 7): {"facing": Vector2i(-1, 0)}},
@@ -3714,7 +3714,7 @@ const LIST: Array[Dictionary] = [
 			"#####################################L#",
 		],
 		"collectible": Vector2i(27, 3),
-		"star_turns": 60,
+		"star_turns": 63,
 		"patrols": {"i": "D6"},
 		"mortars": {Vector2i(15, 12): {"facing": Vector2i(-1, 0)}, Vector2i(10, 22): {"facing": Vector2i(0, -1)}},
 	},
@@ -3763,7 +3763,7 @@ const LIST: Array[Dictionary] = [
 			"##M########################L########L################",
 		],
 		"collectible": Vector2i(5, 13),
-		"star_turns": 68,
+		"star_turns": 71,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R6", "j": "D5"},
 		"mortars": {Vector2i(43, 5): {"facing": Vector2i(0, 1)}, Vector2i(21, 34): {"facing": Vector2i(1, 0)}, Vector2i(2, 37): {"facing": Vector2i(0, -1)}},
@@ -3813,7 +3813,7 @@ const LIST: Array[Dictionary] = [
 			"#########################L###########################",
 		],
 		"collectible": Vector2i(27, 15),
-		"star_turns": 59,
+		"star_turns": 62,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R4"},
 		"mortars": {Vector2i(47, 10): {"facing": Vector2i(0, 1)}, Vector2i(34, 28): {"facing": Vector2i(1, 0)}, Vector2i(19, 29): {"facing": Vector2i(1, 0)}},
@@ -3871,7 +3871,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(2, 41),
-		"star_turns": 64,
+		"star_turns": 67,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R5"},
 		"theme_regions": [
@@ -3974,7 +3974,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(46, 25),
-		"star_turns": 64,
+		"star_turns": 67,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R7"},
 		"theme_regions": [
@@ -4062,7 +4062,7 @@ const LIST: Array[Dictionary] = [
 			"########################L######L#########",
 		],
 		"collectible": Vector2i(37, 5),
-		"star_turns": 65,
+		"star_turns": 68,
 		"patrols": {"i": "D4"},
 		"mortars": {Vector2i(8, 8): {"facing": Vector2i(0, 1)}, Vector2i(20, 8): {"facing": Vector2i(0, 1)}},
 	},
@@ -4115,7 +4115,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(56, 3),
-		"star_turns": 69,
+		"star_turns": 72,
 		"patrols": {"i": "R5"},
 		"theme_regions": [
 			{"rect": Rect2i(5, 1, 5, 7), "floor": "stone_bricks"},
@@ -4220,7 +4220,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(40, 39),
-		"star_turns": 77,
+		"star_turns": 80,
 		"patrols": {"i": "D7"},
 		"theme_regions": [
 			{"rect": Rect2i(2, 16, 5, 5), "floor": "stone_bricks"},
@@ -4314,7 +4314,7 @@ const LIST: Array[Dictionary] = [
 			"#####################################################",
 		],
 		"collectible": Vector2i(17, 6),
-		"star_turns": 73,
+		"star_turns": 76,
 		"patrols": {"i": "R7"},
 		"mortars": {Vector2i(33, 2): {"facing": Vector2i(1, 0)}, Vector2i(39, 36): {"facing": Vector2i(0, -1)}},
 	},
@@ -4371,7 +4371,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(43, 3),
-		"star_turns": 73,
+		"star_turns": 76,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "D6"},
 		"theme_regions": [
@@ -4472,7 +4472,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(67, 28),
-		"star_turns": 77,
+		"star_turns": 80,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "D5"},
 		"theme_regions": [
@@ -4578,7 +4578,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(4, 40),
-		"star_turns": 74,
+		"star_turns": 77,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R5"},
 		"theme_regions": [
@@ -4670,7 +4670,7 @@ const LIST: Array[Dictionary] = [
 			"###########L#########L#######################",
 		],
 		"collectible": Vector2i(13, 19),
-		"star_turns": 79,
+		"star_turns": 82,
 		"patrols": {"i": "R6"},
 		"mortars": {Vector2i(8, 9): {"facing": Vector2i(0, 1)}, Vector2i(10, 15): {"facing": Vector2i(0, -1)}, Vector2i(14, 19): {"facing": Vector2i(0, -1)}},
 	},
@@ -4719,7 +4719,7 @@ const LIST: Array[Dictionary] = [
 			"################################################################",
 		],
 		"collectible": Vector2i(23, 30),
-		"star_turns": 84,
+		"star_turns": 88,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R5 D3 L5 U3", "j": "R7"},
 		"mortars": {Vector2i(49, 1): {"facing": Vector2i(0, 1)}, Vector2i(45, 9): {"facing": Vector2i(1, 0)}, Vector2i(53, 10): {"facing": Vector2i(-1, 0)}},
@@ -4773,7 +4773,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(15, 35),
-		"star_turns": 79,
+		"star_turns": 82,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R6 D3 L6 U3", "j": "D4"},
 		"theme_regions": [
@@ -4889,7 +4889,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(52, 19),
-		"star_turns": 77,
+		"star_turns": 80,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R4", "j": "R7"},
 		"theme_regions": [
@@ -4990,7 +4990,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(30, 6),
-		"star_turns": 87,
+		"star_turns": 90,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R5", "j": "R5"},
 		"theme_regions": [
@@ -5092,7 +5092,7 @@ const LIST: Array[Dictionary] = [
 			"###############################################",
 		],
 		"collectible": Vector2i(43, 25),
-		"star_turns": 84,
+		"star_turns": 88,
 		"patrols": {"i": "D4", "j": "D6"},
 		"mortars": {Vector2i(36, 3): {"facing": Vector2i(0, 1)}, Vector2i(8, 24): {"facing": Vector2i(0, -1)}, Vector2i(34, 31): {"facing": Vector2i(0, -1)}},
 	},
@@ -5145,7 +5145,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(42, 38),
-		"star_turns": 89,
+		"star_turns": 93,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R6", "j": "R5 D4 L5 U4"},
 		"theme_regions": [
@@ -5259,7 +5259,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(40, 16),
-		"star_turns": 94,
+		"star_turns": 98,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "D5", "j": "R7"},
 		"theme_regions": [
@@ -5379,7 +5379,7 @@ const LIST: Array[Dictionary] = [
 			"################################################################",
 		],
 		"collectible": Vector2i(18, 21),
-		"star_turns": 102,
+		"star_turns": 106,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "D4", "j": "D5"},
 		"mortars": {Vector2i(22, 28): {"facing": Vector2i(0, -1)}, Vector2i(44, 28): {"facing": Vector2i(0, -1)}, Vector2i(1, 40): {"facing": Vector2i(1, 0)}, Vector2i(10, 40): {"facing": Vector2i(-1, 0)}},
@@ -5449,7 +5449,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(29, 28),
-		"star_turns": 88,
+		"star_turns": 91,
 		"buttons": {"p": "c", "q": "d"},
 		"patrols": {"i": "R3 D5 L3 U5", "j": "D5"},
 		"theme_regions": [
@@ -5581,7 +5581,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(28, 50),
-		"star_turns": 94,
+		"star_turns": 98,
 		"buttons": {"p": "c", "q": "d"},
 		"patrols": {"i": "D4", "j": "R5"},
 		"theme_regions": [
@@ -5726,7 +5726,7 @@ const LIST: Array[Dictionary] = [
 			"#########################################################M######",
 		],
 		"collectible": Vector2i(2, 43),
-		"star_turns": 92,
+		"star_turns": 95,
 		"buttons": {"p": "c", "q": "d"},
 		"patrols": {"i": "D4", "j": "R6 D5 L6 U5", "k": "R5"},
 		"mortars": {Vector2i(3, 7): {"facing": Vector2i(0, 1)}, Vector2i(11, 14): {"facing": Vector2i(-1, 0)}, Vector2i(54, 17): {"facing": Vector2i(1, 0)}, Vector2i(57, 47): {"facing": Vector2i(0, -1)}},
@@ -5791,7 +5791,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(54, 13),
-		"star_turns": 98,
+		"star_turns": 102,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "D4", "j": "D4", "k": "R4 D4 L4 U4"},
 		"theme_regions": [
@@ -5940,7 +5940,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(79, 6),
-		"star_turns": 103,
+		"star_turns": 107,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R4", "j": "R4", "k": "R4"},
 		"theme_regions": [
@@ -6072,7 +6072,7 @@ const LIST: Array[Dictionary] = [
 			"#############################################L##################",
 		],
 		"collectible": Vector2i(6, 11),
-		"star_turns": 98,
+		"star_turns": 102,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R4", "j": "D7", "k": "R7"},
 		"mortars": {Vector2i(56, 9): {"facing": Vector2i(-1, 0)}, Vector2i(31, 14): {"facing": Vector2i(0, 1)}, Vector2i(15, 22): {"facing": Vector2i(-1, 0)}, Vector2i(35, 29): {"facing": Vector2i(0, -1)}},
@@ -6142,7 +6142,7 @@ const LIST: Array[Dictionary] = [
 			"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
 		],
 		"collectible": Vector2i(18, 4),
-		"star_turns": 95,
+		"star_turns": 99,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "D4", "j": "R5", "k": "R5 D4 L5 U4"},
 		"theme_regions": [
@@ -6285,7 +6285,7 @@ const LIST: Array[Dictionary] = [
 			"################################################L###############",
 		],
 		"collectible": Vector2i(3, 42),
-		"star_turns": 103,
+		"star_turns": 107,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "D5", "j": "R4"},
 		"mortars": {Vector2i(47, 0): {"facing": Vector2i(-1, 0)}, Vector2i(29, 28): {"facing": Vector2i(1, 0)}, Vector2i(34, 38): {"facing": Vector2i(1, 0)}},
@@ -6336,7 +6336,7 @@ const LIST: Array[Dictionary] = [
 			"##############################################################",
 		],
 		"collectible": Vector2i(11, 4),
-		"star_turns": 88,
+		"star_turns": 91,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R4 D2 L4 U2", "j": "R6"},
 		"mortars": {Vector2i(42, 6): {"facing": Vector2i(1, 0)}, Vector2i(46, 17): {"facing": Vector2i(0, 1)}, Vector2i(55, 32): {"facing": Vector2i(-1, 0)}},
@@ -6396,7 +6396,7 @@ const LIST: Array[Dictionary] = [
 			"###########################################################################",
 		],
 		"collectible": Vector2i(19, 14),
-		"star_turns": 97,
+		"star_turns": 101,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R5", "j": "R7"},
 		"mortars": {Vector2i(65, 15): {"facing": Vector2i(0, -1)}, Vector2i(54, 35): {"facing": Vector2i(0, 1)}, Vector2i(65, 36): {"facing": Vector2i(1, 0)}},
@@ -6447,7 +6447,7 @@ const LIST: Array[Dictionary] = [
 			"##############################################################",
 		],
 		"collectible": Vector2i(20, 1),
-		"star_turns": 94,
+		"star_turns": 98,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R5 D4 L5 U4", "j": "D5"},
 		"mortars": {Vector2i(55, 13): {"facing": Vector2i(0, -1)}, Vector2i(6, 16): {"facing": Vector2i(0, 1)}, Vector2i(44, 29): {"facing": Vector2i(0, -1)}},
@@ -6507,7 +6507,7 @@ const LIST: Array[Dictionary] = [
 			"################################################################",
 		],
 		"collectible": Vector2i(13, 44),
-		"star_turns": 100,
+		"star_turns": 104,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "D5", "j": "R4"},
 		"mortars": {Vector2i(58, 0): {"facing": Vector2i(0, 1)}, Vector2i(41, 31): {"facing": Vector2i(0, 1)}, Vector2i(31, 37): {"facing": Vector2i(-1, 0)}},
@@ -6558,7 +6558,7 @@ const LIST: Array[Dictionary] = [
 			"##############################################################",
 		],
 		"collectible": Vector2i(26, 11),
-		"star_turns": 98,
+		"star_turns": 102,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R7", "j": "R6"},
 		"mortars": {Vector2i(7, 25): {"facing": Vector2i(0, 1)}, Vector2i(19, 31): {"facing": Vector2i(1, 0)}, Vector2i(4, 32): {"facing": Vector2i(1, 0)}, Vector2i(37, 34): {"facing": Vector2i(1, 0)}},
@@ -6618,7 +6618,7 @@ const LIST: Array[Dictionary] = [
 			"#######################L###################################################",
 		],
 		"collectible": Vector2i(6, 44),
-		"star_turns": 105,
+		"star_turns": 110,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R7", "j": "R6"},
 		"mortars": {Vector2i(59, 1): {"facing": Vector2i(0, 1)}, Vector2i(17, 4): {"facing": Vector2i(0, 1)}, Vector2i(39, 10): {"facing": Vector2i(0, -1)}, Vector2i(60, 20): {"facing": Vector2i(0, 1)}},
@@ -6669,7 +6669,7 @@ const LIST: Array[Dictionary] = [
 			"#######################################################################",
 		],
 		"collectible": Vector2i(4, 11),
-		"star_turns": 112,
+		"star_turns": 116,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R5 D2 L5 U2", "j": "R7", "k": "R4"},
 		"mortars": {Vector2i(47, 1): {"facing": Vector2i(0, 1)}, Vector2i(27, 6): {"facing": Vector2i(1, 0)}, Vector2i(11, 14): {"facing": Vector2i(-1, 0)}, Vector2i(6, 32): {"facing": Vector2i(0, -1)}},
@@ -6739,7 +6739,7 @@ const LIST: Array[Dictionary] = [
 			"###########################################################L##########L####",
 		],
 		"collectible": Vector2i(17, 53),
-		"star_turns": 118,
+		"star_turns": 123,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R6 D5 L6 U5", "j": "R5", "k": "R6"},
 		"mortars": {Vector2i(72, 0): {"facing": Vector2i(0, 1)}, Vector2i(2, 7): {"facing": Vector2i(1, 0)}, Vector2i(54, 21): {"facing": Vector2i(-1, 0)}, Vector2i(60, 41): {"facing": Vector2i(0, 1)}},
@@ -6798,7 +6798,7 @@ const LIST: Array[Dictionary] = [
 			"#####################L########################L###L#############L###############",
 		],
 		"collectible": Vector2i(20, 25),
-		"star_turns": 118,
+		"star_turns": 123,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "D4", "j": "R4", "k": "D4"},
 		"mortars": {Vector2i(65, 0): {"facing": Vector2i(0, 1)}, Vector2i(61, 8): {"facing": Vector2i(1, 0)}, Vector2i(52, 18): {"facing": Vector2i(0, 1)}, Vector2i(26, 22): {"facing": Vector2i(0, -1)}},
@@ -6868,7 +6868,7 @@ const LIST: Array[Dictionary] = [
 			"####M######################################################################",
 		],
 		"collectible": Vector2i(39, 54),
-		"star_turns": 125,
+		"star_turns": 130,
 		"buttons": {"p": "c"},
 		"patrols": {"i": "R5", "j": "R5", "k": "R6"},
 		"mortars": {Vector2i(53, 5): {"facing": Vector2i(-1, 0)}, Vector2i(45, 6): {"facing": Vector2i(1, 0)}, Vector2i(20, 7): {"facing": Vector2i(-1, 0)}, Vector2i(12, 27): {"facing": Vector2i(0, -1)}, Vector2i(4, 57): {"facing": Vector2i(0, -1)}},
@@ -6927,7 +6927,7 @@ const LIST: Array[Dictionary] = [
 			"#######################################################################",
 		],
 		"collectible": Vector2i(10, 6),
-		"star_turns": 110,
+		"star_turns": 115,
 		"buttons": {"p": "c", "q": "d"},
 		"patrols": {"i": "R4", "j": "R5 D2 L5 U2", "k": "R4"},
 		"mortars": {Vector2i(34, 1): {"facing": Vector2i(0, 1)}, Vector2i(16, 4): {"facing": Vector2i(0, 1)}, Vector2i(56, 16): {"facing": Vector2i(1, 0)}, Vector2i(33, 29): {"facing": Vector2i(-1, 0)}, Vector2i(7, 35): {"facing": Vector2i(0, 1)}},
@@ -6997,7 +6997,7 @@ const LIST: Array[Dictionary] = [
 			"###########################################################################",
 		],
 		"collectible": Vector2i(3, 25),
-		"star_turns": 120,
+		"star_turns": 125,
 		"buttons": {"p": "c", "q": "d"},
 		"patrols": {"i": "D4", "j": "R6", "k": "R6"},
 		"mortars": {Vector2i(51, 10): {"facing": Vector2i(1, 0)}, Vector2i(42, 27): {"facing": Vector2i(1, 0)}, Vector2i(10, 36): {"facing": Vector2i(1, 0)}, Vector2i(22, 37): {"facing": Vector2i(-1, 0)}, Vector2i(46, 38): {"facing": Vector2i(-1, 0)}},
@@ -7056,7 +7056,7 @@ const LIST: Array[Dictionary] = [
 			"###############M###########################################p#############################",
 		],
 		"collectible": Vector2i(23, 42),
-		"star_turns": 129,
+		"star_turns": 134,
 		"buttons": {"p": "c", "q": "d"},
 		"patrols": {"i": "D4", "j": "D4", "k": "R4"},
 		"mortars": {Vector2i(52, 6): {"facing": Vector2i(1, 0)}, Vector2i(50, 24): {"facing": Vector2i(-1, 0)}, Vector2i(54, 29): {"facing": Vector2i(0, -1)}, Vector2i(8, 40): {"facing": Vector2i(1, 0)}, Vector2i(15, 46): {"facing": Vector2i(0, -1)}},
@@ -7126,7 +7126,7 @@ const LIST: Array[Dictionary] = [
 			"###############################################q############################################################",
 		],
 		"collectible": Vector2i(14, 25),
-		"star_turns": 150,
+		"star_turns": 156,
 		"buttons": {"p": "c", "q": "d"},
 		"patrols": {"i": "R4", "j": "R4", "k": "R6", "m": "R7"},
 		"mortars": {Vector2i(88, 9): {"facing": Vector2i(1, 0)}, Vector2i(52, 14): {"facing": Vector2i(0, 1)}, Vector2i(11, 25): {"facing": Vector2i(0, 1)}, Vector2i(53, 27): {"facing": Vector2i(0, -1)}, Vector2i(29, 29): {"facing": Vector2i(1, 0)}, Vector2i(53, 43): {"facing": Vector2i(0, -1)}},
@@ -7189,11 +7189,11 @@ static func count() -> int:
 
 
 ## Giros máximos para la estrella de giros del nivel ("star_turns"; si no lo
-## tiene, el mínimo más un 25 %).
+## tiene, el mínimo más un 30 %).
 static func star_turns(index: int) -> int:
 	var data := get_level(index)
 	var turns: int = data.get("turns", 0)
-	return data.get("star_turns", turns + maxi(2, ceili(turns * 0.25)))
+	return data.get("star_turns", turns + maxi(3, (turns * 3 + 9) / 10))
 
 
 ## Datos del nivel. Si no trae "theme", lleva el de su tramo en THEMES.

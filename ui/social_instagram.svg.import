@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dxgkxq8qgenp3"
-path="res://.godot/imported/logo_cube.svg-c59d9d9f11d2a6e71a31711480723e5a.ctex"
+uid="uid://bsvf2kxun5rka"
+path="res://.godot/imported/social_instagram.svg-fc3265fea563272afdaec41ed0fb6001.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://ui/logo_cube.svg"
-dest_files=["res://.godot/imported/logo_cube.svg-c59d9d9f11d2a6e71a31711480723e5a.ctex"]
+source_file="res://ui/social_instagram.svg"
+dest_files=["res://.godot/imported/social_instagram.svg-fc3265fea563272afdaec41ed0fb6001.ctex"]
 
 [params]
 
