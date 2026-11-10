@@ -3,10 +3,11 @@ extends RefCounted
 ## Música: Music.play("nombre") pone en bucle res://audio/music/nombre.ogg por
 ## el bus "Music" (su volumen se ajusta en Opciones), con un fundido cruzado
 ## desde el tema anterior. Si ya suena ese tema, sigue sin cortarse (p. ej. al
-## pasar a otro nivel de la misma zona).
+## pasar a otro nivel del mismo tramo).
 ##
-## Temas (los compone tools/make_music.py): menu y zone1 … zone5, uno por zona
-## del mapa de niveles. Cada uno tiene una intro que suena solo al empezar: el
+## Temas (los compone tools/make_music.py): menu y, para los niveles, tres en
+## la zona I (la que más niveles tiene) y dos en cada una de las demás; cada
+## uno suena en un tramo de niveles (TRACKS). Cada uno tiene una intro que suena solo al empezar: el
 ## bucle vuelve al punto que indica audio/music/loops.json.
 ##
 ## Music.set_muffled(true) amortigua la música (más baja y sin agudos, con el
@@ -23,9 +24,21 @@ const BUS := &"Music"
 const VOLUME_DB := -8.0
 const SILENT_DB := -60.0
 const FADE_TIME := 1.5
-## Primer nivel (índice) de cada zona del mapa: 1-34, 35-60, 61-75, 76-100 y
-## 101-115 (ver ui/level_select/map.json).
-const ZONE_FIRST_LEVELS := [0, 34, 60, 75, 100]
+## Tema de cada tramo de niveles: [primer nivel (índice), tema]. Los tramos
+## siguen las zonas del mapa (ui/level_select/map.json) y, dentro de cada
+## una, los cambios de paisaje o de mecánicas:
+## I: 1-13 aprendizaje, 14-24 enemigos y mapas grandes, 25-34 grandes
+## travesías y vacío; II: 35-48 praderas, 49-60 montaña y nieve; III: 61-68
+## portales, pinchos, láseres y bombas, 69-75 desierto y cristal; IV: 76-87
+## tierra corrompida, 88-100 volcán y obsidiana; V: 101-108 la fortaleza,
+## 109-115 el final.
+const TRACKS := [
+	[0, "zone1a"], [13, "zone1b"], [24, "zone1c"],
+	[34, "zone2a"], [48, "zone2b"],
+	[60, "zone3a"], [68, "zone3b"],
+	[75, "zone4a"], [87, "zone4b"],
+	[100, "zone5a"], [108, "zone5b"],
+]
 ## Amortiguado: frecuencia de corte (Hz), volumen (dB) y duración de la transición.
 const MUFFLED_CUTOFF := 700.0
 const OPEN_CUTOFF := 20000.0
@@ -45,13 +58,13 @@ static var _muffle_tween: Tween
 static var _muffled := false
 
 
-## Tema de la zona a la que pertenece el nivel `index`.
+## Tema del tramo al que pertenece el nivel `index`.
 static func track_for_level(index: int) -> String:
-	var zone := 0
-	for i in ZONE_FIRST_LEVELS.size():
-		if index >= ZONE_FIRST_LEVELS[i]:
-			zone = i
-	return "zone%d" % (zone + 1)
+	var track: String = TRACKS[0][1]
+	for entry: Array in TRACKS:
+		if index >= entry[0]:
+			track = entry[1]
+	return track
 
 
 static func play(track: String, fade := FADE_TIME) -> void:

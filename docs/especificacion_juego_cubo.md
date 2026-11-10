@@ -313,15 +313,26 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 ## 5. Presentación visual
 
 - **Efectos de sonido:** vuelco del cubo (golpe sordo, con el tono un poco al azar), rebote, giro descartado, llave cogida (campanitas), puerta abierta, golpe y derrumbe de muros destructibles, botón y barrotes, power up, media vuelta (soplido), explosión del cubo, caída al vacío (silbido), crujido de un puente colgante al gastarse y su derrumbe, meta (fanfarria), alarma cuando un perseguidor ve al cubo, cubito dorado (campanas y brillo), estrella conseguida y no conseguida en la pantalla final, y clic en los botones de la interfaz. Son sonidos sintetizados (no hay grabaciones externas) con `tools/make_sfx.py` y suenan por el canal «SFX».
-- **Música:** un tema para el menú y uno por cada **zona** del mapa de niveles, compuestos y sintetizados por código (sin grabaciones ni muestras externas) con `tools/make_music.py` en `audio/music/*.ogg`. Suenan por el canal «Music», algo por debajo de los efectos.
+- **Música:** un tema para el menú y, para los niveles, **tres en la zona I** (la que más niveles tiene) y **dos en cada una de las demás**: 12 temas en total. Están compuestos y sintetizados por código (sin grabaciones ni muestras externas) con `tools/make_music.py` en `audio/music/*.ogg`, y suenan por el canal «Music», algo por debajo de los efectos. Cada tema suena en un tramo de niveles que sigue los cambios de paisaje o de mecánicas (`Music.TRACKS`):
   - **Menú** (88 ppm): tranquilo; marimba en arpegio, pads, campanas y bajo suave.
-  - **I. El mundo de los cubos** (niveles 1-34, 116 ppm): alegre y saltarín; arpegio de cuerda pulsada, bajo que bota, melodía de onda cuadrada y batería ligera.
-  - **II. Las tierras salvajes** (35-60, 120 ppm): aventurero, en modo dórico; flauta, timbales y maracas.
-  - **III. El mundo desconocido** (61-75, 92 ppm): misterioso; pads amplios, campanas con eco y percusión escasa.
-  - **IV. Los territorios corrompidos** (76-100, 104 ppm): tenso, en modo frigio; sierras desafinadas, bajo en corcheas y arpegio rápido.
-  - **V. El núcleo enemigo** (101-115, 132 ppm): intenso; bombo a negras, arpegios de semicorcheas y melodía de sierras.
+  - **Zona I. El mundo de los cubos:** alegre y saltarín.
+    - Niveles 1-13 (aprendizaje), 116 ppm: arpegio de cuerda pulsada, bajo que bota, melodía de onda cuadrada y batería ligera.
+    - Niveles 14-24 (enemigos y mapas grandes), 108 ppm: algo más aventurero, con marimba, bajo que camina y maracas.
+    - Niveles 25-34 (grandes travesías y vacío), 124 ppm: luminoso y con más empuje, en modo mixolidio, con bombo a negras y palmas.
+  - **Zona II. Las tierras salvajes:** aventurero.
+    - Niveles 35-48 (praderas), 120 ppm: modo dórico; flauta, timbales y maracas.
+    - Niveles 49-60 (montaña y nieve), 112 ppm: aire frío, con pads amplios, campanas, flauta y timbales.
+  - **Zona III. El mundo desconocido:** misterioso.
+    - Niveles 61-68 (portales, pinchos, láseres y bombas), 92 ppm: pads amplios, campanas con eco y percusión escasa.
+    - Niveles 69-75 (desierto y cristal), 96 ppm: escala menor armónica de aire exótico; cuerda pulsada, flauta, campanas y percusión de mano.
+  - **Zona IV. Los territorios corrompidos:** tenso.
+    - Niveles 76-87 (tierra corrompida), 104 ppm: modo frigio; sierras desafinadas, bajo en corcheas y arpegio rápido.
+    - Niveles 88-100 (volcán y obsidiana), 112 ppm: más pesado, con bombo grave, timbales y melodía de sierras.
+  - **Zona V. El núcleo enemigo:** intenso.
+    - Niveles 101-108 (la fortaleza), 132 ppm: bombo a negras, arpegios de semicorcheas y melodía de sierras.
+    - Niveles 109-115 (el final), 140 ppm: aún más rápido, con bajo en semicorcheas y campanas en la parte central.
   - Cada tema dura un minuto o algo más y suena **en bucle sin cortes**. La intro suena solo al empezar y el bucle vuelve al final de ella (`audio/music/loops.json`).
-  - **Cambios de tema:** con un fundido cruzado de 1,5 s. Al pasar a otro nivel de la misma zona, el tema sigue sin cortarse; también durante la pantalla de carga, y el nuevo tema empieza mientras se prepara el nivel.
+  - **Cambios de tema:** con un fundido cruzado de 1,5 s. Al pasar a otro nivel del mismo tramo, el tema sigue sin cortarse; también durante la pantalla de carga, y el nuevo tema empieza mientras se prepara el nivel.
   - **Amortiguado:** en la **pausa** y al **completar el nivel**, la música baja de volumen y pierde los agudos (filtro paso bajo); al continuar, reiniciar o repetir vuelve a la normalidad.
 
 - **Icono de la aplicación:** un cubo isométrico con los colores de las caras del cubo del juego (amarillo, azul y rojo) y la flecha de rumbo, sobre el fondo marrón del menú con trozos de muro de laberinto. En Android se usa también como icono adaptativo (primer plano, fondo y versión monocromática). Se genera con `tools/make_icon.py`.

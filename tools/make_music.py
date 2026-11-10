@@ -5,12 +5,19 @@ Como los efectos de sonido (make_sfx.py), todo se genera aquí: no hay
 grabaciones ni muestras externas. Cada tema es un bucle sin cortes:
 
 - menu: el menú (tranquilo, marimba y pads).
-- zone1 … zone5: una por zona del mapa de niveles:
-  1. El mundo de los cubos: alegre y saltarín.
-  2. Las tierras salvajes: aventurero, con flauta y tambores.
-  3. El mundo desconocido: misterioso, campanas y pads amplios.
-  4. Los territorios corrompidos: tenso, sierras desafinadas y pulso grave.
-  5. El núcleo enemigo: intenso, rápido y con arpegios de semicorcheas.
+- zone1a, zone1b, zone1c, zone2a, zone2b … zone5b: tres para la zona I (la
+  que más niveles tiene) y dos para cada una de las demás. Los de una misma
+  zona comparten carácter (ver Music.TRACKS para los tramos de niveles):
+  1. El mundo de los cubos: alegre y saltarín (a: aprendizaje; b: algo más
+     aventurero, con marimba; c: luminoso y con más empuje).
+  2. Las tierras salvajes: aventurero, con flauta y tambores (b: aire frío
+     de montaña, campanas).
+  3. El mundo desconocido: misterioso, campanas y pads amplios (b: desierto
+     y cristal, escala exótica).
+  4. Los territorios corrompidos: tenso, sierras desafinadas y pulso grave
+     (b: volcán, más pesado).
+  5. El núcleo enemigo: intenso, rápido y con arpegios de semicorcheas (b: el
+     final, aún más rápido).
 
 Cómo se hace:
 - Una canción es una lista de secciones (intro, A, B…) de varios compases,
@@ -49,6 +56,7 @@ SCALES = {
     "phrygian": [0, 1, 3, 5, 7, 8, 10],
     "harmonic": [0, 2, 3, 5, 7, 8, 11],
     "lydian": [0, 2, 4, 6, 7, 9, 11],
+    "mixolydian": [0, 2, 4, 5, 7, 9, 10],
 }
 
 
@@ -460,12 +468,15 @@ def render_song(song):
     mix[:, start: start + total - n] += mix[:, n:]
     mix[:, start - lead_in: start] += end_part * np.linspace(0, 1, lead_in) ** 2
     mix = mix[:, :n]
+    mix = master(mix)
     # Al volver, lo que sigue es lo que sonaba justo antes del final de la
-    # intro: un fundido corto hacia eso evita el chasquido del empalme.
+    # intro: un fundido corto hacia eso evita el chasquido del empalme. (Va
+    # después del mastering: su filtro paso alto trata la pista como circular
+    # y movería el final respecto al punto de vuelta.)
     fade = int(0.05 * SR)
     w = np.sin(np.linspace(0, np.pi / 2, fade)) ** 2
     mix[:, n - fade:] = mix[:, n - fade:] * (1 - w) + mix[:, start - fade: start] * w
-    return master(mix)
+    return mix
 
 
 def reverb_fx(x, rt=2.2):
@@ -557,10 +568,10 @@ def song_menu():
     return s
 
 
-def song_zone1():
+def song_zone1a():
     prog_a = [0, 4, 5, 3] * 2           # I V vi IV
     prog_b = [3, 4, 0, 5, 1, 4, 0, 0]
-    s = Song("zone1", 116, 67 - 12, "major",
+    s = Song("zone1a", 116, 67 - 12, "major",
              [("I", [0, 4, 0, 4]), ("A", prog_a), ("B", prog_b), ("A", prog_a), ("C", [3, 4, 5, 4])], seed=21)
     s.add(pad, s.pad_layer("IABC", octave=0, size=3), gain=0.45, reverb=0.4)
     s.add(pluck, s.arp_layer("IABC", [0, 1, 2, 10, 2, 1], step=0.5, octave=1, vel=0.5), pan=-0.35,
@@ -578,10 +589,10 @@ def song_zone1():
     return s
 
 
-def song_zone2():
+def song_zone2a():
     prog_a = [0, 6, 3, 0, 0, 6, 4, 4]   # i bVII IV i (dórico)
     prog_b = [5, 6, 0, 0, 5, 6, 4, 4]
-    s = Song("zone2", 120, 62 - 12, "dorian",
+    s = Song("zone2a", 120, 62 - 12, "dorian",
              [("I", [0, 0, 6, 6]), ("A", prog_a), ("B", prog_b), ("A", prog_a), ("C", [3, 3, 6, 6])], seed=31)
     s.add(pad, s.pad_layer("IABC", octave=0, size=3, bars_per_chord=1), gain=0.45, reverb=0.45)
     s.add(pluck, s.arp_layer("ABC", [0, 2, 1, 2, 0, 2, 10, 2], step=0.5, octave=1, vel=0.45), pan=0.4,
@@ -600,10 +611,10 @@ def song_zone2():
     return s
 
 
-def song_zone3():
+def song_zone3a():
     prog_a = [0, 0, 5, 5, 3, 3, 4, 4]   # i i VI VI iv iv v v (menor)
     prog_b = [5, 6, 0, 0, 3, 5, 4, 4]
-    s = Song("zone3", 92, 64 - 12, "minor", [("I", [0, 0, 5, 5]), ("A", prog_a), ("B", prog_b), ("A", prog_a)],
+    s = Song("zone3a", 92, 64 - 12, "minor", [("I", [0, 0, 5, 5]), ("A", prog_a), ("B", prog_b), ("A", prog_a)],
              seed=41)
     s.add(airpad, s.pad_layer("IAB", octave=0, size=4, bars_per_chord=2), gain=0.8, reverb=0.6)
     s.add(bell, s.arp_layer("IAB", [0, 3, 2, 10, 1, 3, 2, 13], step=0.5, octave=1, vel=0.38), pan=0.35,
@@ -617,10 +628,10 @@ def song_zone3():
     return s
 
 
-def song_zone4():
+def song_zone4a():
     prog_a = [0, 0, 1, 1, 0, 0, 5, 4]   # i bII i … (frigio)
     prog_b = [5, 5, 1, 1, 3, 3, 4, 4]
-    s = Song("zone4", 104, 61 - 12, "phrygian",
+    s = Song("zone4a", 104, 61 - 12, "phrygian",
              [("I", [0, 0, 1, 1]), ("A", prog_a), ("B", prog_b), ("A", prog_a), ("C", [0, 1, 0, 1])], seed=51)
     s.add(pad, s.pad_layer("IABC", octave=-1, size=3), gain=0.5, reverb=0.5)
     s.add(bass, s.bass_layer("ABC", [(j * 0.5, 0.4, 0, 0.9 if j % 2 == 0 else 0.65) for j in range(8)]),
@@ -637,10 +648,10 @@ def song_zone4():
     return s
 
 
-def song_zone5():
+def song_zone5a():
     prog_a = [0, 0, 5, 5, 3, 3, 4, 4]   # i VI iv V (menor armónica)
     prog_b = [3, 4, 0, 5, 3, 4, 4, 4]
-    s = Song("zone5", 132, 57 - 12, "harmonic",
+    s = Song("zone5a", 132, 57 - 12, "harmonic",
              [("I", [0, 0, 5, 4]), ("A", prog_a), ("B", prog_b), ("A", prog_a), ("C", [5, 5, 4, 4])], seed=61)
     s.add(pad, s.pad_layer("ABC", octave=-1, size=3), gain=0.45, reverb=0.45)
     s.add(bass_bright, s.bass_layer("IABC", [(j * 0.5, 0.4, 7 if j % 4 == 3 else 0, 0.9 if j % 2 == 0 else 0.7)
@@ -657,7 +668,135 @@ def song_zone5():
     return s
 
 
-SONGS = {f.__name__[5:]: f for f in (song_menu, song_zone1, song_zone2, song_zone3, song_zone4, song_zone5)}
+def song_zone1b():
+    prog_a = [3, 4, 2, 5, 3, 4, 0, 0]     # IV V iii vi IV V I I
+    prog_b = [5, 3, 0, 4, 5, 3, 1, 4]     # vi IV I V vi IV ii V
+    s = Song("zone1b", 108, 65 - 12, "major",
+             [("I", [0, 3, 0, 4]), ("A", prog_a), ("B", prog_b), ("A", prog_a), ("C", [3, 4, 3, 4])], seed=23)
+    s.add(pad, s.pad_layer("IABC", octave=0, size=4), gain=0.4, reverb=0.45)
+    s.add(marimba, s.arp_layer("IABC", [0, 2, 10, 2, 1, 2, 10, 3], step=0.5, octave=0, vel=0.5), pan=0.35,
+          gain=0.75, reverb=0.3, echo=0.2)
+    s.add(bass, s.bass_layer("ABC", [(0, 0.9, 0, 0.9), (1, 0.45, 2, 0.6), (1.5, 0.45, 4, 0.65),
+                                    (2, 0.9, 7, 0.75), (3, 0.45, 4, 0.6), (3.5, 0.45, 2, 0.6)]),
+          gain=0.8, reverb=0.05)
+    s.add(pluck, s.melody_layer("AB", R_BOUNCY + R_CALM[:2], octave=1, seed=31), pan=-0.2, gain=0.95,
+          reverb=0.3, echo=0.25)
+    s.add(lead, s.melody_layer("C", R_CALM, octave=1, seed=33), pan=-0.1, gain=0.7, reverb=0.35, echo=0.2)
+    s.add("drums", s.drum_layer("ABC", {"K": "X.......X.x.....", "r": "....X.......X...",
+                                        "s": "x.xxx.xxx.xxx.xx"},
+                                fill={"K": "X.......X.......", "r": "....X.......X...", "t": "........x.x.XtXT"}),
+          gain={"K": 0.95, "r": 0.85, "s": 0.75, "t": 0.8, "T": 0.8}, pan={"s": 0.4, "r": -0.2},
+          reverb=0.2)
+    s.add("drums", s.drum_layer("I", {"s": "x.x.x.x.x.x.x.x."}), gain=0.6, pan=0.4, reverb=0.2)
+    return s
+
+
+def song_zone1c():
+    prog_a = [0, 6, 3, 0, 0, 6, 3, 4]     # I bVII IV I (mixolidio)
+    prog_b = [3, 4, 5, 3, 1, 4, 6, 4]
+    s = Song("zone1c", 124, 62 - 12, "mixolydian",
+             [("I", [0, 6, 3, 0]), ("A", prog_a), ("B", prog_b), ("A", prog_a), ("C", [5, 3, 6, 4])], seed=25)
+    s.add(pad, s.pad_layer("IABC", octave=0, size=3), gain=0.45, reverb=0.4)
+    s.add(pluck, s.arp_layer("IABC", [0, 1, 2, 10, 11, 10, 2, 1], step=0.5, octave=1, vel=0.45), pan=-0.4,
+          gain=0.65, reverb=0.25, echo=0.2)
+    s.add(bass_bright, s.bass_layer("ABC", [(j * 0.5, 0.4, 7 if j in (3, 6) else 0, 0.9 if j % 2 == 0 else 0.65)
+                                           for j in range(8)]), gain=0.8, reverb=0.05)
+    s.add(lead, s.melody_layer("AB", R_BOUNCY, octave=1, seed=41), pan=0.15, gain=0.85, reverb=0.3, echo=0.25)
+    s.add(bell, s.melody_layer("C", R_CALM, octave=2, seed=43), pan=0.25, gain=0.6, reverb=0.45, echo=0.3)
+    drums = {"K": "X...X...X...X...", "C": "....X.......X...", "h": "..x...x...x...x.", "s": "x.x.x.x.x.x.x.x."}
+    s.add("drums", s.drum_layer("ABC", drums, fill={**drums, "C": "....X.......X.XX", "t": "..........x.XtTT"}),
+          gain={"K": 0.95, "C": 0.85, "h": 0.75, "s": 0.55, "t": 0.8, "T": 0.8},
+          pan={"h": 0.35, "s": -0.35, "t": -0.2, "T": 0.2}, reverb=0.15)
+    s.add("drums", s.drum_layer("I", {"K": "X.......X.......", "h": "..x...x...x...x."}), gain=0.7,
+          pan={"h": 0.35}, reverb=0.15)
+    return s
+
+
+def song_zone2b():
+    prog_a = [0, 5, 3, 6, 0, 5, 4, 4]     # i VI iv VII (menor, montaña)
+    prog_b = [3, 3, 0, 0, 5, 6, 4, 4]
+    s = Song("zone2b", 112, 59 - 12, "minor",
+             [("I", [0, 0, 5, 5]), ("A", prog_a), ("B", prog_b), ("A", prog_a), ("C", [5, 6, 0, 0])], seed=33)
+    s.add(airpad, s.pad_layer("IABC", octave=0, size=4), gain=0.75, reverb=0.55)
+    s.add(bell, s.arp_layer("IABC", [0, 2, 3, 2, 10, 2, 3, 2], step=0.5, octave=1, vel=0.35), pan=0.35,
+          gain=0.55, reverb=0.45, echo=0.3)
+    s.add(bass, s.bass_layer("ABC", [(0, 1.4, 0, 0.9), (1.5, 0.5, 4, 0.65), (2, 1.4, 0, 0.85),
+                                    (3.5, 0.5, 6, 0.6)]), gain=0.8, reverb=0.05)
+    s.add(flute, s.melody_layer("AB", R_CALM + R_BOUNCY[2:], octave=1, seed=51), pan=-0.15, gain=0.9,
+          reverb=0.5, echo=0.25)
+    s.add(pluck, s.melody_layer("C", R_BOUNCY, octave=1, seed=53), pan=-0.25, gain=0.8, reverb=0.35, echo=0.2)
+    drums = {"t": "X.....x...X.....", "T": "......X.......x.", "K": "X.........X.....", "s": "..x...x...x...x.",
+             "r": "....x.......x..."}
+    s.add("drums", s.drum_layer("ABC", drums, fill={**drums, "T": "........XxXxXXXX"}),
+          gain={"t": 0.85, "T": 0.75, "K": 0.85, "s": 0.7, "r": 0.6}, pan={"t": -0.3, "T": 0.3, "s": 0.4},
+          reverb=0.3)
+    return s
+
+
+def song_zone3b():
+    prog_a = [0, 1, 0, 0, 0, 1, 6, 0]     # i bII i i … (menor armónica, aire de desierto)
+    prog_b = [3, 3, 1, 1, 5, 5, 4, 4]
+    s = Song("zone3b", 96, 62 - 12, "harmonic",
+             [("I", [0, 0, 1, 1]), ("A", prog_a), ("B", prog_b), ("A", prog_a)], seed=43)
+    s.add(airpad, s.pad_layer("IAB", octave=-1, size=3, bars_per_chord=2), gain=0.75, reverb=0.6)
+    s.add(pluck, s.arp_layer("IAB", [0, 1, 2, 1, 10, 2, 1, 2], step=0.5, octave=1, vel=0.4), pan=-0.35,
+          gain=0.6, reverb=0.35, echo=0.3)
+    s.add(bass, s.bass_layer("AB", [(0, 1.4, 0, 0.85), (1.5, 0.5, 0, 0.6), (2.5, 1.4, 4, 0.7)]), gain=0.8,
+          reverb=0.08)
+    s.add(flute, s.melody_layer("A", R_CALM, octave=1, seed=61), pan=0.15, gain=0.85, reverb=0.5, echo=0.3)
+    s.add(bell, s.melody_layer("B", R_CALM, octave=2, seed=63), pan=0.25, gain=0.55, reverb=0.6, echo=0.35)
+    s.add("drums", s.drum_layer("AB", {"t": "X..x..X...X.....", "r": "....X.......X..x", "s": "x.xxx.xxx.xxx.xx"},
+                                fill={"t": "X..x..X...X.T.TT", "r": "....X.......X...", "s": "x.xxx.xxx.xxx.xx"}),
+          gain={"t": 0.8, "r": 0.7, "s": 0.6, "T": 0.7}, pan={"t": -0.25, "r": 0.3, "s": 0.4, "T": 0.25},
+          reverb=0.35)
+    return s
+
+
+def song_zone4b():
+    prog_a = [0, 0, 5, 5, 6, 6, 4, 4]     # i VI VII V (menor)
+    prog_b = [3, 3, 5, 5, 1, 1, 4, 4]
+    s = Song("zone4b", 112, 53 - 12, "minor",
+             [("I", [0, 0, 5, 4]), ("A", prog_a), ("B", prog_b), ("A", prog_a), ("C", [0, 5, 0, 4])], seed=53)
+    s.add(pad, s.pad_layer("IABC", octave=-1, size=3), gain=0.5, reverb=0.5)
+    s.add(bass, s.bass_layer("IABC", [(j * 0.5, 0.4, 0, 1.0 if j % 4 == 0 else 0.7) for j in range(8)]),
+          gain=0.85, reverb=0.05)
+    s.add(arp_square, s.arp_layer("ABC", [0, 2, 1, 2, 10, 2, 1, 2], step=0.25, octave=0, vel=0.38, size=3),
+          pan=-0.35, gain=0.55, reverb=0.2, echo=0.25)
+    s.add(saw_lead, s.melody_layer("AB", R_DRIVE + R_CALM[:1], octave=1, seed=71), pan=0.15, gain=0.95,
+          reverb=0.35, echo=0.25)
+    s.add(bell, s.melody_layer("C", R_CALM, octave=2, seed=73), pan=0.2, gain=0.5, reverb=0.55, echo=0.3)
+    drums = {"B": "X.....X.X.......", "S": "....X.......X...", "h": "x.x.x.x.x.x.x.x.", "t": "..............x."}
+    s.add("drums", s.drum_layer("ABC", drums, fill={**drums, "t": "........X.XtX.TT"}),
+          gain={"B": 0.95, "S": 0.8, "h": 0.6, "t": 0.85, "T": 0.85}, pan={"h": 0.3, "t": -0.25, "T": 0.25},
+          reverb=0.25)
+    s.add("drums", s.drum_layer("I", {"B": "X.......X.......", "t": "............X.t."}), gain=0.8,
+          pan={"t": -0.25}, reverb=0.3)
+    return s
+
+
+def song_zone5b():
+    prog_a = [0, 5, 3, 4, 0, 5, 1, 4]     # i VI iv V i VI ii° V (menor armónica)
+    prog_b = [5, 5, 3, 3, 0, 0, 4, 4]
+    s = Song("zone5b", 140, 60 - 12, "harmonic",
+             [("I", [0, 0, 4, 4]), ("A", prog_a), ("B", prog_b), ("A", prog_a), ("C", [5, 3, 4, 4])], seed=63)
+    s.add(pad, s.pad_layer("ABC", octave=-1, size=3), gain=0.45, reverb=0.45)
+    s.add(bass_bright, s.bass_layer("IABC", [(j * 0.25, 0.22, 7 if j % 8 == 6 else 0, 0.95 if j % 4 == 0 else 0.6)
+                                            for j in range(16)]), gain=0.75, reverb=0.05)
+    s.add(arp_square, s.arp_layer("IABC", [0, 2, 1, 10, 2, 1, 11, 2], step=0.25, octave=1, vel=0.36, size=3),
+          pan=0.35, gain=0.5, reverb=0.2, echo=0.2)
+    s.add(saw_lead, s.melody_layer("AB", R_DRIVE, octave=1, seed=81), pan=-0.1, gain=0.95, reverb=0.35, echo=0.2)
+    s.add(bell, s.melody_layer("C", R_DRIVE[:2], octave=2, seed=83), pan=0.2, gain=0.55, reverb=0.5, echo=0.3)
+    drums = {"B": "X...X...X...X...", "C": "....X.......X...", "h": "xxXxxxXxxxXxxxXx", "o": "......X.......X."}
+    s.add("drums", s.drum_layer("ABC", drums, fill={**drums, "S": "....x.x.xXxXXXXX", "t": "............X.XT"}),
+          gain={"B": 1.0, "C": 0.85, "h": 0.55, "o": 0.55, "S": 0.7, "t": 0.8, "T": 0.8},
+          pan={"h": 0.3, "o": 0.3, "t": -0.2, "T": 0.2}, reverb=0.2)
+    s.add("drums", s.drum_layer("I", {"B": "X...X...X...X...", "h": "xxXxxxXxxxXxxxXx"}), gain=0.8,
+          pan={"h": 0.3}, reverb=0.2)
+    return s
+
+
+SONGS = {f.__name__[5:]: f for f in (song_menu, song_zone1a, song_zone1b, song_zone1c, song_zone2a, song_zone2b,
+                                     song_zone3a, song_zone3b, song_zone4a, song_zone4b, song_zone5a, song_zone5b)}
 
 
 if __name__ == "__main__":
