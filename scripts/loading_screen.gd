@@ -76,6 +76,7 @@ func _ready() -> void:
 	slot.add_child(_status)
 	_continue_button = Button.new()
 	_continue_button.text = "PAUSE_CONTINUE"
+	_continue_button.theme_type_variation = &"PrimaryButton"
 	_continue_button.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_continue_button.visible = false
 	_continue_button.pressed.connect(_on_continue)

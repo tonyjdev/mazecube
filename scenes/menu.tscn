@@ -3,6 +3,8 @@
 [ext_resource type="Script" path="res://scripts/menu.gd" id="1_menu"]
 [ext_resource type="Script" path="res://scripts/level_map.gd" id="2_map"]
 [ext_resource type="Texture2D" path="res://ui/back_arrow.svg" id="3_back"]
+[ext_resource type="Script" path="res://scripts/cube_backdrop.gd" id="4_backdrop"]
+[ext_resource type="Texture2D" path="res://ui/logo_cube.svg" id="5_logo"]
 
 [node name="Menu" type="Control"]
 layout_mode = 3
@@ -13,14 +15,15 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_menu")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" type="Control" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.235, 0.196, 0.157, 1)
+mouse_filter = 2
+script = ExtResource("4_backdrop")
 
 [node name="MainScreen" type="CenterContainer" parent="."]
 unique_name_in_owner = true
@@ -35,42 +38,55 @@ grow_vertical = 2
 layout_mode = 2
 theme_override_constants/separation = 20
 
-[node name="Title" type="Label" parent="MainScreen/VBox"]
+[node name="Header" type="HBoxContainer" parent="MainScreen/VBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.98, 0.85, 0.55, 1)
-theme_override_constants/outline_size = 12
-theme_override_font_sizes/font_size = 88
-text = "Maze Cube"
-horizontal_alignment = 1
+alignment = 1
+theme_override_constants/separation = 24
+
+[node name="Logo" type="TextureRect" parent="MainScreen/VBox/Header"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(112, 116)
+layout_mode = 2
+texture = ExtResource("5_logo")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Title" type="Label" parent="MainScreen/VBox/Header"]
+layout_mode = 2
+theme_type_variation = &"TitleLabel"
+theme_override_font_sizes/font_size = 84
+text = "MAZE CUBE"
+vertical_alignment = 1
 
 [node name="Gap" type="Control" parent="MainScreen/VBox"]
-custom_minimum_size = Vector2(0, 24)
+custom_minimum_size = Vector2(0, 12)
 layout_mode = 2
 
 [node name="PlayButton" type="Button" parent="MainScreen/VBox"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(380, 84)
+custom_minimum_size = Vector2(380, 76)
 layout_mode = 2
+theme_type_variation = &"PrimaryButton"
 size_flags_horizontal = 4
 text = "MENU_PLAY"
 
 [node name="OptionsButton" type="Button" parent="MainScreen/VBox"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(380, 84)
+custom_minimum_size = Vector2(380, 76)
 layout_mode = 2
 size_flags_horizontal = 4
 text = "MENU_OPTIONS"
 
 [node name="CreditsButton" type="Button" parent="MainScreen/VBox"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(380, 84)
+custom_minimum_size = Vector2(380, 76)
 layout_mode = 2
 size_flags_horizontal = 4
 text = "MENU_CREDITS"
 
 [node name="QuitButton" type="Button" parent="MainScreen/VBox"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(380, 84)
+custom_minimum_size = Vector2(380, 76)
 layout_mode = 2
 size_flags_horizontal = 4
 text = "MENU_QUIT"
@@ -104,6 +120,7 @@ offset_top = 20.0
 offset_right = 124.0
 offset_bottom = 108.0
 focus_mode = 0
+theme_type_variation = &"IconButton"
 icon = ExtResource("3_back")
 icon_alignment = 1
 
@@ -123,7 +140,7 @@ theme_override_constants/separation = 24
 
 [node name="Title" type="Label" parent="OptionsScreen/VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 52
+theme_type_variation = &"TitleLabel"
 text = "OPTIONS_TITLE"
 horizontal_alignment = 1
 
@@ -167,7 +184,7 @@ text = "OPT_AA"
 [node name="AaToggle" type="CheckButton" parent="OptionsScreen/VBox/Panel/Grid"]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(120, 56)
+custom_minimum_size = Vector2(140, 64)
 size_flags_horizontal = 0
 
 [node name="VibrationLabel" type="Label" parent="OptionsScreen/VBox/Panel/Grid"]
@@ -176,7 +193,7 @@ text = "OPT_VIBRATION"
 
 [node name="VibrationToggle" type="CheckButton" parent="OptionsScreen/VBox/Panel/Grid"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(120, 56)
+custom_minimum_size = Vector2(140, 64)
 layout_mode = 2
 size_flags_horizontal = 0
 
@@ -212,7 +229,7 @@ theme_override_constants/separation = 20
 
 [node name="Title" type="Label" parent="CreditsScreen/VBox"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 52
+theme_type_variation = &"TitleLabel"
 text = "CREDITS_TITLE"
 horizontal_alignment = 1
 
