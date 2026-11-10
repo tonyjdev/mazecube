@@ -17,6 +17,8 @@ extends Control
 ##   siguiente por jugar) con circle_active.png (dorado, latiendo). En los
 ##   bloqueados, y en los círculos de niveles que aún no existen, el número
 ##   se ve atenuado sobre el gris de la imagen.
+## - Bajo cada nivel completado, sus tres estrellas (las de su mejor partida:
+##   llenas las conseguidas y huecas las que no; ver StarIcon.draw_star).
 ## - El nombre de cada zona en su cartel y «INICIO» bajo la salida.
 ##
 ## Se arrastra con el dedo (o el ratón) para desplazarse, con inercia, y la
@@ -64,6 +66,11 @@ const LOCKED_TEXT := Color(0.95, 0.95, 0.97, 0.55)
 const LOCKED_OUTLINE := Color(0.18, 0.18, 0.2, 0.45)
 const LABEL_OUTLINE := Color(0.06, 0.05, 0.1, 0.85)
 const SELECTED_RING := Color(1, 1, 1, 0.95)
+## Estrellas bajo el círculo: radio y separación (fracción del ancho del
+## círculo) y cuánto bajan las de los lados (en arco).
+const STAR_RADIUS := 0.2
+const STAR_SPACING := 0.42
+const STAR_ARC := 0.08
 
 var _scroll := 0.0
 var _velocity := 0.0
@@ -219,11 +226,17 @@ func _draw() -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, zone_font_size)
 	_draw_fitted_text(_to_screen_rect(_start_label), [tr("MAP_START")], font, TEXT_COLOR)
 	var active := _next_level()
+	var visible_circles: Array[int] = []
 	for i in _circles.size():
 		var center := _circle_center(i)
 		if center.y < -60.0 or center.y > size.y + 60.0:
 			continue
+		visible_circles.append(i)
 		_draw_circle_state(i, center, i == active, font)
+	# Las estrellas, encima de todos los círculos.
+	for i in visible_circles:
+		if i < Levels.count() and GameState.is_completed(i):
+			_draw_level_stars(i, _circle_center(i))
 
 
 func _draw_circle_state(i: int, center: Vector2, is_active: bool, font: Font) -> void:
@@ -258,6 +271,19 @@ func _draw_circle_state(i: int, center: Vector2, is_active: bool, font: Font) ->
 	draw_string_outline(font, baseline, number, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size,
 		maxi(2, font_size / 6), outline)
 	draw_string(font, baseline, number, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, text_color)
+
+
+## Las tres estrellas de la mejor partida, en arco bajo el círculo.
+func _draw_level_stars(i: int, center: Vector2) -> void:
+	var circle_size: Vector2 = _circles[i]["size"] * _scale()
+	var stars := GameState.best_stars(i)
+	var radius := circle_size.x * STAR_RADIUS
+	var spacing := circle_size.x * STAR_SPACING
+	var base := center + Vector2(0, circle_size.y * 0.5 + radius * 0.9)
+	for k in 3:
+		var offset := k - 1
+		var pos := base + Vector2(offset * spacing, absf(offset) * circle_size.x * STAR_ARC)
+		StarIcon.draw_star(self, pos, radius, stars.size() == 3 and stars[k])
 
 
 func _draw_ellipse_ring(center: Vector2, radii: Vector2, color: Color, width: float) -> void:

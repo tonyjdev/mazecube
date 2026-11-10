@@ -295,6 +295,22 @@ def main():
         start = 0.1 + rng.uniform(0, 0.8) ** 1.3
         blast.append(offset(noise(0.02, decay=0.005, lowpass=0.35, volume=rng.uniform(0.08, 0.18)), start))
     save("bomb_explode", mix(*blast), peak=0.9)
+    # Cubito dorado cogido: destello brillante, arpegio de campanas que sube y
+    # un brillo agudo que tintinea.
+    sparkle = [offset(tone(f, 0.9, "bell", decay=0.3, volume=0.8), i * 0.05)
+               for i, f in enumerate((1318.5, 1568.0, 1975.5, 2637.0))]
+    sparkle.append(tone(660, 0.5, "triangle", decay=0.15, sweep_to=1320, volume=0.4))
+    for k in range(10):
+        sparkle.append(offset(tone(rng.uniform(3000, 4200), 0.12, decay=0.03, volume=0.25), 0.1 + k * 0.045))
+    save("collect", mix(*sparkle), peak=0.6)
+    # Estrella conseguida en la pantalla final: campanada clara con un brillo
+    # (el juego sube el tono de una estrella a la siguiente).
+    save("star", mix(tone(880, 0.9, "bell", decay=0.32), tone(1760, 0.6, "bell", decay=0.18, volume=0.5),
+                     tone(2640, 0.3, decay=0.06, volume=0.25),
+                     noise(0.05, decay=0.012, lowpass=0.9, volume=0.25)), peak=0.6)
+    # Estrella no conseguida: golpe apagado y grave.
+    save("star_miss", mix(tone(180, 0.25, "triangle", decay=0.07, sweep_to=120),
+                          noise(0.08, decay=0.02, lowpass=0.15, volume=0.4)), peak=0.45)
     print("Sonidos generados en", OUT)
 
 

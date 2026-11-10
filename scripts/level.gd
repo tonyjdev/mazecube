@@ -60,6 +60,10 @@ extends Node3D
 ##   ("range" = casillas hacia delante y a cada lado). Si no se indica, mira
 ##   hacia donde tiene más casillas libres a su alcance. Ver MortarCannon y
 ##   Bomb.
+## Coleccionable: el campo "collectible" del nivel es la casilla del cubito
+##   dorado (GoldenCube; lo colocan tools/place_collectibles.py). El cubo lo
+##   coge al llegar a su casilla (take_collectible) y no vuelve a salir hasta
+##   reiniciar el nivel.
 ## Materiales (ver BlockCatalog): el campo "theme" del nivel elige el bloque
 ## del suelo ("floor"), de los muros ("wall") y, opcionalmente, de la roca de
 ## debajo ("foundation"; si no se da, la que va bajo el suelo). Lo que falte
@@ -212,6 +216,10 @@ const REVEAL_FADE_TIME := 0.45
 ## Hacia dónde mira y alcance de los cañones de bombas (campo "mortars"). Ver
 ## la leyenda del principio.
 @export var mortar_settings := {}
+## Casilla del cubito dorado (campo "collectible"); NO_CELL si no hay.
+var collectible_cell := NO_CELL
+## Cubito dorado del mapa (null si no hay o ya se ha cogido).
+var _collectible: GoldenCube
 ## Cubo del jugador: los enemigos lo buscan y lo matan.
 var cube: RollingCube:
 	set(value):
@@ -290,6 +298,7 @@ func configure(data: Dictionary) -> void:
 	block_theme = data.get("theme", {})
 	block_regions = data.get("theme_regions", [])
 	mortar_settings = data.get("mortars", {})
+	collectible_cell = data.get("collectible", NO_CELL)
 
 
 func build() -> void:
@@ -303,6 +312,7 @@ func build() -> void:
 	_keys.clear()
 	_doors.clear()
 	_power_ups.clear()
+	_collectible = null
 	_breakables.clear()
 	_bars.clear()
 	_buttons.clear()
@@ -397,6 +407,10 @@ func build() -> void:
 		_add_foundations(wall_cells)
 	_add_bridges(bridge_cells)
 	_add_teleports(teleport_cells)
+	if _walkable.has(collectible_cell):
+		_collectible = GoldenCube.new()
+		_collectible.position = Vector3(collectible_cell.x * CELL_SIZE, 0.0, collectible_cell.y * CELL_SIZE)
+		add_child(_collectible)
 	for cell: Vector2i in enemy_cells:
 		_add_spawner(cell, enemy_cells[cell])
 	for cell in mortar_cells:
@@ -1224,6 +1238,19 @@ func take_key(cell: Vector2i) -> String:
 ## Power up que hay en la casilla, o null si no hay.
 func power_up_at(cell: Vector2i) -> PowerUp:
 	return _power_ups[cell]["power_up"] if _power_ups.has(cell) else null
+
+
+## Coge el cubito dorado si está en `cell` (animación de recogida).
+func take_collectible(cell: Vector2i) -> bool:
+	if _collectible == null or cell != collectible_cell:
+		return false
+	_collectible.collect()
+	_collectible = null
+	return true
+
+
+func has_collectible() -> bool:
+	return collectible_cell != NO_CELL
 
 
 ## Quita el power up del mapa y lo devuelve (null si no había).

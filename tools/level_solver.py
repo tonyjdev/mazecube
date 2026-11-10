@@ -71,6 +71,10 @@ Simula las reglas de scripts/rolling_cube.gd:
   alcance (10 casillas hacia delante y 5 a cada lado, o lo que diga el campo
   "mortars" del nivel).
 - Al llegar a la meta B termina el nivel.
+- Cubito dorado (campo "collectible", lo colocan place_collectibles.py): con
+  solve(..., collectible=casilla) solo vale llegar a la meta tras pasar por
+  él. "validate" comprueba que se puede coger y que "star_turns" (los giros de
+  la estrella) es el mínimo cogiéndolo más un 25 % (al menos 2).
 
 La dificultad de un nivel es el mínimo de giros necesarios (búsqueda 0-1 BFS),
 y como desempate el número de pasos del recorrido óptimo.
@@ -298,8 +302,11 @@ def step(board, state, turn):
 
 
 def solve(layout, start_heading, doors_as_walls=False, breakables_as_walls=False,
-          buttons=None, no_buttons=False):
+          buttons=None, no_buttons=False, collectible=None):
     """Devuelve (giros_minimos, pasos, decisiones) o None si no tiene solución.
+
+    Con collectible=(x, z) solo vale llegar a la meta habiendo pasado antes
+    por esa casilla (el coleccionable del nivel, ver place_collectibles.py).
 
     decisiones es una lista de (casilla, giro) del recorrido óptimo.
     Con doors_as_walls=True las puertas no se pueden abrir (sirve para
@@ -315,7 +322,9 @@ def solve(layout, start_heading, doors_as_walls=False, breakables_as_walls=False
         board.key_at = {}
     if breakables_as_walls:
         board.unbreakable = True
-    start = (board.start, start_heading, None, 0, 0, board.initial_hits, 0, board.initial_wear)
+    # El último elemento del estado indica si ya se ha cogido el coleccionable.
+    start = (board.start, start_heading, None, 0, 0, board.initial_hits, 0, board.initial_wear,
+             collectible is None)
     best = {start: (0, 0)}
     prev = {}
     queue = deque([(0, 0, start)])
@@ -324,6 +333,8 @@ def solve(layout, start_heading, doors_as_walls=False, breakables_as_walls=False
         if best.get(state) != (turns, steps):
             continue
         if state[0] == board.goal:
+            if not state[-1]:
+                continue  # el nivel termina al llegar a la meta: sin coleccionable no vale
             path, key = [], state
             while key in prev:
                 key, turn = prev[key]
@@ -332,9 +343,10 @@ def solve(layout, start_heading, doors_as_walls=False, breakables_as_walls=False
         # En la salida y al llegar por un teletransporte no se puede girar.
         options = (0,) if steps == 0 or state[0] in board.teleport_at else (0, -1, 1)
         for turn in options:
-            nstate = step(board, state, turn)
+            nstate = step(board, state[:-1], turn)
             if nstate is None:
                 continue
+            nstate = nstate + (state[-1] or nstate[0] == collectible,)
             cost = (turns + (1 if turn else 0), steps + 1)
             if nstate not in best or cost < best[nstate]:
                 best[nstate] = cost
@@ -440,9 +452,17 @@ def read_levels(path=LEVELS_GD):
                 for key, a, b in re.findall(r'"(facing|range)":\s*Vector2i\((-?\d+),\s*(-?\d+)\)', body_m):
                     settings[key] = (int(a), int(b))
                 mortars[(int(mx), int(mz))] = settings
+        # Coleccionable y giros de la estrella (ver place_collectibles.py).
+        collectible = None
+        found = re.search(r'"collectible":\s*Vector2i\((\d+),\s*(\d+)\)', extra)
+        if found:
+            collectible = (int(found.group(1)), int(found.group(2)))
+        found = re.search(r'"star_turns":\s*(\d+)', extra)
+        star = int(found.group(1)) if found else None
         levels.append({"name": name, "turns": int(turns),
                        "heading": (int(hx), int(hz)), "layout": rows, "buttons": buttons,
-                       "patrols": patrols, "mortars": mortars})
+                       "patrols": patrols, "mortars": mortars, "collectible": collectible,
+                       "star_turns": star})
     declared = len(re.findall(r'^\t\t"name":', source, re.M))
     if declared != len(levels):
         raise SystemExit(f"Solo se han podido leer {len(levels)} de los {declared} niveles de "
@@ -711,6 +731,26 @@ def check_enemies(rows, patrols):
     return problems
 
 
+def check_collectible(lvl):
+    """El cubito dorado está en suelo y se puede coger, y "star_turns" es el
+    mínimo de giros cogiéndolo más el margen (ver place_collectibles.py)."""
+    cell, star = lvl["collectible"], lvl["star_turns"]
+    if cell is None or star is None:
+        return ['falta "collectible" o "star_turns" (ejecutar place_collectibles.py)']
+    rows = lvl["layout"]
+    x, z = cell
+    if not (0 <= z < len(rows) and 0 <= x < len(rows[z])) or rows[z][x] != ".":
+        return [f"el coleccionable {cell} no está en una casilla de suelo"]
+    result = solve(rows, lvl["heading"], buttons=lvl["buttons"], collectible=cell)
+    if result is None:
+        return [f"el coleccionable {cell} no se puede coger"]
+    turns = result[0]
+    expected = turns + max(2, -(-turns // 4))
+    if star != expected:
+        return [f"star_turns es {star} pero debería ser {expected} ({turns} giros con el coleccionable)"]
+    return []
+
+
 def cmd_validate(_args):
     levels = read_levels()
     if not levels:
@@ -733,6 +773,8 @@ def cmd_validate(_args):
             problems.append("sin solución")
         elif result and result[0] != lvl["turns"]:
             problems.append(f"declara {lvl['turns']} giros pero el mínimo es {result[0]}")
+        if result and not problems:
+            problems += check_collectible(lvl)
         ok &= not problems
         size = f"{len(rows[0])}x{len(rows)}"
         detail = f"giros={result[0]:>2} pasos={result[1]:>3}" if result else ""

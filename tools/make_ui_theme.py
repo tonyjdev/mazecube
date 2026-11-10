@@ -74,6 +74,14 @@ def make_svgs():
               f'<path d="M6 10 L14 19 L22 10" fill="none" stroke="{ICON}" stroke-width="4" '
               'stroke-linecap="round" stroke-linejoin="round"/>')
 
+    # Iconos del HUD de las estrellas: corazón (sin morir) y cubito dorado.
+    write_svg("hud_heart.svg", 40, 40,
+              f'<path d="M20 35 C8 26 3 19 3 12.5 C3 7 7.5 3.5 12 3.5 C15.5 3.5 18.5 5.5 20 8.5 '
+              f'C21.5 5.5 24.5 3.5 28 3.5 C32.5 3.5 37 7 37 12.5 C37 19 32 26 20 35 Z" '
+              f'fill="{RIGHT}" stroke="{OUTLINE}" stroke-width="3" stroke-linejoin="round"/>'
+              '<ellipse cx="12.5" cy="11" rx="4" ry="3" fill="#ffffff" fill-opacity="0.45"/>')
+    write_svg("hud_gold_cube.svg", 40, 40, cube(20, 20, 17, "#ffe27a", "#f0b429", "#c98a12", OUTLINE, 3))
+
     # Icono de pausa del juego (dos barras, como los de los botones de pausa).
     write_svg("pause_pause.svg", 48, 48,
               f'<rect x="13" y="10" width="8" height="28" rx="2" fill="{ICON}"/>'

@@ -92,6 +92,11 @@ signal button_pressed(cell: Vector2i)
 signal reversed(cell: Vector2i)
 ## Se ha pedido un giro hacia una casilla bloqueada y se ha descartado.
 signal turn_rejected(direction: Vector2i)
+## Se ha aplicado un giro pedido (a la izquierda o a la derecha): cuenta para
+## la estrella de giros. Los descartados, los rebotes y la media vuelta no.
+signal turn_applied(direction: Vector2i)
+## Ha cogido el cubito dorado del nivel.
+signal collectible_picked
 signal power_up_picked(power_up: PowerUp, stacks: int)
 signal power_up_ended(power_up: PowerUp)
 ## Un enemigo ha matado al cubo en esa casilla, o ha explotado tras caer al
@@ -503,6 +508,7 @@ func _try_advance() -> void:
 		_pending_turn = 0
 		if level.is_walkable(cell + candidate) or level.is_void(cell + candidate):
 			heading = candidate
+			turn_applied.emit(candidate)
 		else:
 			turn_rejected.emit(candidate)
 		_update_held_key(Vector3.ZERO)
@@ -763,6 +769,8 @@ func _on_roll_finished(next: Vector2i) -> void:
 	var power_up := level.take_power_up(cell)
 	if power_up:
 		_pick_power_up(power_up)
+	if level.take_collectible(cell):
+		collectible_picked.emit()
 	_update_held_key(Vector3.ZERO)
 	rolled.emit(cell)
 	var partner := level.teleport_partner(cell)

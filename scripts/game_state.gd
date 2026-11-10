@@ -1,9 +1,13 @@
 extends Node
 ## Estado global del juego (autoload "GameState").
 ##
-## - Progreso: niveles completados y desbloqueados (user://progress.cfg). El
-##   nivel 1 siempre está desbloqueado; completar un nivel desbloquea el
-##   siguiente.
+## - Progreso: niveles completados y desbloqueados, y las estrellas de la
+##   mejor partida de cada nivel (user://progress.cfg). El nivel 1 siempre
+##   está desbloqueado; completar un nivel con al menos una estrella lo marca
+##   como completado y desbloquea el siguiente. Las estrellas son tres retos:
+##   sin morir, en «star_turns» giros o menos y con el cubito dorado (ver
+##   record_result). Solo cuenta la mejor partida (la de más estrellas); no
+##   se suman estrellas de partidas distintas.
 ## - Ajustes (user://settings.cfg): volumen de efectos y de música (buses
 ##   "SFX" y "Music", ver default_bus_layout.tres), antialiasing, idioma
 ##   y vibración.
@@ -54,6 +58,8 @@ var locale := "es"
 var vibration := true
 
 var _completed: Array[int] = []
+## Índice del nivel -> estrellas de su mejor partida: [sin morir, giros, cubito].
+var _stars := {}
 ## Truco para pruebas: todos los niveles desbloqueados (ver unlock_all_levels).
 var _all_unlocked := false
 ## Capa negra de los fundidos y su animación en curso.
@@ -124,11 +130,31 @@ func unlock_all_levels() -> void:
 	_save_progress()
 
 
-func mark_completed(index: int) -> void:
-	if not _completed.has(index):
+## Estrellas de la mejor partida del nivel: [sin morir, giros, cubito]
+## (vacío si no hay ninguna partida con estrellas).
+func best_stars(index: int) -> Array:
+	return _stars.get(index, [])
+
+
+func star_count(index: int) -> int:
+	return best_stars(index).count(true)
+
+
+## Resultado de una partida: `stars` = [sin morir, giros, cubito]. Si consigue
+## más estrellas que la mejor partida, pasa a ser la mejor. Con al menos una
+## estrella el nivel queda completado (y se desbloquea el siguiente).
+## Devuelve true si es un nuevo récord.
+func record_result(index: int, stars: Array) -> bool:
+	var count := stars.count(true)
+	var record := count > star_count(index)
+	if record:
+		_stars[index] = stars.duplicate()
+	if count > 0 and not _completed.has(index):
 		_completed.append(index)
 		_completed.sort()
+	if record or count > 0:
 		_save_progress()
+	return record
 
 
 func _load_progress() -> void:
@@ -136,6 +162,12 @@ func _load_progress() -> void:
 	if cfg.load(PROGRESS_PATH) != OK:
 		return
 	_all_unlocked = cfg.get_value("progress", "all_unlocked", false)
+	var saved_stars: Variant = cfg.get_value("progress", "stars", {})
+	if saved_stars is Dictionary:
+		for key: Variant in saved_stars:
+			var value: Variant = saved_stars[key]
+			if value is Array and value.size() == 3:
+				_stars[int(key)] = [bool(value[0]), bool(value[1]), bool(value[2])]
 	if cfg.has_section_key("progress", "completed"):
 		for value in cfg.get_value("progress", "completed", []):
 			_completed.append(int(value))
@@ -150,6 +182,7 @@ func _load_progress() -> void:
 func _save_progress() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("progress", "completed", _completed)
+	cfg.set_value("progress", "stars", _stars)
 	if _all_unlocked:
 		cfg.set_value("progress", "all_unlocked", true)
 	cfg.save(PROGRESS_PATH)

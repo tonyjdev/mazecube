@@ -274,6 +274,25 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 - La explosión llega a **2 casillas alrededor** de la de la bomba en todas direcciones (un cuadrado de 5×5 casillas, diagonales incluidas, sin que la frenen los muros) y **mata al cubo** si está en alguna de ellas (con las mismas inmunidades que con los enemigos: dash, pisotón, invulnerabilidad de después de reaparecer, teletransporte). A los **enemigos no les hace nada**.
 - Si explota a 4 casillas del cubo o menos, la cámara tiembla y el móvil vibra. Los disparos, botes, mechas y explosiones solo se oyen a 14 casillas del cubo o menos (más bajo cuanto más lejos). Mientras aparece el tablero los cañones no disparan.
 
+### 2.21. Estrellas y cubito dorado — Implementada en el prototipo
+
+- Cada partida de un nivel puede ganar hasta **tres estrellas**, una por cada reto (se pueden conseguir en cualquier combinación):
+  1. **Sin morir:** se pierde con cualquier muerte (enemigos, vacío, pinchos, láser o bombas).
+  2. **En X giros o menos:** solo cuentan los **giros aplicados**. No cuentan los giros descartados contra un muro, los rebotes, la media vuelta, el dash ni el pisotón. Morir no reinicia la cuenta. X (`star_turns`) es el **mínimo de giros cogiendo el cubito dorado más un 25 %** (al menos +2), así que las tres estrellas siempre se pueden conseguir a la vez.
+  3. **Cubito dorado:** coger el coleccionable del nivel.
+- **Cubito dorado:** uno por nivel. Es un cubo **dorado** metálico apoyado sobre un vértice, como una gema. **Flota** subiendo y bajando suavemente y **gira despacio**. Detrás tiene un resplandor de **rayos de luz dorada** que giran y cambian de intensidad, y una **luz dorada que late** ilumina el suelo y los muros de alrededor.
+  - Se coge al llegar a su casilla: sube, gira deprisa, destella y se encoge con una lluvia de chispas, con sonido de campanas y una vibración breve.
+  - Si el cubo muere después de cogerlo, lo **conserva** (como las llaves). Vuelve a salir al reiniciar o repetir el nivel.
+- **Colocación:** la hace `tools/place_collectibles.py` en todos los niveles.
+  - Va en una casilla de suelo normal **fuera del recorrido óptimo**, mejor en un **fondo de saco** apartado. Nunca está en la ruta de un patrullero ni junto a la salida o la meta.
+  - Ir a por él cuesta unos pocos giros más que el mínimo (en torno a un 12 %, entre 1 y 6; en la práctica de 2 a 8, porque entrar y salir de un recoveco son dos giros).
+  - En los niveles diminutos sin recovecos (1, 3, 6, 16 y 33) está en el propio camino.
+- **Marcador:** durante la partida, junto al número de nivel, una placa muestra cómo van los retos:
+  - un **corazón** que se apaga al morir;
+  - los **giros** usados y el límite («12/20»), que se ponen **rojos** al pasarse;
+  - un **cubito dorado** que se enciende (con un saltito) al cogerlo.
+- **Mejor partida:** se guarda en el dispositivo la de **más estrellas** de cada nivel (no se suman estrellas de partidas distintas). Con un empate se queda la anterior.
+
 ## 3. Escenario y objetivo — Confirmados
 
 - El escenario es un **laberinto**.
@@ -289,11 +308,11 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 - Puzles accesibles a personas sin experiencia previa con juegos de estrategia.
 - Prioridad a la planificación del recorrido frente a controles complicados.
 
-> **Por decidir:** velocidad de avance, duración de cada nivel, comportamiento ante caídas, condiciones de derrota, puntuaciones y ayudas. Se ha comentado como posibilidad un enfoque sin presión de tiempo, pero todavía no se ha fijado como regla definitiva. El comportamiento ante paredes está definido en los apartados 2.4 y 2.5, y la dificultad y el reinicio en el apartado 6.
+> **Por decidir:** velocidad de avance, duración de cada nivel, comportamiento ante caídas, condiciones de derrota, puntuaciones (de momento hay estrellas, apartado 2.21) y ayudas. Se ha comentado como posibilidad un enfoque sin presión de tiempo, pero todavía no se ha fijado como regla definitiva. El comportamiento ante paredes está definido en los apartados 2.4 y 2.5, y la dificultad y el reinicio en el apartado 6.
 
 ## 5. Presentación visual
 
-- **Efectos de sonido:** vuelco del cubo (golpe sordo, con el tono un poco al azar), rebote, giro descartado, llave cogida (campanitas), puerta abierta, golpe y derrumbe de muros destructibles, botón y barrotes, power up, media vuelta (soplido), explosión del cubo, caída al vacío (silbido), crujido de un puente colgante al gastarse y su derrumbe, meta (fanfarria), alarma cuando un perseguidor ve al cubo y clic en los botones de la interfaz. Son sonidos sintetizados (no hay grabaciones externas) con `tools/make_sfx.py` y suenan por el canal «SFX».
+- **Efectos de sonido:** vuelco del cubo (golpe sordo, con el tono un poco al azar), rebote, giro descartado, llave cogida (campanitas), puerta abierta, golpe y derrumbe de muros destructibles, botón y barrotes, power up, media vuelta (soplido), explosión del cubo, caída al vacío (silbido), crujido de un puente colgante al gastarse y su derrumbe, meta (fanfarria), alarma cuando un perseguidor ve al cubo, cubito dorado (campanas y brillo), estrella conseguida y no conseguida en la pantalla final, y clic en los botones de la interfaz. Son sonidos sintetizados (no hay grabaciones externas) con `tools/make_sfx.py` y suenan por el canal «SFX».
 - **Música:** un tema para el menú y uno por cada **zona** del mapa de niveles, compuestos y sintetizados por código (sin grabaciones ni muestras externas) con `tools/make_music.py` en `audio/music/*.ogg`. Suenan por el canal «Music», algo por debajo de los efectos.
   - **Menú** (88 ppm): tranquilo; marimba en arpegio, pads, campanas y bajo suave.
   - **I. El mundo de los cubos** (niveles 1-34, 116 ppm): alegre y saltarín; arpegio de cuerda pulsada, bajo que bota, melodía de onda cuadrada y batería ligera.
@@ -318,7 +337,7 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 - **Cámara — Decidido:** vista **cenital ligeramente inclinada**, en perspectiva (unos 65° sobre el tablero). Se descartó la isométrica, que en vertical mostraba el tablero bastante más pequeño. La cámara es fija: no hay opción para cambiarla.
 - La animación del cubo debe mostrar claramente el vuelco entre casillas; no basta con trasladar el modelo o simular un deslizamiento.
 - **Orientación de pantalla — Confirmada:** el juego se muestra en **horizontal** (apaisado) en el móvil, porque así se maneja mejor con las dos manos. (Antes se jugaba en vertical; se cambió el 7 de noviembre de 2026.)
-- **Interfaz de juego — Confirmada:** solo el **número de nivel** arriba a la izquierda, el botón de **pausa** arriba a la derecha y las indicaciones «← Izquierda» y «Derecha →» en las esquinas inferiores. El tablero ocupa el resto de la pantalla. Los menús se describen en el apartado 7.
+- **Interfaz de juego — Confirmada:** el **número de nivel** y el **marcador de los retos de las estrellas** (apartado 2.21) arriba a la izquierda, el botón de **pausa** arriba a la derecha y las indicaciones «← Izquierda» y «Derecha →» en las esquinas inferiores. El tablero ocupa el resto de la pantalla. Los menús se describen en el apartado 7.
 - **Distancia de la cámara — Confirmada:** la cámara no se aleja más de una **distancia máxima**, la que hace falta para ver entero un tablero de 7×9 casillas (el antiguo nivel 4) en el espacio libre de la pantalla. Así el tablero no se ve diminuto aunque el mapa sea grande.
   - Si el tablero entero cabe a esa distancia, la cámara se acerca hasta encuadrarlo justo en el espacio libre entre los elementos de la interfaz y se queda quieta.
   - Si **no cabe**, la cámara **sigue al cubo** con un **pequeño retraso** y un movimiento **suave**: acelera y frena poco a poco, no se para en seco y no rebota cuando el cubo rebota. Al acercarse al borde del tablero deja de avanzar, de modo que no se ve vacío más allá del muro exterior. En la dirección en la que el tablero sí cabe, se queda centrada.
@@ -331,10 +350,15 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 ### 6.1. Progresión
 
 - El juego tiene **115 niveles** de **dificultad creciente**, repartidos por las zonas del mapa de niveles (apartado 7.2): los niveles **1 a 34** son la zona I (*El mundo de los cubos*), los **35 a 60** la zona II (*Las tierras salvajes*), los **61 a 75** la zona III (*El mundo desconocido*), los **76 a 100** la zona IV (*Los territorios corrompidos*) y los **101 a 115** la zona V (*El núcleo enemigo*).
-- Los niveles se eligen en el **selector de niveles** (apartado 7.2). Solo se puede entrar en los **completados** y en los **desbloqueados**: el nivel 1 está siempre desbloqueado y completar un nivel desbloquea el siguiente.
-- Al llegar a la meta, el nivel queda **completado** y se muestra «¡Nivel completado!» con **Siguiente nivel**, **Repetir** y **Niveles** (vuelve al selector). Tras el último nivel se indica que se han completado todos.
+- Los niveles se eligen en el **selector de niveles** (apartado 7.2). Solo se puede entrar en los **completados** y en los **desbloqueados**: el nivel 1 está siempre desbloqueado, y completar un nivel con **al menos una estrella** (apartado 2.21) lo marca como completado y desbloquea el siguiente. Llegar a la meta sin ninguna estrella no lo completa.
+- **Pantalla de nivel completado:** al llegar a la meta se muestra «¡Nivel completado!».
+  - Las **tres estrellas** aparecen una a una. Cada una crece con un pequeño rebote; las conseguidas son amarillas, con un destello en anillo y una campanada que sube de tono, y las no conseguidas son huecas y oscuras, con un golpe apagado. Debajo de cada una está su reto: «Sin morir», «Giros: 15/14» (los usados y el límite) y «Cubito dorado».
+  - Si la partida mejora la anterior, aparece «¡Nuevo récord!».
+  - Botones: **Niveles** (vuelve al selector), **Repetir** y **Siguiente nivel**, que pasa por la pantalla de carga del siguiente.
+  - **Siguiente nivel** solo se puede pulsar si el siguiente está desbloqueado, es decir, con alguna estrella en esta partida o en una anterior del nivel. Si no, se ve atenuado con el aviso «Consigue al menos una estrella para pasar al siguiente nivel».
+  - Tras el último nivel se indica que se han completado todos.
 - El jugador puede **reiniciar** el nivel en cualquier momento desde el menú de pausa.
-- Los **niveles completados se guardan** en el dispositivo.
+- Los **niveles completados** y las **estrellas de la mejor partida** de cada uno **se guardan** en el dispositivo.
 
 ### 6.2. Formato de los niveles
 
@@ -352,6 +376,7 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 - Cañón láser: `L` (apartado 2.19). Debe tener exactamente una casilla libre al lado, hacia la que dispara.
 - Cañón de bombas: `M` (apartado 2.20). Opcional: `mortars`, hacia dónde mira y el alcance de cada cañón, p. ej. `{Vector2i(19, 12): {"facing": Vector2i(0, 1), "range": Vector2i(8, 5)}}` (`range` = casillas hacia delante y a cada lado, como mucho 10 y 5).
 - Opcional: `theme`, los bloques del catálogo (apartado 5) del suelo, los muros y la roca de debajo, p. ej. `"theme": {"floor": "snow", "wall": "ice"}` (la roca, si no se indica, es la que corresponde al suelo). Y `theme_regions`, zonas rectangulares del mapa con otros bloques, para transiciones: `[{"rect": Rect2i(x, z, ancho, alto), "floor": "grass"}]`. Los niveles sin `theme` toman el de su tramo de `Levels.THEMES`, que sigue las zonas del mapa: en la zona I praderas, aldeas y ruinas (hierba, tierra, sillería, tronco, ladrillo), en la zona II islas que suben desde los prados en flor (hierba con flores y piedra con musgo) por la hierba seca y el granito hasta la nieve y el hielo de las cumbres, en la zona III el desierto (arena y arenisca) y las cuevas de cristal, en la zona IV la tierra corrompida, la obsidiana y el magma, y en la zona V el metal, la obsidiana y el cristal.
+- `collectible`: la casilla del cubito dorado, `Vector2i(x, z)`. `star_turns`: los giros máximos de la estrella de giros. Los calcula `tools/place_collectibles.py` (apartado 2.21), que hay que volver a ejecutar si se cambia o regenera un nivel; `level_solver.py validate` comprueba que el cubito se puede coger y que `star_turns` es correcto.
 - Opcional: `camera_distance`, la distancia de la cámara para ese nivel (por defecto, la máxima; ver apartado 5).
 - Los mapas pueden ser más grandes que la pantalla, apaisados o verticales: la cámara sigue al cubo (apartado 5).
 
@@ -514,7 +539,7 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 
 - Es una **imagen ilustrada del mapa** (`ui/level_select/map.png`, vertical) que ocupa **toda la pantalla**, sin título ni bordes (llena el ancho y se **desplaza en vertical**). Arriba a la izquierda, superpuesto al mapa, hay un botón con una **flecha hacia atrás** que vuelve al menú principal. Tiene un camino que sube desde la **casilla de inicio** (un cubo azul sobre un pedestal, abajo, con el texto «INICIO»/«START») y un **círculo por nivel** a lo largo del camino: el primero es el nivel 1. La imagen tiene 115 círculos, uno por nivel.
 - El mapa se divide en **cinco zonas**, de abajo arriba, con su nombre en un cartel a la izquierda, alineado a la izquierda y precedido de su número romano en la misma línea («II. LAS TIERRAS SALVAJES»; todos los carteles con el mismo tamaño de letra): **I. El mundo de los cubos**, **II. Las tierras salvajes**, **III. El mundo desconocido**, **IV. Los territorios corrompidos** y **V. El núcleo enemigo** (en inglés: The World of Cubes, The Wildlands, The Unknown World, The Corrupted Territories y The Enemy Core).
-- En cada círculo se ve el **número del nivel**. Los **completados** se tapan con un círculo **verde** y el **activo** (el siguiente por jugar) con uno **dorado** que late. En los **bloqueados**, y en los círculos de niveles que aún no existen, el número se ve **atenuado** sobre el gris de la imagen, y no se pueden pulsar.
+- En cada círculo se ve el **número del nivel**. Los **completados** se tapan con un círculo **verde** y el **activo** (el siguiente por jugar) con uno **dorado** que late. Bajo cada nivel completado se ven sus **tres estrellas** en arco: llenas las conseguidas en su mejor partida y huecas las demás. En los **bloqueados**, y en los círculos de niveles que aún no existen, el número se ve **atenuado** sobre el gris de la imagen, y no se pueden pulsar.
 - Se desplaza **arrastrando** con el dedo (con inercia) o con la rueda del ratón. Al entrar, se centra en vertical en el nivel activo (y se vuelve a centrar si cambia el tamaño de la pantalla mientras el jugador no lo haya movido). Tocar un círculo desbloqueado juega ese nivel. Con el teclado, arriba y abajo cambian el nivel elegido (se marca con un anillo blanco) e Intro lo juega.
 - La posición de los círculos, su zona, los huecos de los carteles y el del texto «INICIO» están en `ui/level_select/map.json`, que **se genera a partir de la imagen** con `tools/find_level_circles.py` (detecta los círculos grises, los ordena siguiendo el camino, los carteles y el cubo de inicio). Al cambiar la imagen basta con volver a ejecutarlo y revisar la imagen de control que genera con `--check`. Los círculos verde y dorado (`circle_done.png` y `circle_active.png`) los dibuja `tools/make_circle_sprites.py`.
 - **Truco para pruebas** (solo en las versiones de depuración): tocar **5 veces seguidas** el rótulo «INICIO» del mapa desbloquea todos los niveles (sin marcarlos como completados). Se guarda en el dispositivo.

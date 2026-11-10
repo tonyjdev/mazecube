@@ -31,8 +31,18 @@ extends Node3D
 ## después aparece el cubo
 ## (RollingCube.appear); los enemigos no se mueven hasta que el cubo empieza
 ## a rodar.
-## Al llegar a la meta se marca el nivel como completado y se muestra otro
-## menú (Siguiente nivel, Repetir, Niveles).
+## Estrellas: cada partida tiene tres retos, una estrella por cada uno: no
+## morir, usar «star_turns» giros o menos (solo cuentan los giros aplicados:
+## no los descartados, los rebotes ni la media vuelta) y coger el cubito
+## dorado. Arriba, junto al número de nivel, se ve cómo van: el corazón se
+## apaga al morir, los giros («12/20») se ponen rojos al pasarse y el cubito
+## se enciende al cogerlo. Reiniciar o repetir empieza la cuenta de cero.
+## Al llegar a la meta se guarda el resultado (GameState.record_result: solo
+## cuenta la mejor partida) y se muestra la pantalla de nivel completado: las
+## tres estrellas aparecen una a una con su reto debajo y los botones Niveles,
+## Repetir y Siguiente nivel (que pasa por la pantalla de carga). Para seguir
+## hace falta alguna estrella, en esta partida o en una anterior del nivel
+## (que el siguiente esté desbloqueado); si no, se avisa.
 ##
 ## Controles:
 ##   Media vuelta: pulsar izquierda y derecha a la vez (con el otro lado aún
@@ -74,6 +84,14 @@ extends Node3D
 const HINT_IDLE_ALPHA := 0.45
 ## Pausa entre llegar a la meta y mostrar el menú de nivel completado.
 const COMPLETE_MENU_DELAY := 0.5
+## Pantalla de nivel completado: espera antes de la primera estrella y entre
+## una y otra, y tono de la campanada de cada estrella conseguida.
+const STAR_FIRST_DELAY := 0.35
+const STAR_INTERVAL := 0.4
+const STAR_PITCHES := [1.0, 1.12, 1.26]
+## Iconos del HUD de los retos: apagados (corazón tras morir, cubito sin coger).
+const STAT_OFF := Color(0.45, 0.42, 0.4, 0.55)
+const TURNS_OVER_COLOR := Color(1.0, 0.45, 0.4)
 ## Diferencia máxima entre pulsar izquierda y derecha para que cuente como a
 ## la vez (media vuelta).
 const SIMULTANEOUS_WINDOW := 0.15
@@ -116,6 +134,12 @@ var _speed_tween: Tween
 var _intro_id := 0
 ## Fundiendo a negro para reiniciar.
 var _restarting := false
+## Partida en curso (para las estrellas): giros aplicados, muertes y cubito.
+var _run_turns := 0
+var _run_deaths := 0
+var _run_collected := false
+var _star_turns := 0
+var _stars_tween: Tween
 
 @onready var level: Level = $Level
 @onready var cube: RollingCube = $Cube
@@ -131,6 +155,11 @@ var _restarting := false
 @onready var complete_menu: CanvasLayer = $CompleteMenu
 @onready var complete_title: Label = %CompleteTitle
 @onready var next_button: Button = %NextButton
+@onready var turns_label: Label = %TurnsLabel
+@onready var life_icon: TextureRect = %LifeIcon
+@onready var gold_icon: TextureRect = %GoldIcon
+@onready var star_icons: Array[StarIcon] = [%Star1, %Star2, %Star3]
+@onready var star_labels: Array[Label] = [%StarLabel1, %StarLabel2, %StarLabel3]
 
 
 func _ready() -> void:
@@ -148,11 +177,13 @@ func _ready() -> void:
 			GameState.vibrate(GameState.VIBRATION_BOMB))
 	cube.respawned.connect(_appear_after_camera)
 	cube.died.connect(func(_cell: Vector2i) -> void:
+		_add_death()
 		Sfx.play("explode")
 		level.notify_cube_died()
 		camera.shake()
 		GameState.vibrate(GameState.VIBRATION_DEATH))
 	cube.fell.connect(func(_cell: Vector2i) -> void:
+		_add_death()
 		Sfx.play("fall")
 		level.notify_cube_died()
 		GameState.vibrate(GameState.VIBRATION_TURN_REJECTED))
@@ -193,6 +224,15 @@ func _ready() -> void:
 	cube.bounced.connect(func(_cell: Vector2i) -> void: Sfx.play("bounce", 0.1))
 	cube.landed.connect(func() -> void: Sfx.play("bounce", 0.1))
 	cube.key_picked.connect(func(_color: String) -> void: Sfx.play("key"))
+	cube.turn_applied.connect(func(_dir: Vector2i) -> void:
+		_run_turns += 1
+		_update_stats())
+	cube.collectible_picked.connect(func() -> void:
+		_run_collected = true
+		Sfx.play("collect")
+		GameState.vibrate(GameState.VIBRATION_BUTTON)
+		_pop_stat(gold_icon)
+		_update_stats())
 	cube.door_opened.connect(func(_color: String) -> void: Sfx.play("door"))
 	cube.power_up_picked.connect(func(_power_up: PowerUp, _stacks: int) -> void:
 		Sfx.play("powerup"))
@@ -221,6 +261,7 @@ func _ready() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_TRANSLATION_CHANGED and is_node_ready():
 		_update_level_label()
+		_update_stats()
 	elif what == NOTIFICATION_WM_GO_BACK_REQUEST and not GameState.is_loading:
 		_toggle_pause()
 	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT and OS.has_feature("mobile") \
@@ -489,6 +530,10 @@ func _restart() -> void:
 	pause_button.visible = true
 	_stop_speed_ramp()
 	Music.set_muffled(false)
+	_run_turns = 0
+	_run_deaths = 0
+	_run_collected = false
+	_update_stats()
 	_play_intro()
 
 
@@ -536,6 +581,7 @@ func _load_level(index: int) -> void:
 	GameState.current_level = current_level
 	var data := Levels.get_level(current_level)
 	level.configure(data)
+	_star_turns = Levels.star_turns(current_level)
 	Music.play(Music.track_for_level(current_level))
 	_update_level_label()
 	_restart()
@@ -547,6 +593,8 @@ func _update_level_label() -> void:
 
 
 func _next_level() -> void:
+	if not _can_continue():
+		return
 	if current_level >= Levels.count() - 1:
 		GameState.go_to_menu("levels")
 	else:
@@ -556,15 +604,83 @@ func _next_level() -> void:
 func _on_reached_goal() -> void:
 	Sfx.play("goal")
 	Music.set_muffled(true)
-	GameState.mark_completed(current_level)
+	var stars := [_run_deaths == 0, _run_turns <= _star_turns,
+		_run_collected or not level.has_collectible()]
+	var record := GameState.record_result(current_level, stars)
 	pause_button.visible = false
+	await get_tree().create_timer(COMPLETE_MENU_DELAY).timeout
+	if cube.is_finished:
+		_show_complete_menu(stars, record)
+
+
+## Pantalla de nivel completado: las estrellas aparecen una a una (con su
+## campanada, o un golpe apagado si no se ha conseguido) y luego el aviso de
+## récord.
+func _show_complete_menu(stars: Array, record: bool) -> void:
 	var last := current_level >= Levels.count() - 1
 	complete_title.text = "COMPLETE_ALL" if last else "COMPLETE_TITLE"
 	next_button.visible = not last
-	await get_tree().create_timer(COMPLETE_MENU_DELAY).timeout
-	if cube.is_finished:
-		complete_menu.visible = true
-		_focus_first(complete_menu)
+	next_button.disabled = not _can_continue()
+	%NoStarsLabel.visible = stars.count(true) == 0 and not _can_continue()
+	%RecordLabel.visible = false
+	var texts := [tr("STAR_NO_DEATH"), tr("STAR_TURNS") % [_run_turns, _star_turns], tr("STAR_GOLD")]
+	for i in 3:
+		star_icons[i].reset()
+		star_labels[i].text = texts[i]
+		star_labels[i].modulate = Color(1, 1, 1, 0)
+	complete_menu.visible = true
+	_focus_first(complete_menu)
+	if _stars_tween and _stars_tween.is_valid():
+		_stars_tween.kill()
+	_stars_tween = complete_menu.create_tween()
+	_stars_tween.tween_interval(STAR_FIRST_DELAY)
+	for i in 3:
+		var got: bool = stars[i]
+		_stars_tween.tween_callback(func() -> void:
+			star_icons[i].reveal(got)
+			if got:
+				Sfx.play("star", 0.0, 0.0, STAR_PITCHES[i])
+			else:
+				Sfx.play("star_miss"))
+		_stars_tween.tween_property(star_labels[i], "modulate",
+			Color(1, 1, 1, 1.0) if got else Color(1, 1, 1, 0.5), 0.2)
+		_stars_tween.tween_interval(STAR_INTERVAL - 0.2)
+	if record and stars.count(true) > 0:
+		_stars_tween.tween_callback(func() -> void:
+			%RecordLabel.visible = true
+			_pop_stat(%RecordLabel))
+
+
+## Se puede pasar al siguiente nivel si está desbloqueado: hace falta alguna
+## estrella en esta partida o en la mejor anterior.
+func _can_continue() -> bool:
+	return current_level >= Levels.count() - 1 or GameState.is_unlocked(current_level + 1)
+
+
+func _add_death() -> void:
+	_run_deaths += 1
+	_update_stats()
+
+
+## Marcador de los retos de la partida (arriba, junto al número de nivel).
+func _update_stats() -> void:
+	if not is_node_ready():
+		return
+	turns_label.text = tr("HUD_TURNS") % [_run_turns, _star_turns]
+	turns_label.add_theme_color_override("font_color",
+		TURNS_OVER_COLOR if _run_turns > _star_turns else Color(0.965, 0.937, 0.886))
+	life_icon.modulate = Color.WHITE if _run_deaths == 0 else STAT_OFF
+	gold_icon.modulate = Color.WHITE if _run_collected else STAT_OFF
+	gold_icon.visible = level.has_collectible()
+
+
+## Pequeño salto de un icono o texto del marcador.
+func _pop_stat(control: Control) -> void:
+	control.pivot_offset = control.size * 0.5
+	var tween := control.create_tween()
+	tween.tween_property(control, "scale", Vector2.ONE * 1.4, 0.12).set_trans(Tween.TRANS_QUAD)
+	tween.tween_property(control, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK) \
+		.set_ease(Tween.EASE_OUT)
 
 
 func _on_play_area_resized() -> void:

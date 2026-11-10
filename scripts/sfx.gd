@@ -17,7 +17,8 @@ extends RefCounted
 ## por el otro), spikes (salen los pinchos), laser_beep (aviso del cañón
 ## láser), laser (disparo), laser_hit (el láser choca), mortar (disparo del
 ## cañón de bombas), bomb_bounce (bote de una bomba), bomb_fuse (se enciende
-## la mecha), bomb_explode (explosión) y click
+## la mecha), bomb_explode (explosión), collect (cubito dorado), star y
+## star_miss (estrella conseguida o no en la pantalla final) y click
 ## (botones de la interfaz).
 
 const POOL_SIZE := 10
@@ -36,15 +37,15 @@ static var _next := 0
 
 
 ## Reproduce un sonido. `pitch_jitter` varía el tono al azar (±) para que los
-## sonidos repetidos no suenen idénticos.
-static func play(sound: String, pitch_jitter := 0.0, volume_db := 0.0) -> void:
+## sonidos repetidos no suenen idénticos; `pitch` lo cambia a propósito.
+static func play(sound: String, pitch_jitter := 0.0, volume_db := 0.0, pitch := 1.0) -> void:
 	var stream := _stream(sound)
 	if stream == null or not _ensure_players():
 		return
 	var player := _players[_next]
 	_next = (_next + 1) % _players.size()
 	player.stream = stream
-	player.pitch_scale = 1.0 + randf_range(-pitch_jitter, pitch_jitter)
+	player.pitch_scale = pitch * (1.0 + randf_range(-pitch_jitter, pitch_jitter))
 	player.volume_db = VOLUMES.get(sound, 0.0) + volume_db
 	if player.is_inside_tree():
 		player.play()
