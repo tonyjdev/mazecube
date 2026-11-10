@@ -36,7 +36,7 @@ El diseño busca combinar **lógica y planificación** con **controles y reglas 
 - Los controles son **relativos al rumbo del cubo**, no a direcciones absolutas del tablero o de la pantalla.
 - **Media vuelta:** pulsar **izquierda y derecha a la vez** (ver apartado 2.12).
 - **Dash** y **pisotón:** deslizar el dedo hacia arriba o hacia abajo (ver apartado 2.16).
-- **Inmunidad:** pulsar el botón del escudo, arriba en el centro (ver apartado 2.22).
+- **Inmunidad:** deslizar el dedo hacia un lado (ver apartado 2.22).
 
 **Ejemplo:** si el cubo avanza hacia arriba en el tablero y el jugador pulsa izquierda, vuelca sobre la arista inferior izquierda y continúa avanzando hacia la izquierda. Si después vuelve a pulsar izquierda, su nuevo rumbo será hacia abajo.
 
@@ -297,14 +297,15 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 
 ### 2.22. Inmunidad — En pruebas en el prototipo
 
-- El jugador la activa con el **botón del escudo** (un escudo con un rayo), **arriba en el centro** de la pantalla de juego. En PC, **Espacio** o **E**. De momento el botón está **siempre disponible** (más adelante se podrá desbloquear o limitar).
+- El jugador la activa **deslizando el dedo hacia un lado** (a la izquierda o a la derecha, da igual), en cualquier parte de la pantalla, con las mismas reglas que el deslizamiento del dash y el pisotón (apartado 7.5). En PC, **Espacio** o **E**. De momento está **siempre disponible** (más adelante se podrá desbloquear o limitar).
+- Al principio se probó con un botón arriba en el centro, pero se descartó: era la única acción con un botón en pantalla y quedaba lejos del dedo.
 - **Gasta toda la fuerza**, como el dash y el pisotón (apartado 2.16). Sin la fuerza llena se descarta con el mismo aviso (sonido, vibración leve y la barra tiembla en rojo). La fuerza **no se recarga mientras dura** la inmunidad: empieza a recargarse (2 s) al acabar.
-- Se activa **al momento**, al apoyar el dedo en el botón, sin esperar al siguiente límite entre casillas, y **no toca** el giro, la media vuelta, el dash o el pisotón pendientes.
+- Se activa **al momento**, en cuanto se reconoce el deslizamiento, sin esperar al siguiente límite entre casillas, y **no toca** el giro, la media vuelta, el dash o el pisotón pendientes.
 - Dura **3 s** (`immunity_time`). Es un valor configurable: podrá cambiar con otros eventos del juego (power ups, mejoras…).
 - Mientras dura, el cubo **no muere** por enemigos, pinchos, láseres (chocan con el cubo y se deshacen) ni bombas. **Sí se cae al vacío.**
 - **Efecto:** el cubo se ve **disuelto** (el mismo efecto que al reaparecer), que entra y sale en 0,3 s.
 - **Sonido:** un **chispazo eléctrico** al activarla y un **zumbido eléctrico constante** (en bucle) mientras dura, que se apaga en 0,25 s al acabar. En la pausa se detiene, como el resto del juego.
-- **Botón:** se ve apagado si la fuerza no está llena; mientras dura la inmunidad, el icono late en azul eléctrico y un **anillo** alrededor se vacía con el tiempo que queda.
+- **Barra de fuerza:** mientras dura la inmunidad se vuelve **azul eléctrico**, parpadea y se **vacía con el tiempo que queda**; al acabar, vuelve a mostrar la fuerza (vacía) recargándose.
 - Se pierde al **morir** (caída al vacío), al **reiniciar** el nivel y al **llegar a la meta**.
 - No cuenta como giro para las estrellas y el resolvedor de niveles no la usa.
 
@@ -363,7 +364,7 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 - **Cámara — Decidido:** vista **cenital ligeramente inclinada**, en perspectiva (unos 65° sobre el tablero). Se descartó la isométrica, que en vertical mostraba el tablero bastante más pequeño. La cámara es fija: no hay opción para cambiarla.
 - La animación del cubo debe mostrar claramente el vuelco entre casillas; no basta con trasladar el modelo o simular un deslizamiento.
 - **Orientación de pantalla — Confirmada:** el juego se muestra en **horizontal** (apaisado) en el móvil, porque así se maneja mejor con las dos manos. (Antes se jugaba en vertical; se cambió el 7 de noviembre de 2026.)
-- **Interfaz de juego — Confirmada:** el **número de nivel** y el **marcador de los retos de las estrellas** (apartado 2.21) arriba a la izquierda, el botón de la **inmunidad** arriba en el centro (apartado 2.22), el botón de **pausa** arriba a la derecha y las indicaciones «← Izquierda» y «Derecha →» en las esquinas inferiores. El tablero ocupa el resto de la pantalla. Los menús se describen en el apartado 7.
+- **Interfaz de juego — Confirmada:** el **número de nivel** y el **marcador de los retos de las estrellas** (apartado 2.21) arriba a la izquierda, el botón de **pausa** arriba a la derecha y las indicaciones «← Izquierda» y «Derecha →» en las esquinas inferiores. El tablero ocupa el resto de la pantalla. Los menús se describen en el apartado 7.
 - **Distancia de la cámara — Confirmada:** la cámara no se aleja más de una **distancia máxima**, la que hace falta para ver entero un tablero de 7×9 casillas (el antiguo nivel 4) en el espacio libre de la pantalla. Así el tablero no se ve diminuto aunque el mapa sea grande.
   - Si el tablero entero cabe a esa distancia, la cámara se acerca hasta encuadrarlo justo en el espacio libre entre los elementos de la interfaz y se queda quieta.
   - Si **no cabe**, la cámara **sigue al cubo** con un **pequeño retraso** y un movimiento **suave**: acelera y frena poco a poco, no se para en seco y no rebota cuando el cubo rebota. Al acercarse al borde del tablero deja de avanzar, de modo que no se ve vacío más allá del muro exterior. En la dirección en la que el tablero sí cabe, se queda centrada.
@@ -594,14 +595,13 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 ### 7.5. Controles
 
 - **Tocar la mitad izquierda de la pantalla** gira a la izquierda y **tocar la mitad derecha** gira a la derecha (relativo al rumbo, como en el apartado 2.3).
-- Toda la mitad de la pantalla es zona de toque, sin botones pequeños; cada toque cuenta como una pulsación. Tocar el botón de pausa o el de la inmunidad no cuenta como giro.
+- Toda la mitad de la pantalla es zona de toque, sin botones pequeños; cada toque cuenta como una pulsación. Tocar el botón de pausa no cuenta como giro.
 - **Media vuelta:** tocar las dos mitades a la vez, con un dedo en cada una (en el teclado, las dos flechas a la vez). Se resaltan las dos indicaciones.
-- **Inmunidad:** botón del escudo, arriba en el centro (apartado 2.22).
-- **Dash:** deslizar el dedo **hacia arriba**; **pisotón:** deslizar **hacia abajo** (apartado 2.16). Vale en cualquier mitad de la pantalla. Un deslizamiento es un recorrido vertical de al menos el **6 % del alto de la pantalla**, claramente más vertical que horizontal (1,5 veces), en **0,5 s o menos** desde que se apoya el dedo.
+- **Dash:** deslizar el dedo **hacia arriba**; **pisotón:** deslizar **hacia abajo** (apartado 2.16); **inmunidad:** deslizar **hacia un lado**, a la izquierda o a la derecha (apartado 2.22). Vale en cualquier mitad de la pantalla. Un deslizamiento es un recorrido vertical u horizontal de al menos el **6 % del alto de la pantalla**, claramente más en esa dirección que en la otra (1,5 veces), en **0,5 s o menos** desde que se apoya el dedo.
 - **Toque frente a deslizamiento:** un deslizamiento **nunca gira** el cubo.
   - El giro de un toque se pide **al levantar el dedo** o, si se deja apoyado sin moverse (menos del 2 % del alto), a los **80 ms**.
   - Si ese dedo apoyado acaba deslizando, **se anula el giro** que había pedido (salvo que el cubo ya lo haya hecho al llegar a una casilla en ese instante).
-  - Un dedo que se mueve **en vertical** sin llegar a deslizamiento no hace nada; si se mueve en horizontal, cuenta como toque.
+  - Un dedo que se mueve (más del 2 % del alto, en cualquier dirección) sin llegar a deslizamiento no hace nada.
   - Sin fuerza, el deslizamiento se descarta, pero tampoco gira.
   - El dedo que desliza no cuenta para la media vuelta.
 - Las indicaciones de las esquinas inferiores («← Izquierda» y «Derecha →») se resaltan al tocar cada lado.

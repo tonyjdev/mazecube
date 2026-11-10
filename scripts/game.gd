@@ -16,8 +16,7 @@ extends Node3D
 ## Vibración (si está activada en Opciones): al destruir un muro, al pulsar
 ## un botón, al morir el cubo y, muy suave, al descartarse un giro.
 ##
-## Interfaz: número de nivel arriba a la izquierda, botón de inmunidad arriba
-## en el centro (ImmunityButton), botón de pausa arriba a la
+## Interfaz: número de nivel arriba a la izquierda, botón de pausa arriba a la
 ## derecha e indicaciones de giro abajo, con la barra de fuerza entre ellas. La pausa oculta esa interfaz y
 ## muestra a la izquierda cuatro botones con iconos (Continuar, Enciclopedia,
 ## Reiniciar, Salir al selector de niveles); la cámara se aleja y se pone casi
@@ -54,24 +53,26 @@ extends Node3D
 ##   pulsado, o con menos de SIMULTANEOUS_WINDOW segundos de diferencia). La
 ##   primera pulsación ya ha pedido un giro, pero la media vuelta lo sustituye.
 ##   Al darla, la cámara tiembla y el móvil vibra.
-##   Dash y pisotón: deslizar el dedo hacia arriba (dash) o hacia abajo
-##   (pisotón), en cualquier lado de la pantalla. Un deslizamiento recorre
-##   SWIPE_DISTANCE en vertical (claramente más vertical que horizontal) en
-##   SWIPE_MAX_TIME segundos o menos desde que se apoya el dedo.
+##   Dash, pisotón e inmunidad: deslizar el dedo hacia arriba (dash), hacia
+##   abajo (pisotón) o hacia un lado, da igual cuál (inmunidad), en cualquier
+##   lado de la pantalla. Un deslizamiento recorre SWIPE_DISTANCE en vertical
+##   o en horizontal (claramente más en esa dirección que en la otra:
+##   SWIPE_DIRECTION_RATIO) en SWIPE_MAX_TIME segundos o menos desde que se
+##   apoya el dedo.
 ##   Un deslizamiento nunca gira el cubo:
 ##   - El giro de un toque no se pide al apoyar el dedo sino al levantarlo
 ##     o, si se deja apoyado sin moverlo (menos de SWIPE_SLOP), a los
 ##     TAP_COMMIT_TIME segundos.
 ##   - Si ese dedo apoyado acaba deslizando, el giro que pidió se anula
 ##     (RollingCube.cancel_turn), a no ser que el cubo ya lo haya hecho.
-##   - Un dedo que se mueve en vertical sin llegar a deslizamiento no cuenta
-##     como toque: no hace nada.
+##   - Un dedo que se mueve (más de SWIPE_SLOP) sin llegar a deslizamiento no
+##     cuenta como toque: no hace nada.
 ##   - Sin fuerza, el deslizamiento se descarta (aviso y la barra de fuerza
 ##     tiembla), pero el giro también se anula.
 ##   El dedo que desliza no cuenta para la media vuelta.
-##   Inmunidad: el botón de arriba en el centro (RollingCube.request_immunity).
 ##   Fuerza: la barra del centro de la parte inferior (StrengthBar) muestra la
-##   fuerza del cubo (RollingCube.strength).
+##   fuerza del cubo (RollingCube.strength) y, mientras dura la inmunidad, el
+##   tiempo que le queda.
 ##   Teclado: ←/A gira a la izquierda, →/D a la derecha, ↑/W dash, ↓/S pisotón,
 ##            Espacio/E inmunidad, R reinicia,
 ##            Esc pausa o reanuda; al completar un nivel, Intro/N pasa al siguiente.
@@ -110,8 +111,9 @@ const TAP_COMMIT_TIME := 0.08
 const SWIPE_SLOP := 0.02
 const SWIPE_DISTANCE := 0.06
 const SWIPE_MAX_TIME := 0.5
-## Un deslizamiento debe ser al menos así de más vertical que horizontal.
-const SWIPE_VERTICAL_RATIO := 1.5
+## Un deslizamiento debe ser al menos así de más vertical que horizontal (o
+## al revés).
+const SWIPE_DIRECTION_RATIO := 1.5
 ## Tiempo que tarda el juego en recuperar su velocidad al salir de la pausa.
 const RESUME_RAMP_TIME := 1.0
 ## Tiempo máximo que el cubo espera a la cámara para reaparecer tras morir.
@@ -167,7 +169,6 @@ var _hum_tween: Tween
 @onready var left_hint: Label = %LeftHint
 @onready var right_hint: Label = %RightHint
 @onready var strength_bar: StrengthBar = %StrengthBar
-@onready var immunity_button: ImmunityButton = %ImmunityButton
 @onready var pause_menu: CanvasLayer = $PauseMenu
 @onready var complete_menu: CanvasLayer = $CompleteMenu
 @onready var complete_title: Label = %CompleteTitle
@@ -261,9 +262,7 @@ func _ready() -> void:
 	cube.power_up_picked.connect(func(_power_up: PowerUp, _stacks: int) -> void:
 		Sfx.play("powerup"))
 	for button in find_children("*", "BaseButton", true, false):
-		if button != immunity_button:
-			(button as BaseButton).pressed.connect(func() -> void: Sfx.play("click"))
-	immunity_button.pressed.connect(cube.request_immunity)
+		(button as BaseButton).pressed.connect(func() -> void: Sfx.play("click"))
 	_setup_immunity_hum()
 	# La enciclopedia pone sus propios sonidos (después de lo de arriba).
 	_encyclopedia = Encyclopedia.new()
@@ -325,7 +324,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				info["pos"] = touch.position
 				_try_swipe(touch.index)
 				# Levantado sin deslizar ni moverse en vertical: es un toque.
-				if not info["committed"] and not info["done"] and not _is_vertical_attempt(info):
+				if not info["committed"] and not info["done"] and not _is_swipe_attempt(info):
 					_press_side(info["side"])
 				_gestures.erase(touch.index)
 		elif not _is_over_buttons(touch.position):
@@ -392,35 +391,38 @@ func _press_side(side: int) -> void:
 
 
 ## Deslizamiento del dedo `index`: si en SWIPE_MAX_TIME o menos ha recorrido
-## SWIPE_DISTANCE en vertical, anula el giro que hubiera pedido ese dedo, pide
-## el dash (arriba) o el pisotón (abajo) y el dedo ya no hace nada más.
+## SWIPE_DISTANCE en vertical o en horizontal, anula el giro que hubiera
+## pedido ese dedo, pide el dash (arriba), el pisotón (abajo) o la inmunidad
+## (a un lado, cualquiera) y el dedo ya no hace nada más.
 ## Devuelve true si ha deslizado.
 func _try_swipe(index: int) -> bool:
 	var info: Dictionary = _gestures[index]
 	if info["done"] or _gesture_age(info) > SWIPE_MAX_TIME:
 		return false
 	var moved: Vector2 = info["pos"] - info["start"]
-	var height := get_viewport().get_visible_rect().size.y
-	if absf(moved.y) < SWIPE_DISTANCE * height \
-			or absf(moved.y) < absf(moved.x) * SWIPE_VERTICAL_RATIO:
+	var distance := SWIPE_DISTANCE * get_viewport().get_visible_rect().size.y
+	var vertical := absf(moved.y) >= distance and absf(moved.y) >= absf(moved.x) * SWIPE_DIRECTION_RATIO
+	var sideways := absf(moved.x) >= distance and absf(moved.x) >= absf(moved.y) * SWIPE_DIRECTION_RATIO
+	if not vertical and not sideways:
 		return false
 	info["done"] = true
 	if info["committed"]:
 		cube.cancel_turn()
 		_touches.erase(index)
-	if moved.y < 0.0:
+	if sideways:
+		cube.request_immunity()
+	elif moved.y < 0.0:
 		cube.request_dash()
 	else:
 		cube.request_stomp()
 	return true
 
 
-## El dedo se ha movido sobre todo en vertical más de SWIPE_SLOP: intenta
-## deslizar, así que no debe contar como toque.
-func _is_vertical_attempt(info: Dictionary) -> bool:
+## El dedo se ha movido más de SWIPE_SLOP: intenta deslizar, así que no debe
+## contar como toque.
+func _is_swipe_attempt(info: Dictionary) -> bool:
 	var moved: Vector2 = info["pos"] - info["start"]
-	var height := get_viewport().get_visible_rect().size.y
-	return absf(moved.y) >= SWIPE_SLOP * height and absf(moved.y) >= absf(moved.x)
+	return moved.length() >= SWIPE_SLOP * get_viewport().get_visible_rect().size.y
 
 
 func _gesture_age(info: Dictionary) -> float:
@@ -428,9 +430,8 @@ func _gesture_age(info: Dictionary) -> float:
 
 
 ## Dedos apoyados que ya cuentan como toque (piden su giro): los que siguen
-## quietos pasados TAP_COMMIT_TIME y los que se han movido sin llegar a
-## deslizamiento en SWIPE_MAX_TIME, salvo que se movieran en vertical (esos
-## se descartan).
+## quietos pasados TAP_COMMIT_TIME. Los que se han movido sin llegar a
+## deslizamiento en SWIPE_MAX_TIME se descartan.
 func _update_gestures() -> void:
 	var height := get_viewport().get_visible_rect().size.y
 	for index: int in _gestures.keys():
@@ -440,7 +441,7 @@ func _update_gestures() -> void:
 		var age := _gesture_age(info)
 		var moved: Vector2 = info["pos"] - info["start"]
 		var still := moved.length() < SWIPE_SLOP * height
-		if age >= SWIPE_MAX_TIME and _is_vertical_attempt(info):
+		if age >= SWIPE_MAX_TIME and _is_swipe_attempt(info):
 			info["done"] = true
 		elif (still and age >= TAP_COMMIT_TIME) or age >= SWIPE_MAX_TIME:
 			info["committed"] = true
@@ -450,8 +451,7 @@ func _update_gestures() -> void:
 
 func _process(_delta: float) -> void:
 	strength_bar.value = cube.strength()
-	immunity_button.strength = cube.strength()
-	immunity_button.immunity = cube.immunity_left() / maxf(cube.immunity_time, 0.001)
+	strength_bar.immunity = cube.immunity_left() / maxf(cube.immunity_time, 0.001)
 	if not _gestures.is_empty() and not get_tree().paused:
 		_update_gestures()
 
@@ -750,10 +750,7 @@ func _on_play_area_resized() -> void:
 
 ## Los toques sobre los botones no cuentan como giro.
 func _is_over_buttons(pos: Vector2) -> bool:
-	for button: Control in [pause_button, immunity_button]:
-		if button.is_visible_in_tree() and button.get_global_rect().has_point(pos):
-			return true
-	return false
+	return pause_button.visible and pause_button.get_global_rect().has_point(pos)
 
 
 ## Reproductor del zumbido de la inmunidad, con el sonido en bucle.

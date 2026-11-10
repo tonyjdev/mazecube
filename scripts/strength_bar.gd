@@ -7,6 +7,8 @@ extends Control
 ## - Llena: dorada, late suavemente y da un destello al llenarse.
 ## - reject(): si se intenta usar sin fuerza, tiembla y se tiñe de rojo un
 ##   momento.
+## - Inmunidad (`immunity` > 0): la barra pasa a azul eléctrico, parpadea y
+##   se vacía con el tiempo de inmunidad que queda.
 
 const FILL_COLOR := Color(1.0, 0.8, 0.3)
 const CHARGING_COLOR := Color(0.78, 0.66, 0.45, 0.8)
@@ -14,6 +16,9 @@ const BACK_COLOR := Color(0.0, 0.0, 0.0, 0.35)
 const BORDER_COLOR := Color(1.0, 1.0, 1.0, 0.55)
 const REJECT_COLOR := Color(1.0, 0.28, 0.22)
 const BORDER_WIDTH := 3
+## Inmunidad: color del relleno y del borde, y parpadeo (rad/s).
+const IMMUNITY_COLOR := Color(0.45, 0.85, 1.0)
+const IMMUNITY_FLICKER_SPEED := 22.0
 ## Aviso sin fuerza: duración, desplazamiento máximo (px) y frecuencia (rad/s).
 const REJECT_TIME := 0.35
 const REJECT_SHAKE := 7.0
@@ -32,6 +37,9 @@ var value := 1.0:
 		if v >= 1.0 and value < 1.0:
 			_full_flash = 1.0
 		value = v
+
+## Fracción de inmunidad que queda (0 = sin inmunidad).
+var immunity := 0.0
 
 var _time := 0.0
 var _reject_left := 0.0
@@ -67,15 +75,22 @@ func _draw() -> void:
 	var radius := int(size.y * 0.5)
 	_back_style.set_corner_radius_all(radius)
 	_back_style.bg_color = BACK_COLOR
-	_back_style.border_color = BORDER_COLOR.lerp(REJECT_COLOR, reject_amount)
+	var border := IMMUNITY_COLOR if immunity > 0.0 else BORDER_COLOR
+	_back_style.border_color = border.lerp(REJECT_COLOR, reject_amount)
 	_back_style.draw(get_canvas_item(), rect)
 
 	var inner := rect.grow(-BORDER_WIDTH - 1)
-	var width := inner.size.x * value
+	var width := inner.size.x * (immunity if immunity > 0.0 else value)
 	if width < 1.0:
 		return
 	var color := CHARGING_COLOR
-	if value >= 1.0:
+	if immunity > 0.0:
+		# Parpadeo eléctrico: un latido rápido con algún destello suelto.
+		var flicker := 0.5 + 0.5 * sin(_time * IMMUNITY_FLICKER_SPEED)
+		if sin(_time * 7.3) > 0.85:
+			flicker = 1.0
+		color = IMMUNITY_COLOR.lightened(flicker * 0.35)
+	elif value >= 1.0:
 		var pulse := (0.5 + 0.5 * sin(_time * PULSE_SPEED)) * PULSE_LIGHTEN
 		color = FILL_COLOR.lightened(pulse + _full_flash * FULL_FLASH_LIGHTEN)
 	color = color.lerp(REJECT_COLOR, reject_amount)

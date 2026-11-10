@@ -619,14 +619,6 @@ def draw_stomp(b):
     swipe(b, 625, 470, False)
 
 
-def shield_shape(c, s):
-    """Contorno de escudo (como el icono del botón) centrado en c, alto 2s."""
-    x, y = c
-    return [(x, y - s), (x + s * 0.72, y - s * 0.72), (x + s * 0.72, y - s * 0.1),
-            (x + s * 0.55, y + s * 0.45), (x, y + s), (x - s * 0.55, y + s * 0.45),
-            (x - s * 0.72, y - s * 0.1), (x - s * 0.72, y - s * 0.72)]
-
-
 def zigzag(b, a, z, rnd, color="cyan", width=3.5, steps=5, amp=14.0):
     """Rayo quebrado de a hasta z."""
     dx, dy = z[0] - a[0], z[1] - a[1]
@@ -678,12 +670,13 @@ def draw_immunity(b):
     b.line([s, z], "red", 6)
     b.line([s, z], "white", 2, alpha=0.8, passes=1)
     b.burst(z, 10, 34, 9, "red", 3)
-    # Arriba, el botón del escudo.
-    sh = shield_shape((600, 105), 52)
-    b.hatch(b.poly_mask(sh), "cyan", 9, -35, 2.2, 0.45)
-    b.poly(sh, "white", 4.5)
-    b.line([(608, 72), (588, 108), (606, 108), (594, 140)], "yellow", 4.5)
-    b.line(b.ellipse_pts((600, 105), 74, 74, -90, 160), "cyan", 3.5, alpha=0.85)
+    # Arriba, el gesto: el dedo desliza hacia un lado (da igual cuál).
+    x, y = 590, 110
+    b.poly([(x - 48, y - 80), (x + 48, y - 80), (x + 48, y + 80), (x - 48, y + 80)], "white", 3.5)
+    b.line([(x - 12, y - 68), (x + 12, y - 68)], "grey", 3)
+    b.circle((x, y + 5), 15, color="cyan", width=3.5)
+    b.arrow([(x - 34, y + 5), (x - 100, y + 5)], "cyan", 4.5, 16)
+    b.arrow([(x + 34, y + 5), (x + 100, y + 5)], "cyan", 4.5, 16)
 
 
 def draw_speed(b):

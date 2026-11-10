@@ -47,8 +47,8 @@ const MESSAGES := {
 		"ENC_STOMP_DESC": "Desliza el dedo hacia abajo y el cubo saltará para caer con fuerza en su casilla. La onda destruye a los enemigos que estén a 2 casillas o menos, diagonales incluidas.",
 		"ENC_STOMP_FACTS": "Las paredes no frenan la onda: alcanza una zona de 5 × 5 casillas.\nQuita dos golpes a los muros agrietados de la zona.\nGasta toda la fuerza, igual que el dash, y el cubo es invulnerable mientras salta.",
 		"ENC_IMMUNITY_NAME": "Inmunidad",
-		"ENC_IMMUNITY_DESC": "Pulsa el botón del escudo, arriba en el centro, y el cubo se cargará de electricidad durante 3 segundos: ningún enemigo ni arma puede destruirlo. Se activa al momento, sin esperar a la siguiente casilla.",
-		"ENC_IMMUNITY_FACTS": "Gasta toda la fuerza, y la fuerza no empieza a recargarse hasta que se acaba.\nMientras dura, el cubo se ve medio disuelto, zumba y un anillo alrededor del botón marca el tiempo que queda.\nProtege de enemigos, pinchos, láseres y bombas, pero no de caer al vacío.\nSi el cubo cae o llega a la meta, se pierde.",
+		"ENC_IMMUNITY_DESC": "Desliza el dedo hacia un lado, a la izquierda o a la derecha, y el cubo se cargará de electricidad durante 3 segundos: ningún enemigo ni arma puede destruirlo. Se activa al momento, sin esperar a la siguiente casilla.",
+		"ENC_IMMUNITY_FACTS": "Gasta toda la fuerza, y la fuerza no empieza a recargarse hasta que se acaba.\nMientras dura, el cubo se ve medio disuelto y zumba, y la barra de fuerza se vuelve azul y se vacía con el tiempo que queda.\nProtege de enemigos, pinchos, láseres y bombas, pero no de caer al vacío.\nSi el cubo cae o llega a la meta, se pierde.",
 
 		"ENC_GOLDEN_CUBE_NAME": "Cubito dorado",
 		"ENC_GOLDEN_CUBE_DESC": "Cada nivel esconde un cubito dorado que flota, gira y brilla. Cógelo antes de llegar a la meta para ganar una de las tres estrellas del nivel.",
@@ -138,8 +138,8 @@ const MESSAGES := {
 		"ENC_STOMP_DESC": "Swipe down and the cube will jump and slam down on its tile. The shockwave destroys enemies 2 tiles away or closer, diagonals included.",
 		"ENC_STOMP_FACTS": "Walls don't stop the shockwave: it covers a 5 × 5 area.\nIt takes two hits off the cracked walls in the area.\nIt uses up all your strength, like the dash, and the cube is invulnerable while jumping.",
 		"ENC_IMMUNITY_NAME": "Immunity",
-		"ENC_IMMUNITY_DESC": "Press the shield button at the top centre and the cube will be charged with electricity for 3 seconds: no enemy or weapon can destroy it. It kicks in right away, without waiting for the next tile.",
-		"ENC_IMMUNITY_FACTS": "It uses up all your strength, and strength doesn't start refilling until it wears off.\nWhile it lasts, the cube looks half dissolved, it buzzes and a ring around the button shows the time left.\nIt protects you from enemies, spikes, lasers and bombs, but not from falling into the void.\nIt is lost if the cube falls or reaches the goal.",
+		"ENC_IMMUNITY_DESC": "Swipe sideways, left or right, and the cube will be charged with electricity for 3 seconds: no enemy or weapon can destroy it. It kicks in right away, without waiting for the next tile.",
+		"ENC_IMMUNITY_FACTS": "It uses up all your strength, and strength doesn't start refilling until it wears off.\nWhile it lasts, the cube looks half dissolved and buzzes, and the strength bar turns blue and drains with the time left.\nIt protects you from enemies, spikes, lasers and bombs, but not from falling into the void.\nIt is lost if the cube falls or reaches the goal.",
 
 		"ENC_GOLDEN_CUBE_NAME": "Golden cube",
 		"ENC_GOLDEN_CUBE_DESC": "Every level hides a golden cube that floats, spins and shines. Grab it before reaching the goal to earn one of the level's three stars.",

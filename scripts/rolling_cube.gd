@@ -45,7 +45,7 @@ extends Node3D
 ##   STOMP_WALL_HITS golpes a los muros destructibles de esa zona.
 ## Durante el dash y el pisotón el cubo es invulnerable.
 ##
-## Inmunidad: el jugador la pide (botón de arriba en el centro) y también
+## Inmunidad: el jugador la pide (deslizando el dedo hacia un lado) y también
 ## gasta toda la fuerza, pero se activa al momento, sin esperar al límite
 ## entre casillas, y no toca lo pendiente. Durante `immunity_time` segundos
 ## el cubo no puede morir por enemigos ni armas (sí cayendo al vacío) y se ve
