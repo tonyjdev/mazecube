@@ -58,6 +58,10 @@ static var _halo_mesh: QuadMesh
 static var _flash_mesh: QuadMesh
 ## "bloque|tamaño|tinte" -> ArrayMesh (muros y suelos recortados).
 static var _block_meshes := {}
+## Piezas fusionadas por material (menos llamadas de dibujo): placa, cuerpo
+## y cañón (dos superficies: metal y oscuro), y las luces del aro con la boca.
+static var _body_mesh: ArrayMesh
+static var _lights_mesh: ArrayMesh
 
 var _time_left := 0.0
 var _wall_block := "stone_bricks"
@@ -86,30 +90,32 @@ func _ready() -> void:
 	# Muro recortado (de z = -0,5 a la cara) y suelo bajo el cañón, en el
 	# cuarto de casilla que deja libre el muro.
 	_add_part(_block_mesh(_wall_block, Vector3(1.0, Level.WALL_HEIGHT, WALL_DEPTH), Color.WHITE), null,
-		Vector3(0.0, Level.WALL_HEIGHT * 0.5, (WALL_DEPTH - 1.0) * 0.5))
+		Vector3(0.0, Level.WALL_HEIGHT * 0.5, (WALL_DEPTH - 1.0) * 0.5), false, true)
 	_add_part(_block_mesh(_floor_block, Vector3(1.0, Level.FLOOR_THICKNESS, 1.0 - WALL_DEPTH),
 		Level.FLOOR_DARK_TINT), null,
 		Vector3(0.0, -Level.FLOOR_THICKNESS * 0.5, face + (1.0 - WALL_DEPTH) * 0.5))
 	# Placa metálica pegada a la cara del muro, cuerpo del cañón y cañón, a lo
-	# largo de +Z.
-	_add_part(_plate_mesh, _metal_material, Vector3(0.0, HEIGHT, face + PLATE_SIZE.z * 0.5))
-	_add_part(_housing_mesh, _metal_material,
-		Vector3(0.0, HEIGHT, face + PLATE_SIZE.z + HOUSING_LENGTH * 0.5), true)
-	_add_part(_barrel_mesh, _dark_material, Vector3(0.0, HEIGHT, 0.5 - _barrel_mesh.height * 0.5), true)
-	# Boca: un disco rojo que se enciende y se apaga con las luces.
+	# largo de +Z (fusionados en _body_mesh, ver _ensure_resources).
+	_add_part(_body_mesh, null, Vector3.ZERO)
+	# Boca y aro de luces rojas (discos planos sobre la placa, fusionados en
+	# _lights_mesh): se encienden y se apagan juntos.
 	_light_material = StandardMaterial3D.new()
 	_light_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_light_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	_add_part(_lens_mesh, _light_material, Vector3(0.0, HEIGHT, 0.501), true)
-	# Aro de luces rojas (discos planos sobre la placa) con un halo de luz
-	# sumada.
+	_add_part(_lights_mesh, _light_material, Vector3.ZERO)
+	# Halo de luz sumada de cada luz: un MultiMesh (los halos miran a la cámara).
 	_halo_material = _make_glow_material(LIGHT_COLOR, 0.9)
-	var light_z := face + PLATE_SIZE.z + 0.002
+	var halos := MultiMesh.new()
+	halos.transform_format = MultiMesh.TRANSFORM_3D
+	halos.mesh = _halo_mesh
+	halos.instance_count = LIGHT_COUNT
 	for i in LIGHT_COUNT:
-		var angle := TAU * i / LIGHT_COUNT + PI / LIGHT_COUNT
-		var at := Vector3(cos(angle) * LIGHT_RING_RADIUS, HEIGHT + sin(angle) * LIGHT_RING_RADIUS, light_z)
-		_add_part(_light_mesh, _light_material, at, true)
-		_add_part(_halo_mesh, _halo_material, at + Vector3(0.0, 0.0, LIGHT_RADIUS))
+		halos.set_instance_transform(i, Transform3D(Basis.IDENTITY, _light_position(i) + Vector3(0.0, 0.0, LIGHT_RADIUS)))
+	var halo_node := MultiMeshInstance3D.new()
+	halo_node.multimesh = halos
+	halo_node.material_override = _halo_material
+	halo_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(halo_node)
 	# Destello de la boca (escondido hasta que dispara).
 	_flash = _add_part(_flash_mesh, _flash_material, Vector3(0.0, HEIGHT, 0.55))
 	_flash.visible = false
@@ -158,11 +164,23 @@ func _fire_effect() -> void:
 	_muzzle_sparks.restart()
 
 
-func _add_part(mesh: Mesh, material: Material, at: Vector3, along_z := false) -> MeshInstance3D:
+## Centro de la luz `i` del aro, sobre la placa.
+static func _light_position(i: int) -> Vector3:
+	var angle := TAU * i / LIGHT_COUNT + PI / LIGHT_COUNT
+	return Vector3(cos(angle) * LIGHT_RING_RADIUS, HEIGHT + sin(angle) * LIGHT_RING_RADIUS,
+		WALL_DEPTH - 0.5 + PLATE_SIZE.z + 0.002)
+
+
+## Pieza del cañón. Solo el muro (el primero, con `shadow`) da sombra: las
+## demás son pequeñas y cada sombra es otra llamada de dibujo.
+func _add_part(mesh: Mesh, material: Material, at: Vector3, along_z := false,
+		shadow := false) -> MeshInstance3D:
 	var part := MeshInstance3D.new()
 	part.mesh = mesh
 	if material:
 		part.material_override = material
+	if not shadow:
+		part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	part.position = at
 	if along_z:
 		# Los cilindros van a lo largo de +Y: girados 90° en X apuntan a +Z.
@@ -273,6 +291,34 @@ static func _make_disc(radius: float, segments: int) -> ArrayMesh:
 	return st.commit()
 
 
+## Fusiona las piezas que comparten material (ver _body_mesh y _lights_mesh).
+static func _build_merged_meshes() -> void:
+	var face := WALL_DEPTH - 0.5
+	var along_z := Basis(Vector3.RIGHT, PI * 0.5)
+	var body := ArrayMesh.new()
+	var metal := SurfaceTool.new()
+	metal.begin(Mesh.PRIMITIVE_TRIANGLES)
+	metal.append_from(_plate_mesh, 0, Transform3D(Basis.IDENTITY,
+		Vector3(0.0, HEIGHT, face + PLATE_SIZE.z * 0.5)))
+	metal.append_from(_housing_mesh, 0, Transform3D(along_z,
+		Vector3(0.0, HEIGHT, face + PLATE_SIZE.z + HOUSING_LENGTH * 0.5)))
+	metal.commit(body)
+	body.surface_set_material(0, _metal_material)
+	var dark := SurfaceTool.new()
+	dark.begin(Mesh.PRIMITIVE_TRIANGLES)
+	dark.append_from(_barrel_mesh, 0, Transform3D(along_z,
+		Vector3(0.0, HEIGHT, 0.5 - _barrel_mesh.height * 0.5)))
+	dark.commit(body)
+	body.surface_set_material(1, _dark_material)
+	_body_mesh = body
+	var lights := SurfaceTool.new()
+	lights.begin(Mesh.PRIMITIVE_TRIANGLES)
+	lights.append_from(_lens_mesh, 0, Transform3D(along_z, Vector3(0.0, HEIGHT, 0.501)))
+	for i in LIGHT_COUNT:
+		lights.append_from(_light_mesh, 0, Transform3D(along_z, _light_position(i)))
+	_lights_mesh = lights.commit()
+
+
 static func _ensure_resources() -> void:
 	if _metal_material:
 		return
@@ -306,6 +352,7 @@ static func _ensure_resources() -> void:
 	_dark_material.albedo_color = Color(0.12, 0.12, 0.14)
 	_dark_material.metallic = 0.6
 	_dark_material.roughness = 0.35
+	_build_merged_meshes()
 	# Destello: centro blanco con un borde rojizo (el color de la textura
 	# multiplica al rojo claro).
 	_flash_material = _make_glow_material(Color(1.0, 0.75, 0.7), 1.0)

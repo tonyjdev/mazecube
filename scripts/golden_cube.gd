@@ -151,7 +151,7 @@ func _update(delta: float) -> void:
 		_bob.position.y = FLOAT_HEIGHT + sin(_time * BOB_SPEED) * BOB_AMOUNT
 		_spin.rotate_y(SPIN_SPEED * delta)
 	var pulse := 1.0 + sin(_time * LIGHT_PULSE_SPEED) * LIGHT_PULSE
-	_light.light_energy = LIGHT_ENERGY * pulse * _reveal * (1.0 + _flash * 2.0)
+	_light.light_energy = LIGHT_ENERGY * GameState.light_scale() * pulse * _reveal * (1.0 + _flash * 2.0)
 	_rays_material.set_shader_parameter("intensity", RAYS_INTENSITY * _reveal * (1.0 + _flash * 1.5))
 
 

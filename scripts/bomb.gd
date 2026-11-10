@@ -79,6 +79,15 @@ static var _fire_material: StandardMaterial3D
 static var _scorch_material: StandardMaterial3D
 static var _fire_mesh: QuadMesh
 static var _zone_mesh: QuadMesh
+## Recursos de las chispas de la mecha, del fuego y del destello de la
+## explosión, compartidos por todas las bombas (crearlos en cada una se
+## notaba en el móvil).
+static var _spark_mesh: BoxMesh
+static var _spark_material: StandardMaterial3D
+static var _spark_ramp: Gradient
+static var _fire_curve: Curve
+static var _fire_ramp: Gradient
+static var _flash_quad: QuadMesh
 
 var velocity := Vector3.ZERO
 var angular_velocity := Vector3.ZERO
@@ -360,9 +369,7 @@ func explode() -> void:
 	var at := position
 	# Destello.
 	var flash := MeshInstance3D.new()
-	var quad := QuadMesh.new()
-	quad.size = Vector2.ONE
-	flash.mesh = quad
+	flash.mesh = _flash_quad
 	flash.material_override = _flash_material
 	flash.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	flash.position = at + Vector3(0.0, 0.2, 0.0)
@@ -438,18 +445,8 @@ func _make_fire() -> CPUParticles3D:
 	fire.angle_max = 360.0
 	fire.scale_amount_min = 0.7
 	fire.scale_amount_max = 1.25
-	var curve := Curve.new()
-	curve.add_point(Vector2(0.0, 0.5))
-	curve.add_point(Vector2(0.25, 1.0))
-	curve.add_point(Vector2(1.0, 0.35))
-	fire.scale_amount_curve = curve
-	var ramp := Gradient.new()
-	ramp.set_color(0, Color(1.0, 0.92, 0.55, 1.0))
-	ramp.add_point(0.18, Color(FIRE_COLOR, 1.0))
-	ramp.add_point(0.5, Color(0.8, 0.18, 0.04, 0.9))
-	ramp.add_point(0.75, Color(0.25, 0.12, 0.08, 0.6))
-	ramp.set_color(ramp.get_point_count() - 1, Color(0.15, 0.12, 0.1, 0.0))
-	fire.color_ramp = ramp
+	fire.scale_amount_curve = _fire_curve
+	fire.color_ramp = _fire_ramp
 	fire.mesh = _fire_mesh
 	fire.material_override = _fire_material
 	fire.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -469,20 +466,9 @@ func _make_fuse_sparks() -> CPUParticles3D:
 	sparks.particle_flag_align_y = true
 	sparks.scale_amount_min = 0.5
 	sparks.scale_amount_max = 1.0
-	var fade := Gradient.new()
-	fade.set_color(0, Color(1.0, 1.0, 0.9, 1.0))
-	fade.add_point(0.3, Color(1.0, 0.75, 0.3, 1.0))
-	fade.set_color(fade.get_point_count() - 1, Color(1.0, 0.3, 0.05, 0.0))
-	sparks.color_ramp = fade
-	var streak := BoxMesh.new()
-	streak.size = Vector3(0.008, 0.045, 0.008)
-	sparks.mesh = streak
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	mat.vertex_color_use_as_albedo = true
-	sparks.material_override = mat
+	sparks.color_ramp = _spark_ramp
+	sparks.mesh = _spark_mesh
+	sparks.material_override = _spark_material
 	sparks.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return sparks
 
@@ -601,6 +587,29 @@ static func _ensure_resources() -> void:
 	_scorch_material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
 	_scorch_material.albedo_color = Color(0.05, 0.04, 0.03, 0.7)
 	_scorch_material.albedo_texture = _soft_dot()
+	_spark_ramp = Gradient.new()
+	_spark_ramp.set_color(0, Color(1.0, 1.0, 0.9, 1.0))
+	_spark_ramp.add_point(0.3, Color(1.0, 0.75, 0.3, 1.0))
+	_spark_ramp.set_color(_spark_ramp.get_point_count() - 1, Color(1.0, 0.3, 0.05, 0.0))
+	_spark_mesh = BoxMesh.new()
+	_spark_mesh.size = Vector3(0.008, 0.045, 0.008)
+	_spark_material = StandardMaterial3D.new()
+	_spark_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_spark_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_spark_material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	_spark_material.vertex_color_use_as_albedo = true
+	_fire_curve = Curve.new()
+	_fire_curve.add_point(Vector2(0.0, 0.5))
+	_fire_curve.add_point(Vector2(0.25, 1.0))
+	_fire_curve.add_point(Vector2(1.0, 0.35))
+	_fire_ramp = Gradient.new()
+	_fire_ramp.set_color(0, Color(1.0, 0.92, 0.55, 1.0))
+	_fire_ramp.add_point(0.18, Color(FIRE_COLOR, 1.0))
+	_fire_ramp.add_point(0.5, Color(0.8, 0.18, 0.04, 0.9))
+	_fire_ramp.add_point(0.75, Color(0.25, 0.12, 0.08, 0.6))
+	_fire_ramp.set_color(_fire_ramp.get_point_count() - 1, Color(0.15, 0.12, 0.1, 0.0))
+	_flash_quad = QuadMesh.new()
+	_flash_quad.size = Vector2.ONE
 
 
 ## Círculo negro que se difumina hacia el borde (sombra y quemado).

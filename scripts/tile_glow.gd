@@ -278,7 +278,7 @@ func _process(delta: float) -> void:
 	_update_particles(delta)
 	if _light:
 		var pulse := 0.8 + 0.2 * sin(Time.get_ticks_msec() * 0.001 * TAU * 0.9)
-		_light.light_energy = LIGHT_ENERGY * (power - 1.0) * pulse * _reveal
+		_light.light_energy = LIGHT_ENERGY * GameState.light_scale() * (power - 1.0) * pulse * _reveal
 
 
 func _update_particles(delta: float) -> void:

@@ -26,6 +26,9 @@ const ROLL_TIME := 0.35
 const ROLL_PAUSE := 0.12
 const TIP_WIDTH := 880.0
 const DIM_TEXT := Color(0.62, 0.62, 0.66)
+## Luz del cubo en el renderizador Compatibility (ver GameState.light_scale).
+const LIGHT_COMPAT := 0.6
+const AMBIENT_COMPAT := 1.0
 
 ## Último consejo mostrado, para no repetirlo dos veces seguidas.
 static var _last_tip := -1
@@ -143,6 +146,10 @@ func _build_cube_view() -> Control:
 	env.environment.background_mode = Environment.BG_CLEAR_COLOR
 	env.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.environment.ambient_light_color = Color(0.55, 0.55, 0.6)
+	# En Compatibility la luz se calibra aparte (ver GameState.light_scale).
+	if GameState.is_compatibility():
+		light.light_energy = LIGHT_COMPAT
+		env.environment.ambient_light_energy = AMBIENT_COMPAT
 	viewport.add_child(env)
 
 	_cube = MeshInstance3D.new()

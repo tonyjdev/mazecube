@@ -84,6 +84,10 @@ signal reveal_finished
 signal bomb_exploded(distance: float)
 
 const CELL_SIZE := 1.0
+## Tipo de caja del terreno (ver _add_terrain_box).
+const TERRAIN_WALL := 0
+const TERRAIN_FLOOR := 1
+const TERRAIN_FOUNDATION := 2
 const WALL_HEIGHT := 0.5
 const FLOOR_THICKNESS := 0.1
 const KEY_CHARS := "yorug"
@@ -282,6 +286,15 @@ var _reveal_time := 0.0
 var _reveal_delays := {}
 var _reveal_multimeshes: Array[Dictionary] = []
 var _reveal_nodes: Array[Dictionary] = []
+## Terreno en mallas fusionadas por trozos (ver TerrainBuilder): sustituye a
+## los MultiMesh al acabar la aparición. Casillas de muro (tapan los lados de
+## lo que tienen al lado).
+var _terrain: Node3D
+## Efectos ya precalentados en esta ejecución ("mortar", "laser"; ver
+## _warm_up_effects).
+static var _warmed := {}
+var _terrain_builder: TerrainBuilder
+var _wall_set := {}
 
 
 func _ready() -> void:
@@ -334,6 +347,8 @@ func build() -> void:
 	var teleport_cells := {}
 	var bridge_cells := {}
 
+	_terrain_builder = TerrainBuilder.new()
+	_wall_set.clear()
 	var start_mat := _make_material(START_COLOR)
 	var goal_mat := _make_material(GOAL_COLOR)
 	# Muros y baldosas normales se dibujan con MultiMesh (una llamada de dibujo
@@ -395,16 +410,28 @@ func build() -> void:
 				_group(teleport_cells, symbol, cell)
 			elif symbol == SPIKE_CHAR:
 				_add_spikes(cell)
+	# Los cañones láser no tapan: su muro está recortado y deja ver el lado
+	# del muro de al lado.
+	for cell in wall_cells:
+		if layout[cell.y][cell.x] != LASER_CHAR:
+			_wall_set[cell] = true
 	for id: String in wall_groups:
 		_add_multimesh(wall_groups[id], id, Vector3(CELL_SIZE, WALL_HEIGHT, CELL_SIZE),
-			WALL_HEIGHT * 0.5, Color.WHITE)
+			WALL_HEIGHT * 0.5, Color.WHITE, TERRAIN_WALL)
 	var tile_size := Vector3(CELL_SIZE * 0.96, FLOOR_THICKNESS, CELL_SIZE * 0.96)
 	for key: String in floor_groups:
 		var parts := key.split("|")
 		_add_multimesh(floor_groups[key], parts[0], tile_size, -FLOOR_THICKNESS * 0.5,
-			FLOOR_DARK_TINT if parts[1] == "1" else Color.WHITE)
+			FLOOR_DARK_TINT if parts[1] == "1" else Color.WHITE, TERRAIN_FLOOR)
 	if not _void.is_empty():
 		_add_foundations(wall_cells)
+	# Terreno para la partida (se ve al acabar la aparición, ver _finish_reveal).
+	_terrain = Node3D.new()
+	_terrain.name = "Terrain"
+	_terrain.visible = false
+	add_child(_terrain)
+	_terrain_builder.build(_terrain)
+	_terrain_builder = null
 	_add_bridges(bridge_cells)
 	_add_teleports(teleport_cells)
 	if _walkable.has(collectible_cell):
@@ -417,6 +444,84 @@ func build() -> void:
 		_add_mortar(cell)
 	for button in _buttons.values():
 		button["near"] = _cells_within(button["front"], BUTTON_APPROACH_CELLS)
+	_warm_up_effects.call_deferred()
+
+
+## Precalentamiento de efectos: en el renderizador Compatibility cada tipo
+## de material se compila la primera vez que se pinta, y en el móvil eso
+## congelaba el juego un momento al disparar el primer cañón. Al cargar un
+## nivel con cañones de bombas o láser se pintan unos fotogramas, en la
+## casilla de salida (mientras lo tapa la pantalla de carga o el fundido),
+## una bomba real que se enciende y explota, el humo y el destello del
+## cañón, y un láser que choca, con sus chispas. Después se borra todo. Solo
+## la primera vez en cada ejecución (los shaders quedan compilados).
+func _warm_up_effects() -> void:
+	var mortar := not _mortars.is_empty() and not _warmed.has("mortar")
+	var laser := not _cannons.is_empty() and not _warmed.has("laser")
+	if not mortar and not laser:
+		return
+	var at := Vector3(start_cell.x * CELL_SIZE, 0.0, start_cell.y * CELL_SIZE)
+	var made: Array[Node] = []
+	var bomb: Bomb
+	var bolt: LaserBolt
+	var cannon: LaserCannon
+	if mortar:
+		_warmed["mortar"] = true
+		bomb = Bomb.create(self, at + Vector3(0.0, 0.5, 0.0), Vector3.ZERO)
+		made.append(bomb)
+		add_child(bomb)
+		# Mecha encendida: casillas rojas de la zona.
+		bomb._fuse_total = 1.0
+		bomb.fuse_left = 1.0
+		bomb._update_visuals(0.016)
+		var smoke := MortarCannon.make_smoke(6, 0.5, Color.GRAY, 1.0, Vector2.ONE, Vector2.ONE, 1.5)
+		smoke.position = at
+		smoke.emitting = true
+		made.append(smoke)
+		add_child(smoke)
+		var flash := MeshInstance3D.new()
+		flash.mesh = MortarCannon._flash_mesh
+		flash.material_override = MortarCannon._flash_material
+		flash.position = at + Vector3(0.0, 0.5, 0.0)
+		flash.transparency = 0.5
+		made.append(flash)
+		add_child(flash)
+	if laser:
+		_warmed["laser"] = true
+		bolt = LaserBolt.create(Vector2(start_cell), Vector2(1, 0))
+		bolt.position = at + Vector3(0.0, LaserCannon.HEIGHT, 0.0)
+		made.append(bolt)
+		add_child(bolt)
+		cannon = _cannons.values()[0]["node"]
+		cannon.process_mode = Node.PROCESS_MODE_ALWAYS
+		cannon._fire_effect()
+	for node in made:
+		node.process_mode = Node.PROCESS_MODE_ALWAYS
+	var before := get_children()
+	await _warm_up_frames(3)
+	if is_instance_valid(bomb):
+		bomb.explode()
+	if is_instance_valid(bolt):
+		bolt.explode(Vector2(start_cell))
+	# Lo que han creado las explosiones (fuego, humo, chispas, destellos y la
+	# mancha de quemado) también se procesa en la pausa de la carga.
+	for node in get_children():
+		if not before.has(node):
+			node.process_mode = Node.PROCESS_MODE_ALWAYS
+			made.append(node)
+	await _warm_up_frames(4)
+	if is_instance_valid(cannon):
+		cannon.process_mode = Node.PROCESS_MODE_INHERIT
+	for node in made:
+		if is_instance_valid(node):
+			node.queue_free()
+
+
+func _warm_up_frames(count: int) -> void:
+	for i in count:
+		if not is_inside_tree():
+			return
+		await RenderingServer.frame_post_draw
 
 
 func _process(delta: float) -> void:
@@ -1333,7 +1438,7 @@ func start_reveal() -> void:
 	_reveal_nodes.clear()
 	for child in get_children():
 		var node := child as Node3D
-		if node == null or node is MultiMeshInstance3D or node.is_queued_for_deletion():
+		if node == null or node is MultiMeshInstance3D or node == _terrain or node.is_queued_for_deletion():
 			continue
 		var cell := Vector2i(roundi(node.position.x / CELL_SIZE), roundi(node.position.z / CELL_SIZE))
 		_reveal_nodes.append({"delay": _reveal_delays.get(cell, 0.0),
@@ -1366,16 +1471,15 @@ func _update_reveal(delta: float) -> void:
 		reveal_finished.emit()
 
 
-## Deja todo opaco, con los materiales del juego normales.
+## Deja todo opaco, con los materiales del juego normales, y cambia los
+## MultiMesh del terreno por el terreno fusionado (mucho más ligero de pintar).
 func _finish_reveal() -> void:
 	_revealing = false
 	for entry in _reveal_multimeshes:
-		var multimesh: MultiMesh = entry["multimesh"]
-		for i in multimesh.instance_count:
-			multimesh.set_instance_color(i, Color.WHITE)
-		for mat: BaseMaterial3D in entry["materials"]:
-			mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
-			mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_OPAQUE_ONLY
+		(entry["instance"] as Node).queue_free()
+	_reveal_multimeshes.clear()
+	if _terrain:
+		_terrain.visible = true
 	for entry in _reveal_nodes:
 		if is_instance_valid(entry["node"]) and entry["node"].has_method("set_reveal_alpha"):
 			entry["node"].set_reveal_alpha(1.0)
@@ -1462,9 +1566,12 @@ func _reveal_progress(delay: float) -> float:
 
 
 ## Un mismo bloque del catálogo (BlockCatalog) repetido en varias casillas,
-## en un solo MultiMesh. La cara de arriba de cada casilla va girada al azar
-## (siempre igual en la misma casilla) para que no se note la repetición.
-func _add_multimesh(cells: Array, block: String, size: Vector3, y: float, tint: Color) -> void:
+## en un solo MultiMesh (para la aparición del tablero) y, además, en el
+## terreno fusionado de la partida (TerrainBuilder, ver _add_terrain_box).
+## La cara de arriba de cada casilla va girada al azar (siempre igual en la
+## misma casilla) para que no se note la repetición.
+func _add_multimesh(cells: Array, block: String, size: Vector3, y: float, tint: Color,
+		kind: int) -> void:
 	if cells.is_empty():
 		return
 	var mesh := BlockCatalog.make_mesh(block, size, tint)
@@ -1486,10 +1593,34 @@ func _add_multimesh(cells: Array, block: String, size: Vector3, y: float, tint: 
 		multimesh.set_instance_transform(i, Transform3D(Basis(Vector3.UP, turns * PI * 0.5),
 			Vector3(cell.x * CELL_SIZE, y, cell.y * CELL_SIZE)))
 		multimesh.set_instance_color(i, Color.WHITE)
+		_add_terrain_box(cell, block, size, y, tint, kind, turns)
 	var instance := MultiMeshInstance3D.new()
 	instance.multimesh = multimesh
+	if kind != TERRAIN_WALL:
+		instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(instance)
-	_reveal_multimeshes.append({"multimesh": multimesh, "materials": materials, "cells": cells.duplicate()})
+	_reveal_multimeshes.append({"multimesh": multimesh, "materials": materials,
+		"cells": cells.duplicate(), "instance": instance})
+
+
+## Añade una caja al terreno fusionado solo con las caras que se pueden ver:
+## - Muros: arriba y los lados que no dan a otro muro.
+## - Baldosas: arriba y los lados que no dan a un muro (asoman por las juntas).
+## - Roca de debajo (niveles con vacío): arriba solo bajo las baldosas (se ve
+##   por las juntas) y los lados que dan al vacío.
+## Ni el suelo ni la roca dan sombra: caería donde no se ve.
+func _add_terrain_box(cell: Vector2i, block: String, size: Vector3, y: float, tint: Color,
+		kind: int, turns: int) -> void:
+	var sides: Array[bool] = []
+	for i in TerrainBuilder.SIDES.size():
+		var other := TerrainBuilder.side_neighbor(cell, i)
+		if kind == TERRAIN_FOUNDATION:
+			sides.append(is_void(other) or bridge_cell(other))
+		else:
+			sides.append(not _wall_set.has(other))
+	var top := kind != TERRAIN_FOUNDATION or not _wall_set.has(cell)
+	_terrain_builder.add_box(cell, Vector3(cell.x * CELL_SIZE, y, cell.y * CELL_SIZE), size,
+		block, tint, top, sides, turns, kind == TERRAIN_WALL)
 
 
 static func _cell_hash(cell: Vector2i) -> int:
@@ -1547,9 +1678,9 @@ func _add_foundations(wall_cells: Array[Vector2i]) -> void:
 	var size := Vector3(CELL_SIZE, FOUNDATION_DEPTH, CELL_SIZE)
 	var y := -FLOOR_THICKNESS - FOUNDATION_DEPTH * 0.5
 	for id: String in inner:
-		_add_multimesh(inner[id], id, size, y, FOUNDATION_INNER_TINT)
+		_add_multimesh(inner[id], id, size, y, FOUNDATION_INNER_TINT, TERRAIN_FOUNDATION)
 	for id: String in edge:
-		_add_multimesh(edge[id], id, size, y, Color.WHITE)
+		_add_multimesh(edge[id], id, size, y, Color.WHITE, TERRAIN_FOUNDATION)
 
 
 ## La casilla es '=' en el mapa (aunque el puente ya se haya caído).

@@ -44,6 +44,9 @@ static var _plate_material: StandardMaterial3D
 static var _spear_material: StandardMaterial3D
 static var _shaft_mesh: CylinderMesh
 static var _tip_mesh: CylinderMesh
+## Las cuatro lanzas (astas y puntas) en una sola malla: una llamada de
+## dibujo por trampa en lugar de ocho.
+static var _spears_mesh: ArrayMesh
 
 var _phase := Phase.HIDDEN
 var _time_left := 0.0
@@ -73,20 +76,11 @@ func _ready() -> void:
 	plate.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(plate)
 	_plate = plate
-	_spears = Node3D.new()
+	var spears := MeshInstance3D.new()
+	spears.mesh = _spears_mesh
+	spears.material_override = _spear_material
+	_spears = spears
 	add_child(_spears)
-	for sx in [-1, 1]:
-		for sz in [-1, 1]:
-			var shaft := MeshInstance3D.new()
-			shaft.mesh = _shaft_mesh
-			shaft.material_override = _spear_material
-			shaft.position = Vector3(sx * SPEAR_OFFSET, SHAFT_LENGTH * 0.5, sz * SPEAR_OFFSET)
-			_spears.add_child(shaft)
-			var tip := MeshInstance3D.new()
-			tip.mesh = _tip_mesh
-			tip.material_override = _spear_material
-			tip.position = Vector3(sx * SPEAR_OFFSET, SHAFT_LENGTH + TIP_LENGTH * 0.5, sz * SPEAR_OFFSET)
-			_spears.add_child(tip)
 	_apply_extension()
 
 
@@ -180,6 +174,15 @@ static func _ensure_resources() -> void:
 	_tip_mesh.height = TIP_LENGTH
 	_tip_mesh.radial_segments = 10
 	_tip_mesh.rings = 1
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for sx in [-1, 1]:
+		for sz in [-1, 1]:
+			st.append_from(_shaft_mesh, 0, Transform3D(Basis.IDENTITY,
+				Vector3(sx * SPEAR_OFFSET, SHAFT_LENGTH * 0.5, sz * SPEAR_OFFSET)))
+			st.append_from(_tip_mesh, 0, Transform3D(Basis.IDENTITY,
+				Vector3(sx * SPEAR_OFFSET, SHAFT_LENGTH + TIP_LENGTH * 0.5, sz * SPEAR_OFFSET)))
+	_spears_mesh = st.commit()
 
 
 ## Placa de acero con el borde biselado, cuatro remaches en las esquinas y

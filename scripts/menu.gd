@@ -76,6 +76,8 @@ func _ready() -> void:
 	_setup_options()
 	if OS.is_debug_build():
 		%LevelMap.start_tapped.connect(_on_start_tapped)
+	# Banco de pruebas de rendimiento (solo en depuración, ver Benchmark).
+	Benchmark.maybe_start(get_tree())
 	_show(GameState.menu_screen)
 	GameState.menu_screen = "main"
 	Music.play("menu")
@@ -161,6 +163,12 @@ func _setup_options() -> void:
 	%SfxSlider.value = GameState.sfx_volume * 100.0
 	%MusicSlider.value = GameState.music_volume * 100.0
 	%AaToggle.button_pressed = GameState.antialiasing
+	%ShadowsToggle.button_pressed = GameState.shadows
+	var quality: OptionButton = %QualityOption
+	quality.clear()
+	for key in ["OPT_QUALITY_LOW", "OPT_QUALITY_MEDIUM", "OPT_QUALITY_HIGH"]:
+		quality.add_item(key)
+	quality.select(GameState.graphics_quality)
 	%VibrationToggle.button_pressed = GameState.vibration
 	var language: OptionButton = %LanguageOption
 	language.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
@@ -172,6 +180,8 @@ func _setup_options() -> void:
 	%SfxSlider.value_changed.connect(func(v: float) -> void: GameState.set_sfx_volume(v / 100.0))
 	%MusicSlider.value_changed.connect(func(v: float) -> void: GameState.set_music_volume(v / 100.0))
 	%AaToggle.toggled.connect(GameState.set_antialiasing)
+	quality.item_selected.connect(GameState.set_graphics_quality)
+	%ShadowsToggle.toggled.connect(GameState.set_shadows)
 	%VibrationToggle.toggled.connect(GameState.set_vibration)
 	language.item_selected.connect(func(index: int) -> void:
 		GameState.set_locale(GameState.LOCALES[index]))

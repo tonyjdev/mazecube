@@ -134,7 +134,7 @@ grow_vertical = 2
 
 [node name="VBox" type="VBoxContainer" parent="OptionsScreen"]
 layout_mode = 2
-theme_override_constants/separation = 24
+theme_override_constants/separation = 14
 
 [node name="Title" type="Label" parent="OptionsScreen/VBox"]
 layout_mode = 2
@@ -148,7 +148,7 @@ layout_mode = 2
 [node name="Grid" type="GridContainer" parent="OptionsScreen/VBox/Panel"]
 layout_mode = 2
 theme_override_constants/h_separation = 48
-theme_override_constants/v_separation = 12
+theme_override_constants/v_separation = 2
 columns = 2
 
 [node name="SfxLabel" type="Label" parent="OptionsScreen/VBox/Panel/Grid"]
@@ -182,7 +182,26 @@ text = "OPT_AA"
 [node name="AaToggle" type="CheckButton" parent="OptionsScreen/VBox/Panel/Grid"]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(140, 64)
+custom_minimum_size = Vector2(140, 56)
+size_flags_horizontal = 0
+
+[node name="QualityLabel" type="Label" parent="OptionsScreen/VBox/Panel/Grid"]
+layout_mode = 2
+text = "OPT_QUALITY"
+
+[node name="QualityOption" type="OptionButton" parent="OptionsScreen/VBox/Panel/Grid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(380, 56)
+layout_mode = 2
+
+[node name="ShadowsLabel" type="Label" parent="OptionsScreen/VBox/Panel/Grid"]
+layout_mode = 2
+text = "OPT_SHADOWS"
+
+[node name="ShadowsToggle" type="CheckButton" parent="OptionsScreen/VBox/Panel/Grid"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(140, 56)
+layout_mode = 2
 size_flags_horizontal = 0
 
 [node name="VibrationLabel" type="Label" parent="OptionsScreen/VBox/Panel/Grid"]
@@ -191,7 +210,7 @@ text = "OPT_VIBRATION"
 
 [node name="VibrationToggle" type="CheckButton" parent="OptionsScreen/VBox/Panel/Grid"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(140, 64)
+custom_minimum_size = Vector2(140, 56)
 layout_mode = 2
 size_flags_horizontal = 0
 
@@ -201,7 +220,7 @@ text = "OPT_LANGUAGE"
 
 [node name="LanguageOption" type="OptionButton" parent="OptionsScreen/VBox/Panel/Grid"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(380, 64)
+custom_minimum_size = Vector2(380, 56)
 layout_mode = 2
 
 [node name="OptionsBack" type="Button" parent="OptionsScreen/VBox"]

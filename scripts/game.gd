@@ -182,6 +182,7 @@ var _hum_tween: Tween
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	GameState.setup_environment($WorldEnvironment.environment, $Sun)
 	# La cámara se procesa siempre (ver FollowCamera) para explorar en la pausa.
 	for node: Node in [level, cube, $UI]:
 		node.process_mode = Node.PROCESS_MODE_PAUSABLE

@@ -559,7 +559,7 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 
 - **Jugar:** abre el selector de niveles.
 - **Enciclopedia:** abre la enciclopedia (apartado 7.6) encima del menú.
-- **Opciones:** volumen de **efectos de sonido** y de **música** (0-100%; canales de audio «SFX» y «Music»), **antialiasing** (activado/desactivado), **vibración** (activada/desactivada; al activarla vibra brevemente como prueba) e **idioma** (español o inglés). Los cambios se aplican al momento y se guardan en el dispositivo. Por defecto se usa el idioma del sistema si es español o inglés, y si no, inglés.
+- **Opciones:** volumen de **efectos de sonido** y de **música** (0-100%; canales de audio «SFX» y «Music»), **antialiasing** (activado/desactivado), **calidad gráfica** (baja, media o alta: el 3D se pinta al 60, 75 o 100 % de la resolución de la pantalla, la interfaz siempre a la resolución completa, y el mapa de sombras es de 1024, 2048 o 4096; por defecto media en el móvil y alta en el PC), **sombras** (activadas/desactivadas), **vibración** (activada/desactivada; al activarla vibra brevemente como prueba) e **idioma** (español o inglés). Los cambios se aplican al momento y se guardan en el dispositivo. Por defecto se usa el idioma del sistema si es español o inglés, y si no, inglés.
 - **Créditos:** equipo de desarrollo, gráficos, sonido, tipografía, herramientas y licencia del motor, en una lista que se puede desplazar. Al final, tras «¡Gracias por jugar!», un apartado «Sígueme» con los **iconos de Instagram y X**, que abren los perfiles (instagram.com/tonyjdev y x.com/tonyjdev) en el navegador o en su aplicación, y debajo «@tonyjdev».
 - **Salir:** cierra el juego (igual que pulsar Atrás en la pantalla principal).
 
@@ -628,10 +628,19 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 | Motor de juego | **Decidido** | Godot 4 |
 | Entorno de desarrollo | **Previsto** | Ubuntu Linux |
 | Lenguaje | **Propuesto** | GDScript |
-| Renderizador | **Propuesto inicialmente** | Compatibility, sujeto a pruebas |
+| Renderizador | **Decidido** | Compatibility (OpenGL ES 3) en el móvil; Mobile (Vulkan) en el PC (ver 8.1) |
 | Control de versiones | **Propuesto** | Git |
 | Asistencia de IA | **Pendiente de elegir** | Se ha valorado Codex y una integración MCP con Godot |
 | Backend | **No previsto para el prototipo** | Juego inicialmente local |
+
+### 8.1. Rendimiento en el móvil
+
+Medido en el móvil de pruebas (Redmi Note 11S, GPU Mali-G57 MC2, pantalla de 2400×1080 a 60 Hz) con el banco de pruebas de las builds de depuración (`scripts/benchmark.gd`):
+
+- El renderizador **Mobile (Vulkan)** tenía un coste fijo de ~20 ms por fotograma en esa GPU aunque no se pintara nada, así que nunca llegaba a 60 FPS (21-32 FPS según el nivel) y los controles respondían tarde. **Compatibility** no tiene ese coste y es el que se usa en el móvil. No aplica el tonemap «filmic», así que las luces se reducen (GameState.light_scale y setup_environment, calibrado comparando capturas de los dos renderizadores) para que se vea igual.
+- **Terreno:** durante la aparición del tablero, los muros, las baldosas y la roca se pintan con MultiMesh (una casilla por instancia, para el fundido en diagonal); al acabar se sustituyen por mallas fusionadas por trozos de 12×12 casillas (TerrainBuilder) con solo las caras visibles. Los trozos fuera de cámara no se pintan, y el suelo y la roca no dan sombra. En el nivel más grande se pasa de 157 000 a 12 000 triángulos por fotograma.
+- Las piezas de los cañones láser y de los pinchos se fusionan por material y solo el muro del cañón da sombra (de ~400 a ~170 llamadas de dibujo en el nivel más grande).
+- Resultado: 51-60 FPS en los niveles más grandes (antes 21-23) con la calidad media.
 
 Aunque existe experiencia previa con Unreal Engine (Blueprints y C++), se ha elegido **Godot para este juego** por su adecuación a un proyecto pequeño orientado a Android. Unreal Engine sigue siendo una opción para otros proyectos futuros.
 

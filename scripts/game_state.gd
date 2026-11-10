@@ -9,13 +9,21 @@ extends Node
 ##   record_result). Solo cuenta la mejor partida (la de más estrellas); no
 ##   se suman estrellas de partidas distintas.
 ## - Ajustes (user://settings.cfg): volumen de efectos y de música (buses
-##   "SFX" y "Music", ver default_bus_layout.tres), antialiasing, idioma
-##   y vibración.
+##   "SFX" y "Music", ver default_bus_layout.tres), antialiasing, calidad
+##   gráfica, sombras, idioma y vibración.
+##   Calidad gráfica (QUALITY_*): resolución a la que se pinta el 3D (la
+##   interfaz siempre va a la resolución de la pantalla) y tamaño del mapa de
+##   sombras. Por defecto, media en el móvil y alta en el PC.
 ## - Vibración del móvil (vibrate()), que respeta el ajuste.
 ## - Traducciones: se registran al arrancar a partir de Translations.
 ## - Navegación entre el menú y la partida.
 ## - Fundido a negro de toda la pantalla (fade_to_black / fade_from_black),
 ##   por encima de todo, para las transiciones al cargar o reiniciar un nivel.
+## - Ajuste de la luz según el renderizador (light_scale, setup_environment):
+##   en el móvil se usa el renderizador Compatibility (OpenGL ES 3), mucho más
+##   rápido en GPU de gama media que Mobile (Vulkan), pero no aplica el
+##   tonemap «filmic» y las luces salen unas cuatro veces más fuertes. Las
+##   intensidades se calibraron comparando capturas de los dos renderizadores.
 
 const PROGRESS_PATH := "user://progress.cfg"
 const SETTINGS_PATH := "user://settings.cfg"
@@ -43,6 +51,18 @@ const VIBRATION_BOMB := Vector2(70, 0.6)
 const VIBRATION_PREVIEW := Vector2(60, 0.6)
 
 ## Nivel que se va a jugar (índice en Levels.LIST).
+## Renderizador Compatibility: intensidad de todas las luces respecto a
+## Mobile y luz ambiente (de color fijo: la del cielo no se puede ajustar).
+const COMPAT_LIGHT_SCALE := 0.26
+const COMPAT_AMBIENT_COLOR := Color(0.92, 0.95, 1.0)
+const COMPAT_AMBIENT_ENERGY := 0.22
+## Calidad gráfica: baja, media y alta. Escala del 3D y mapa de sombras.
+const QUALITY_LOW := 0
+const QUALITY_MEDIUM := 1
+const QUALITY_HIGH := 2
+const QUALITY_3D_SCALES := [0.6, 0.75, 1.0]
+const QUALITY_SHADOW_SIZES := [1024, 2048, 4096]
+
 var current_level := 0
 ## Pantalla del menú que se abre al volver de la partida ("main" o "levels").
 var menu_screen := "main"
@@ -54,6 +74,8 @@ var is_loading := false
 var sfx_volume := 1.0
 var music_volume := 1.0
 var antialiasing := true
+var graphics_quality := QUALITY_MEDIUM if OS.has_feature("mobile") else QUALITY_HIGH
+var shadows := true
 var locale := "es"
 var vibration := true
 
@@ -208,6 +230,17 @@ func set_antialiasing(enabled: bool) -> void:
 	save_settings()
 
 
+func set_graphics_quality(value: int) -> void:
+	graphics_quality = clampi(value, QUALITY_LOW, QUALITY_HIGH)
+	_apply_graphics()
+	save_settings()
+
+
+func set_shadows(enabled: bool) -> void:
+	shadows = enabled
+	save_settings()
+
+
 func set_locale(value: String) -> void:
 	locale = value if LOCALES.has(value) else LOCALES[0]
 	TranslationServer.set_locale(locale)
@@ -233,6 +266,7 @@ func apply_settings() -> void:
 	_apply_bus_volume("SFX", sfx_volume)
 	_apply_bus_volume("Music", music_volume)
 	_apply_antialiasing()
+	_apply_graphics()
 	TranslationServer.set_locale(locale)
 
 
@@ -241,6 +275,8 @@ func save_settings() -> void:
 	cfg.set_value("audio", "sfx_volume", sfx_volume)
 	cfg.set_value("audio", "music_volume", music_volume)
 	cfg.set_value("video", "antialiasing", antialiasing)
+	cfg.set_value("video", "quality", graphics_quality)
+	cfg.set_value("video", "shadows", shadows)
 	cfg.set_value("general", "locale", locale)
 	cfg.set_value("general", "vibration", vibration)
 	cfg.save(SETTINGS_PATH)
@@ -256,6 +292,9 @@ func _load_settings() -> void:
 	sfx_volume = float(cfg.get_value("audio", "sfx_volume", sfx_volume))
 	music_volume = float(cfg.get_value("audio", "music_volume", music_volume))
 	antialiasing = bool(cfg.get_value("video", "antialiasing", antialiasing))
+	graphics_quality = clampi(int(cfg.get_value("video", "quality", graphics_quality)),
+		QUALITY_LOW, QUALITY_HIGH)
+	shadows = bool(cfg.get_value("video", "shadows", shadows))
 	vibration = bool(cfg.get_value("general", "vibration", vibration))
 	var saved := str(cfg.get_value("general", "locale", locale))
 	if LOCALES.has(saved):
@@ -270,8 +309,35 @@ func _apply_bus_volume(bus_name: String, value: float) -> void:
 	AudioServer.set_bus_volume_db(bus, linear_to_db(maxf(value, 0.001)))
 
 
+## Factor por el que se multiplican las intensidades de las luces (1 en
+## Mobile/Forward+, COMPAT_LIGHT_SCALE en Compatibility).
+static func light_scale() -> float:
+	return COMPAT_LIGHT_SCALE if is_compatibility() else 1.0
+
+
+static func is_compatibility() -> bool:
+	return RenderingServer.get_current_rendering_method() == "gl_compatibility"
+
+
+## Adapta un entorno y su luz principal al renderizador (ver light_scale) y
+## a los ajustes (sombras).
+func setup_environment(environment: Environment, sun: DirectionalLight3D) -> void:
+	sun.shadow_enabled = shadows
+	if not is_compatibility():
+		return
+	sun.light_energy *= COMPAT_LIGHT_SCALE
+	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	environment.ambient_light_color = COMPAT_AMBIENT_COLOR
+	environment.ambient_light_energy = COMPAT_AMBIENT_ENERGY
+
+
 func _apply_antialiasing() -> void:
 	get_tree().root.msaa_3d = Viewport.MSAA_4X if antialiasing else Viewport.MSAA_DISABLED
+
+
+func _apply_graphics() -> void:
+	get_tree().root.scaling_3d_scale = QUALITY_3D_SCALES[graphics_quality]
+	RenderingServer.directional_shadow_atlas_set_size(QUALITY_SHADOW_SIZES[graphics_quality], true)
 
 
 # --- Navegación -------------------------------------------------------------
