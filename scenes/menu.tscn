@@ -35,7 +35,7 @@ grow_vertical = 2
 
 [node name="VBox" type="VBoxContainer" parent="MainScreen"]
 layout_mode = 2
-theme_override_constants/separation = 20
+theme_override_constants/separation = 18
 
 [node name="Header" type="HBoxContainer" parent="MainScreen/VBox"]
 layout_mode = 2
@@ -55,29 +55,36 @@ layout_mode = 2
 
 [node name="PlayButton" type="Button" parent="MainScreen/VBox"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(380, 76)
+custom_minimum_size = Vector2(380, 70)
 layout_mode = 2
 theme_type_variation = &"PrimaryButton"
 size_flags_horizontal = 4
 text = "MENU_PLAY"
 
+[node name="EncyclopediaButton" type="Button" parent="MainScreen/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(380, 70)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "MENU_ENCYCLOPEDIA"
+
 [node name="OptionsButton" type="Button" parent="MainScreen/VBox"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(380, 76)
+custom_minimum_size = Vector2(380, 70)
 layout_mode = 2
 size_flags_horizontal = 4
 text = "MENU_OPTIONS"
 
 [node name="CreditsButton" type="Button" parent="MainScreen/VBox"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(380, 76)
+custom_minimum_size = Vector2(380, 70)
 layout_mode = 2
 size_flags_horizontal = 4
 text = "MENU_CREDITS"
 
 [node name="QuitButton" type="Button" parent="MainScreen/VBox"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(380, 76)
+custom_minimum_size = Vector2(380, 70)
 layout_mode = 2
 size_flags_horizontal = 4
 text = "MENU_QUIT"

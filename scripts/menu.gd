@@ -1,11 +1,14 @@
 extends Control
-## Menú del juego: pantalla principal (Jugar, Opciones, Créditos, Salir), selector de
-## niveles, opciones y créditos. Solo se ve una pantalla a la vez.
+## Menú del juego: pantalla principal (Jugar, Enciclopedia, Opciones, Créditos,
+## Salir), selector de niveles, opciones y créditos. Solo se ve una pantalla a
+## la vez. La enciclopedia (ver Encyclopedia) se abre encima de la pantalla
+## principal.
 ##
 ## Los textos fijos de la escena son claves de traducción (ver Translations);
 ## los que se generan aquí se rehacen al cambiar de idioma.
-## Atrás (Esc o el botón Atrás de Android) vuelve a la pantalla principal y,
-## desde ella, cierra el juego.
+## Atrás (Esc o el botón Atrás de Android) cierra la enciclopedia si está
+## abierta; si no, vuelve a la pantalla principal y, desde ella, cierra el
+## juego.
 ##
 ## Truco (solo en builds de depuración): tocar 5 veces seguidas el rótulo
 ## «INICIO» del mapa de niveles desbloquea todos los niveles.
@@ -40,6 +43,7 @@ var _screens: Dictionary
 var _current := "main"
 var _unlock_taps := 0
 var _last_unlock_tap := 0.0
+var _encyclopedia: Encyclopedia
 
 
 func _ready() -> void:
@@ -62,6 +66,11 @@ func _ready() -> void:
 		GameState.play_level(index))
 	for button in find_children("*", "BaseButton", true, false):
 		(button as BaseButton).pressed.connect(func() -> void: Sfx.play("click"))
+	# La enciclopedia pone sus propios sonidos (después de lo de arriba).
+	_encyclopedia = Encyclopedia.new()
+	add_child(_encyclopedia)
+	_encyclopedia.closed.connect(func() -> void: _focus_first(_screens[_current]))
+	%EncyclopediaButton.pressed.connect(_encyclopedia.open)
 	for back in [%LevelsBack, %OptionsBack, %CreditsBack]:
 		back.pressed.connect(_show.bind("main"))
 	_setup_options()
@@ -88,7 +97,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _go_back() -> void:
-	if _current == "main":
+	if _encyclopedia.is_open():
+		_encyclopedia.close()
+	elif _current == "main":
 		get_tree().quit()
 	else:
 		_show("main")

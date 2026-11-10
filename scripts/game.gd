@@ -17,9 +17,12 @@ extends Node3D
 ##
 ## Interfaz: número de nivel arriba a la izquierda, botón de pausa arriba a la
 ## derecha e indicaciones de giro abajo, con la barra de fuerza entre ellas. La pausa oculta esa interfaz y
-## muestra a la izquierda tres botones con iconos (Continuar, Reiniciar,
-## Salir al selector de niveles); la cámara se aleja y se pone casi vertical,
-## y arrastrando el dedo se recorre el mapa (ver FollowCamera.start_explore).
+## muestra a la izquierda cuatro botones con iconos (Continuar, Enciclopedia,
+## Reiniciar, Salir al selector de niveles); la cámara se aleja y se pone casi
+## vertical, y arrastrando el dedo se recorre el mapa (ver
+## FollowCamera.start_explore). El botón de la enciclopedia la muestra u
+## oculta encima del mapa (ver Encyclopedia); mientras se ve, los botones de
+## la pausa se esconden y Atrás o Esc la cierran (sin salir de la pausa).
 ## Al continuar, la cámara vuelve a su sitio y después se reanuda el juego:
 ## la velocidad del juego (Engine.time_scale) sube de 0 a la normal en
 ## RESUME_RAMP_TIME segundos con una curva ease-in cúbica (empieza muy
@@ -115,6 +118,7 @@ const BOMB_SHAKE_DISTANCE := 4.0
 
 var current_level := 0
 var _hint_tweens := {}
+var _encyclopedia: Encyclopedia
 ## Por lado (TURN_LEFT / TURN_RIGHT): momento de la última pulsación
 ## (Time.get_ticks_msec) y si sigue pulsado (teclas o dedos).
 var _side_pressed_at := {RollingCube.TURN_LEFT: -100000, RollingCube.TURN_RIGHT: -100000}
@@ -242,6 +246,11 @@ func _ready() -> void:
 		Sfx.play("powerup"))
 	for button in find_children("*", "BaseButton", true, false):
 		(button as BaseButton).pressed.connect(func() -> void: Sfx.play("click"))
+	# La enciclopedia pone sus propios sonidos (después de lo de arriba).
+	_encyclopedia = Encyclopedia.new()
+	pause_menu.add_child(_encyclopedia)
+	_encyclopedia.closed.connect(_on_encyclopedia_closed)
+	%EncyclopediaButton.pressed.connect(_toggle_encyclopedia)
 	pause_button.pressed.connect(_set_paused.bind(true))
 	%ContinueButton.pressed.connect(_set_paused.bind(false))
 	%RestartButton.pressed.connect(func() -> void:
@@ -267,7 +276,10 @@ func _notification(what: int) -> void:
 		_update_level_label()
 		_update_stats()
 	elif what == NOTIFICATION_WM_GO_BACK_REQUEST and not GameState.is_loading:
-		_toggle_pause()
+		if _encyclopedia.is_open():
+			_encyclopedia.close()
+		else:
+			_toggle_pause()
 	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT and OS.has_feature("mobile") \
 			and is_node_ready() and not cube.is_finished and not GameState.is_loading:
 		# En el móvil, al salir de la aplicación (llamada, cambiar de app...) se pausa.
@@ -490,7 +502,26 @@ func _exit_tree() -> void:
 	_stop_speed_ramp()
 
 
+## Muestra u oculta la enciclopedia encima del mapa (en la pausa).
+func _toggle_encyclopedia() -> void:
+	if _encyclopedia.is_open():
+		_encyclopedia.close()
+		return
+	_dragging = false
+	%Buttons.visible = false
+	%ExploreHint.visible = false
+	_encyclopedia.open()
+
+
+func _on_encyclopedia_closed() -> void:
+	%Buttons.visible = true
+	%ExploreHint.visible = true
+	_focus_first(pause_menu)
+
+
 func _close_pause_menu() -> void:
+	if _encyclopedia.is_open():
+		_encyclopedia.close()
 	pause_menu.visible = false
 	$UI.visible = true
 	_dragging = false

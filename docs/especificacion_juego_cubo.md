@@ -542,6 +542,7 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 ### 7.1. Menú principal
 
 - **Jugar:** abre el selector de niveles.
+- **Enciclopedia:** abre la enciclopedia (apartado 7.6) encima del menú.
 - **Opciones:** volumen de **efectos de sonido** y de **música** (0-100%; canales de audio «SFX» y «Music»), **antialiasing** (activado/desactivado), **vibración** (activada/desactivada; al activarla vibra brevemente como prueba) e **idioma** (español o inglés). Los cambios se aplican al momento y se guardan en el dispositivo. Por defecto se usa el idioma del sistema si es español o inglés, y si no, inglés.
 - **Créditos:** equipo de desarrollo, gráficos, sonido, tipografía, herramientas y licencia del motor, en una lista que se puede desplazar. Al final, tras «¡Gracias por jugar!», un apartado «Sígueme» con los **iconos de Instagram y X**, que abren los perfiles (instagram.com/tonyjdev y x.com/tonyjdev) en el navegador o en su aplicación, y debajo «@tonyjdev».
 - **Salir:** cierra el juego (igual que pulsar Atrás en la pantalla principal).
@@ -566,8 +567,9 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 
 ### 7.4. Pausa
 
-- El botón de **pausa** (arriba a la derecha) detiene el juego. Se oculta la interfaz de juego (número de nivel, botón de pausa e indicaciones) y, sin título ni recuadro, se ven tres **botones con iconos** en columna, pegados a la **izquierda** y centrados en vertical:
+- El botón de **pausa** (arriba a la derecha) detiene el juego. Se oculta la interfaz de juego (número de nivel, botón de pausa e indicaciones) y, sin título ni recuadro, se ven cuatro **botones con iconos** en columna, pegados a la **izquierda** y centrados en vertical:
   - **Continuar** (icono de «play»): reanuda la partida.
+  - **Enciclopedia** (libro abierto): muestra u oculta la enciclopedia (apartado 7.6) **encima del mapa**. Mientras se ve, los botones de la pausa y la indicación de abajo se esconden; al cerrarla se vuelve a la pausa.
   - **Reiniciar** (flecha circular): vuelve a empezar el nivel.
   - **Salir** (flecha que sale de una puerta): vuelve al selector de niveles.
 - **Explorar el mapa:** al pausar, la cámara se **aleja** (≈1,7 veces, sin pasar de lo necesario para ver el tablero entero) y se **inclina casi en vertical** (82°) con una transición suave. **Arrastrando el dedo** (o el ratón) se desplaza la vista por el mapa, sin enseñar más allá de sus bordes. Al pie de la pantalla, centrado, se lee «Desliza el dedo sobre la pantalla para navegar por el mapa».
@@ -587,8 +589,20 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
   - Sin fuerza, el deslizamiento se descarta, pero tampoco gira.
   - El dedo que desliza no cuenta para la media vuelta.
 - Las indicaciones de las esquinas inferiores («← Izquierda» y «Derecha →») se resaltan al tocar cada lado.
-- El botón **Atrás** de Android pausa y reanuda la partida; en los menús vuelve a la pantalla anterior y, desde el menú principal, cierra el juego.
+- El botón **Atrás** de Android cierra la enciclopedia si está abierta; si no, pausa y reanuda la partida; en los menús vuelve a la pantalla anterior y, desde el menú principal, cierra el juego.
 - En PC se mantienen los controles de teclado (←/A, →/D, ↑/W dash, ↓/S pisotón, R reiniciar, Esc pausa/atrás, Intro/N siguiente nivel) y el clic del ratón se trata como un toque.
+
+### 7.6. Enciclopedia
+
+- Un **libro de consulta** con los elementos del juego. Se abre desde el menú principal y desde la pausa (encima del mapa, con el fondo oscurecido). Funciona con el juego en pausa.
+- Arriba: el título «Enciclopedia», cuatro **pestañas** (la abierta, en amarillo) y un botón para **cerrar** (✕). Esc y Atrás también la cierran.
+  - **Enemigos:** perseguidor, patrullero y obstáculo.
+  - **Habilidades:** girar, media vuelta, dash y pisotón.
+  - **Objetos:** cubito dorado, llave y velocidad.
+  - **Obstáculos:** puerta, muro agrietado, barrotes y botones, vacío, puente colgante, teletransporte, pinchos, cañón láser y cañón de bombas.
+- Cada pestaña es como un libro: **una página por elemento**, que se pasa con las **flechas** de los lados, **deslizando el dedo** a izquierda o derecha sobre el libro o con las flechas del teclado. Al pasar la página suena un roce de papel y la hoja se desliza hacia un lado. Cada pestaña recuerda su página, y al volver a abrir la enciclopedia sigue donde se dejó.
+- Cada página es un libro abierto: a la **izquierda**, el **dibujo** del elemento, que parece hecho **con tiza en una pizarra** con marco de madera (no son los modelos 3D, sino bocetos con flechas y marcas que explican cómo funciona, sin textos); a la **derecha**, en papel, la pestaña, el **nombre**, la **descripción**, las **curiosidades** (con desplazamiento si no caben) y, al pie, en qué nivel aparece **por primera vez** (calculado a partir de los mapas) y el número de página.
+- **Ampliable:** el contenido está en `scripts/encyclopedia_data.gd` (pestañas y páginas), los textos en `scripts/encyclopedia_texts.gd` (español e inglés) y los dibujos los genera `tools/make_encyclopedia_art.py` en `ui/encyclopedia/<id>.png` (720 × 600). Para añadir un enemigo, objeto, obstáculo o habilidad basta con añadir su página, sus textos y su dibujo.
 
 ## 8. Tecnologías — Decididas y propuestas
 

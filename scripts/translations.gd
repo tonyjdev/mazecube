@@ -67,7 +67,7 @@ const MESSAGES := {
 		"TIP_TURN_EARLY": "Los giros se hacen al llegar a la siguiente casilla: puedes pulsar con antelación.",
 		"TIP_TURN_BLOCKED": "Si pides un giro hacia una pared, se descarta y el cubo sigue recto.",
 		"TIP_BOUNCE": "Al chocar contra una pared, el cubo rebota y sigue rodando en sentido contrario.",
-		"TIP_REVERSE": "Toca los dos lados de la pantalla a la vez para dar media vuelta. Es un movimiento costoso: gasta la fuerza y cuenta como dos giros.",
+		"TIP_REVERSE": "Toca los dos lados de la pantalla a la vez para dar media vuelta. Úsala con cabeza: cuenta como dos giros.",
 		"TIP_START": "En la casilla de salida no se puede girar: el primer movimiento siempre es recto.",
 		"TIP_KEY_ONE": "El cubo solo puede llevar una llave a la vez; las demás se quedan en el mapa.",
 		"TIP_DOOR": "Para abrir una puerta, choca de frente contra ella llevando la llave de su color.",
@@ -148,7 +148,7 @@ const MESSAGES := {
 		"TIP_TURN_EARLY": "Turns happen when the cube reaches the next tile: you can tap ahead of time.",
 		"TIP_TURN_BLOCKED": "If you ask for a turn into a wall, it is ignored and the cube keeps going straight.",
 		"TIP_BOUNCE": "When the cube hits a wall, it bounces back and keeps rolling the other way.",
-		"TIP_REVERSE": "Tap both sides of the screen at once to turn around. It is a costly move: it uses up your strength and counts as two turns.",
+		"TIP_REVERSE": "Tap both sides of the screen at once to turn around. Use it wisely: it counts as two turns.",
 		"TIP_START": "You can't turn on the starting tile: the first move is always straight ahead.",
 		"TIP_KEY_ONE": "The cube can only carry one key at a time; the others stay on the map.",
 		"TIP_DOOR": "To open a door, hit it head-on while carrying the key of its colour.",
@@ -294,10 +294,11 @@ static func register() -> void:
 	var all_keys := {}
 	for locale in MESSAGES:
 		all_keys.merge(MESSAGES[locale])
+		all_keys.merge(EncyclopediaTexts.MESSAGES[locale])
 	for locale in MESSAGES:
 		var translation := Translation.new()
 		translation.locale = locale
-		var messages: Dictionary = MESSAGES[locale]
+		var messages: Dictionary = MESSAGES[locale].merged(EncyclopediaTexts.MESSAGES[locale])
 		for key in all_keys:
 			translation.add_message(key, messages.get(key, key))
 		TranslationServer.add_translation(translation)

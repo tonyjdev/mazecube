@@ -93,6 +93,25 @@ def make_svgs():
               f'<rect x="13" y="10" width="8" height="28" rx="2" fill="{ICON}"/>'
               f'<rect x="27" y="10" width="8" height="28" rx="2" fill="{ICON}"/>')
 
+    # Enciclopedia: libro abierto (botón de la pausa), flechas de página y
+    # cerrar.
+    write_svg("enc_book.svg", 48, 48,
+              f'<path d="M24 13 C19 9 11 9 5 11 V38 C11 36 19 36 24 40 C29 36 37 36 43 38 V11 '
+              f'C37 9 29 9 24 13 Z M24 13 V40" fill="none" stroke="{ICON}" stroke-width="4" '
+              f'stroke-linejoin="round" stroke-linecap="round"/>'
+              f'<path d="M10 18 C14 17 17 17 19 18 M10 24 C14 23 17 23 19 24 M29 18 C31 17 34 17 38 18 '
+              f'M29 24 C31 23 34 23 38 24" fill="none" stroke="{ICON}" stroke-width="2.5" '
+              f'stroke-linecap="round" opacity="0.8"/>')
+    write_svg("enc_prev.svg", 48, 48,
+              f'<path d="M30 9 L15 24 L30 39" fill="none" stroke="{ICON}" stroke-width="7" '
+              f'stroke-linecap="round" stroke-linejoin="round"/>')
+    write_svg("enc_next.svg", 48, 48,
+              f'<path d="M18 9 L33 24 L18 39" fill="none" stroke="{ICON}" stroke-width="7" '
+              f'stroke-linecap="round" stroke-linejoin="round"/>')
+    write_svg("enc_close.svg", 48, 48,
+              f'<path d="M12 12 L36 36 M36 12 L12 36" fill="none" stroke="{ICON}" stroke-width="7" '
+              f'stroke-linecap="round"/>')
+
 
 # --- Tema -------------------------------------------------------------------
 

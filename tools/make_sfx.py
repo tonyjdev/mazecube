@@ -311,6 +311,12 @@ def main():
     # Estrella no conseguida: golpe apagado y grave.
     save("star_miss", mix(tone(180, 0.25, "triangle", decay=0.07, sweep_to=120),
                           noise(0.08, decay=0.02, lowpass=0.15, volume=0.4)), peak=0.45)
+    # Pasar página en la enciclopedia: roce de papel que sube y se apaga, con
+    # un pequeño golpe de la hoja al caer.
+    page = [noise(0.22, decay=0.07, lowpass=0.55, attack=0.06, volume=0.7),
+            noise(0.16, decay=0.05, lowpass=0.2, attack=0.03, volume=0.5),
+            offset(noise(0.05, decay=0.012, lowpass=0.12, volume=0.5), 0.17)]
+    save("page", mix(*page), peak=0.4)
     print("Sonidos generados en", OUT)
 
 

@@ -18,8 +18,8 @@ extends RefCounted
 ## láser), laser (disparo), laser_hit (el láser choca), mortar (disparo del
 ## cañón de bombas), bomb_bounce (bote de una bomba), bomb_fuse (se enciende
 ## la mecha), bomb_explode (explosión), collect (cubito dorado), star y
-## star_miss (estrella conseguida o no en la pantalla final) y click
-## (botones de la interfaz).
+## star_miss (estrella conseguida o no en la pantalla final), page (pasar
+## página en la enciclopedia) y click (botones de la interfaz).
 
 const POOL_SIZE := 10
 ## Ajuste de volumen (dB) de cada sonido respecto a los demás.
