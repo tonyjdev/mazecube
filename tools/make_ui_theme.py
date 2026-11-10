@@ -93,6 +93,13 @@ def make_svgs():
               f'<rect x="13" y="10" width="8" height="28" rx="2" fill="{ICON}"/>'
               f'<rect x="27" y="10" width="8" height="28" rx="2" fill="{ICON}"/>')
 
+    # Inmunidad (botón de arriba en el centro de la partida): escudo con un rayo.
+    write_svg("hud_immunity.svg", 48, 48,
+              f'<path d="M24 4 L41 10 V22 C41 32 34 40 24 44 C14 40 7 32 7 22 V10 Z" fill="none" '
+              f'stroke="{ICON}" stroke-width="4" stroke-linejoin="round"/>'
+              f'<path d="M27 11 L17 26 H24 L21 37 L31 21 H24 Z" fill="{ICON}" stroke="{ICON}" '
+              f'stroke-width="1.5" stroke-linejoin="round"/>')
+
     # Enciclopedia: libro abierto (botón de la pausa), flechas de página y
     # cerrar.
     write_svg("enc_book.svg", 48, 48,

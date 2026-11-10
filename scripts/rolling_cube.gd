@@ -45,6 +45,15 @@ extends Node3D
 ##   STOMP_WALL_HITS golpes a los muros destructibles de esa zona.
 ## Durante el dash y el pisotón el cubo es invulnerable.
 ##
+## Inmunidad: el jugador la pide (botón de arriba en el centro) y también
+## gasta toda la fuerza, pero se activa al momento, sin esperar al límite
+## entre casillas, y no toca lo pendiente. Durante `immunity_time` segundos
+## el cubo no puede morir por enemigos ni armas (sí cayendo al vacío) y se ve
+## «disuelto» (CubeDissolve: el efecto entra y sale en IMMUNITY_FADE
+## segundos). La fuerza no se recarga mientras dura. Se pierde al morir, al
+## reiniciar y al llegar a la meta. Si se pide sin fuerza, se descarta
+## (strength_rejected).
+##
 ## Enemigos: si un perseguidor o un patrullero lo toca (lo comprueba Level),
 ## el cubo explota en pedazos de sus colores (ver CubeExplosion) y, cuando
 ## termina la explosión, vuelve a su casilla de salida con el rumbo inicial. Conserva la
@@ -115,8 +124,12 @@ signal appeared
 signal dashed(from: Vector2i, to: Vector2i)
 ## Ha caído el pisotón en esa casilla.
 signal stomped(cell: Vector2i)
-## Se ha pedido un dash o un pisotón sin la fuerza llena.
+## Se ha pedido un dash, un pisotón o la inmunidad sin la fuerza llena.
 signal strength_rejected
+## Ha empezado la inmunidad, que durará `duration` segundos.
+signal immunity_started(duration: float)
+## Se ha acabado la inmunidad (por tiempo, al morir, al reiniciar o en la meta).
+signal immunity_ended
 ## Ha entrado en una casilla de teletransporte y empieza a disolverse.
 signal teleport_started(from: Vector2i, to: Vector2i)
 ## Ya ha desaparecido y está en la casilla de destino (`to`): la cámara tiene
@@ -166,6 +179,8 @@ const REVERSE_SMOKE_LIFETIME := 0.8
 ## últimos RESPAWN_DISSOLVE_FADE segundos.
 const RESPAWN_GRACE := 1.5
 const RESPAWN_DISSOLVE_FADE := 0.5
+## Inmunidad: lo que tarda el efecto de disolverse en entrar y en salir.
+const IMMUNITY_FADE := 0.3
 ## Aparición: duración, altura desde la que baja, vueltas que da al bajar,
 ## fracción del tiempo que tarda en posarse (el resto es el aplastamiento) y
 ## cuánto se aplasta.
@@ -213,6 +228,9 @@ static var _smoke_material: StandardMaterial3D
 ## Segundos que tarda la fuerza en llenarse tras un dash o un pisotón. Más
 ## adelante podrá cambiar con otras habilidades.
 @export var strength_recharge_time := 2.0
+## Segundos que dura la inmunidad. Podrá cambiar con otros eventos del juego
+## (se lee al activarla).
+@export var immunity_time := 3.0
 
 var level: Level
 var cell := Vector2i.ZERO
@@ -263,6 +281,10 @@ var _explosion: CubeExplosion
 ## Malla de un pedazo de la explosión (un cubo pequeño con los mismos colores).
 var _piece_mesh: Mesh
 var _grace_left := 0.0
+## Inmunidad: segundos que le quedan (0 = sin inmunidad) y duración total de
+## la actual (para el efecto).
+var _immunity_left := 0.0
+var _immunity_total := 0.0
 ## Material del efecto de disolverse (se pone en _body solo durante la
 ## invulnerabilidad).
 var _dissolve_material: ShaderMaterial
@@ -312,6 +334,7 @@ func reset(target_level: Level) -> void:
 	is_finished = false
 	_dead = false
 	_grace_left = 0.0
+	_end_immunity()
 	_set_dissolve(0.0)
 	_body.visible = true
 	if is_instance_valid(_explosion):
@@ -417,6 +440,37 @@ func _request_ability(ability: int) -> void:
 	_pending_ability = ability
 
 
+## Activa la inmunidad al momento (ver la descripción de la clase).
+func request_immunity() -> void:
+	if is_finished or _dead or is_appearing():
+		return
+	# Mientras dura, la fuerza está gastada: también se avisa.
+	if _strength < 1.0 or _immunity_left > 0.0:
+		strength_rejected.emit()
+		return
+	_strength = 0.0
+	_immunity_total = immunity_time
+	_immunity_left = immunity_time
+	immunity_started.emit(immunity_time)
+
+
+func is_immune() -> bool:
+	return _immunity_left > 0.0
+
+
+## Segundos de inmunidad que quedan (0 si no la tiene).
+func immunity_left() -> float:
+	return _immunity_left
+
+
+## Quita la inmunidad (sin tocar el efecto: lo hace quien la llama).
+func _end_immunity() -> void:
+	if _immunity_left <= 0.0:
+		return
+	_immunity_left = 0.0
+	immunity_ended.emit()
+
+
 ## Olvida el giro o la media vuelta pendientes (p. ej. si el toque que los
 ## pidió resulta ser un deslizamiento).
 func cancel_turn() -> void:
@@ -444,13 +498,10 @@ func _process(delta: float) -> void:
 	if _appear_time >= 0.0:
 		_process_appear(delta)
 		return
-	if _strength < 1.0 and not _dashing and not _stomping:
+	if _strength < 1.0 and not _dashing and not _stomping and _immunity_left <= 0.0:
 		_strength = minf(_strength + delta / strength_recharge_time, 1.0)
-	if _grace_left > 0.0:
-		_grace_left -= delta
-		var elapsed := RESPAWN_GRACE - _grace_left
-		_set_dissolve(minf(smoothstep(0.0, RESPAWN_DISSOLVE_FADE, elapsed),
-			smoothstep(0.0, RESPAWN_DISSOLVE_FADE, _grace_left)))
+	if _grace_left > 0.0 or _immunity_left > 0.0:
+		_process_protection(delta)
 	_process_power_ups(delta)
 	# La llave que lleva el cubo sigue girando sobre sí misma, como en el mapa.
 	if _held_key_node:
@@ -780,6 +831,9 @@ func _on_roll_finished(next: Vector2i) -> void:
 		return
 	if cell == level.goal_cell:
 		is_finished = true
+		# La inmunidad se acaba (el efecto sale poco a poco).
+		if _immunity_left > IMMUNITY_FADE:
+			_immunity_left = IMMUNITY_FADE
 		if _held_key_node:
 			_held_key_node.visible = false
 		reached_goal.emit()
@@ -860,6 +914,27 @@ func _process_teleport(delta: float) -> void:
 				_cooldown = pause_between_rolls / speed_multiplier()
 
 
+## Avanza la invulnerabilidad de después de reaparecer y la inmunidad, y pone
+## el efecto de disolverse del que esté más visible (el teletransporte pone
+## el suyo encima, porque se procesa después).
+func _process_protection(delta: float) -> void:
+	var amount := 0.0
+	if _grace_left > 0.0:
+		_grace_left = maxf(_grace_left - delta, 0.0)
+		var elapsed := RESPAWN_GRACE - _grace_left
+		amount = minf(smoothstep(0.0, RESPAWN_DISSOLVE_FADE, elapsed),
+			smoothstep(0.0, RESPAWN_DISSOLVE_FADE, _grace_left))
+	if _immunity_left > 0.0:
+		_immunity_left = maxf(_immunity_left - delta, 0.0)
+		var elapsed := _immunity_total - _immunity_left
+		amount = maxf(amount, minf(smoothstep(0.0, IMMUNITY_FADE, elapsed),
+			smoothstep(0.0, IMMUNITY_FADE, _immunity_left)))
+		if _immunity_left <= 0.0:
+			immunity_ended.emit()
+	if not is_teleporting():
+		_set_dissolve(amount)
+
+
 ## Gira un rumbo 90° a la izquierda o a la derecha. En el tablero "arriba"
 ## es -Z, así que la izquierda de (0, -1) es (-1, 0).
 static func turned(dir: Vector2i, direction: int) -> Vector2i:
@@ -878,10 +953,11 @@ func is_alive() -> bool:
 
 
 ## Un enemigo puede matarlo ahora: vivo, sin haber llegado a la meta, sin la
-## invulnerabilidad de después de reaparecer y sin estar haciendo un dash o
-## un pisotón.
+## invulnerabilidad de después de reaparecer, sin la inmunidad y sin estar
+## haciendo un dash o un pisotón.
 func is_vulnerable() -> bool:
-	return not _dead and not is_finished and _grace_left <= 0.0 and not is_appearing() \
+	return not _dead and not is_finished and _grace_left <= 0.0 and _immunity_left <= 0.0 \
+		and not is_appearing() \
 		and not _dashing and not _stomping and not is_teleporting()
 
 
@@ -915,6 +991,7 @@ func _explode(on_floor: bool) -> void:
 	_clear_pending()
 	_dashing = false
 	_stomping = false
+	_end_immunity()
 	_end_all_power_ups()
 	_explosion = CubeExplosion.create(_body.mesh, _piece_mesh, body_basis, SIZE, on_floor)
 	_explosion.finished.connect(_respawn)

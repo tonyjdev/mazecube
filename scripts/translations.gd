@@ -87,6 +87,7 @@ const MESSAGES := {
 		"TIP_STARS": "Cada nivel da hasta tres estrellas: por no morir, por no pasarte de los giros que marca arriba y por coger el cubito dorado. Necesitas al menos una para seguir.",
 		"TIP_GOLD": "El cubito dorado suele esconderse en un recoveco apartado del camino: ir a por él cuesta unos giros, pero el límite de giros ya cuenta con ello.",
 		"TIP_BOMBS": "Los cañones de encima de los muros te lanzan bombas cuando estás a su alcance. Caen en tu camino y explotan a los pocos segundos: sal de las casillas rojas antes de que estallen.",
+		"TIP_IMMUNITY": "El botón del escudo de arriba hace al cubo inmune durante 3 segundos: ni enemigos, ni pinchos, ni láseres, ni bombas pueden con él. Gasta toda la fuerza y no te salva de caer al vacío.",
 	},
 	"en": {
 		"MENU_PLAY": "Play",
@@ -168,6 +169,7 @@ const MESSAGES := {
 		"TIP_STARS": "Each level awards up to three stars: for not dying, for staying within the turn limit shown at the top and for grabbing the golden cube. You need at least one to move on.",
 		"TIP_GOLD": "The golden cube usually hides in a nook off the main path: fetching it costs a few turns, but the turn limit already allows for that.",
 		"TIP_BOMBS": "Cannons on top of walls lob bombs at you when you're in range. They land in your path and go off a few seconds later: get off the red tiles before they blow.",
+		"TIP_IMMUNITY": "The shield button at the top makes the cube immune for 3 seconds: enemies, spikes, lasers and bombs can't hurt it. It uses up all your strength and won't save you from falling into the void.",
 		"Primer giro": "First Turn",
 		"El muro": "The Wall",
 		"La llave": "The Key",

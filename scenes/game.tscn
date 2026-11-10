@@ -13,6 +13,8 @@
 [ext_resource type="Texture2D" path="res://ui/hud_gold_cube.svg" id="16_gold"]
 [ext_resource type="Script" path="res://scripts/star_icon.gd" id="17_star"]
 [ext_resource type="Texture2D" path="res://ui/enc_book.svg" id="18_book"]
+[ext_resource type="Texture2D" path="res://ui/hud_immunity.svg" id="19_immunity"]
+[ext_resource type="Script" path="res://scripts/immunity_button.gd" id="20_immunity_btn"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sgp6g"]
 
@@ -169,6 +171,23 @@ size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 30
 text = "HINT_RIGHT"
 horizontal_alignment = 2
+
+[node name="ImmunityButton" type="Button" parent="UI"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(80, 80)
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -40.0
+offset_top = 20.0
+offset_right = 40.0
+offset_bottom = 100.0
+grow_horizontal = 2
+focus_mode = 0
+theme_type_variation = &"IconButton"
+icon = ExtResource("19_immunity")
+icon_alignment = 1
+script = ExtResource("20_immunity_btn")
 
 [node name="PauseMenu" type="CanvasLayer" parent="."]
 process_mode = 3

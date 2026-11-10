@@ -317,6 +317,34 @@ def main():
             noise(0.16, decay=0.05, lowpass=0.2, attack=0.03, volume=0.5),
             offset(noise(0.05, decay=0.012, lowpass=0.12, volume=0.5), 0.17)]
     save("page", mix(*page), peak=0.4)
+    # Inmunidad activada: chispazo eléctrico que sube, con un golpe de
+    # corriente y crepitar.
+    zap = [tone(180, 0.45, "square", attack=0.01, decay=0.18, sweep_to=720, volume=0.5),
+           tone(360, 0.35, "rich", attack=0.01, decay=0.12, sweep_to=1440, volume=0.4),
+           noise(0.25, decay=0.06, lowpass=0.8, volume=0.6)]
+    for k in range(12):
+        zap.append(offset(noise(0.015, decay=0.004, lowpass=0.9, volume=rng.uniform(0.2, 0.5)),
+                          rng.uniform(0.0, 0.35)))
+    save("immunity", mix(*zap), peak=0.55)
+    # Zumbido de la inmunidad (en bucle mientras dura): zumbido eléctrico
+    # grave con armónicos, un pitido agudo que ondula y chasquidos sueltos.
+    # Todas las frecuencias dan un número entero de ciclos en el bucle, así
+    # que empalma sin saltos.
+    hum_len = 2.0
+    n = int(hum_len * RATE)
+    hum = []
+    for i in range(n):
+        t = i / RATE
+        buzz = sum(math.sin(2 * math.pi * 110 * h * t) / h ** 0.8 for h in (1, 2, 3, 4, 5, 7, 9))
+        buzz *= 0.75 + 0.25 * math.sin(2 * math.pi * 8 * t)
+        whine = 0.18 * math.sin(2 * math.pi * 1320 * t + 2.5 * math.sin(2 * math.pi * 3 * t))
+        hum.append(0.5 * buzz + whine)
+    for k in range(40):
+        start = rng.randrange(n)
+        tick = noise(0.012, decay=0.003, lowpass=0.9, volume=rng.uniform(0.4, 1.0))
+        for j, v in enumerate(tick):
+            hum[(start + j) % n] += v
+    save("immunity_hum", hum, peak=0.45)
     print("Sonidos generados en", OUT)
 
 

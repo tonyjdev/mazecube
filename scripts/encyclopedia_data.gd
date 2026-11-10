@@ -30,6 +30,7 @@ const TABS: Array[Dictionary] = [
 		{"id": "reverse", "symbols": ""},
 		{"id": "dash", "symbols": ""},
 		{"id": "stomp", "symbols": ""},
+		{"id": "immunity", "symbols": ""},
 	]},
 	{"id": "items", "title": "ENC_TAB_ITEMS", "pages": [
 		{"id": "golden_cube", "symbols": ""},

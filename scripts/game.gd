@@ -5,6 +5,7 @@ extends Node3D
 ## selector de niveles del menú).
 ##
 ## Sonidos (ver Sfx): vuelcos, rebotes, giros descartados, dash, pisotón,
+## inmunidad (chispazo al activarla y zumbido en bucle mientras dura),
 ## enemigos destruidos, llaves, puertas,
 ## muros, botones y barrotes, power ups, media vuelta, muerte, meta y botones
 ## de la interfaz.
@@ -15,7 +16,8 @@ extends Node3D
 ## Vibración (si está activada en Opciones): al destruir un muro, al pulsar
 ## un botón, al morir el cubo y, muy suave, al descartarse un giro.
 ##
-## Interfaz: número de nivel arriba a la izquierda, botón de pausa arriba a la
+## Interfaz: número de nivel arriba a la izquierda, botón de inmunidad arriba
+## en el centro (ImmunityButton), botón de pausa arriba a la
 ## derecha e indicaciones de giro abajo, con la barra de fuerza entre ellas. La pausa oculta esa interfaz y
 ## muestra a la izquierda cuatro botones con iconos (Continuar, Enciclopedia,
 ## Reiniciar, Salir al selector de niveles); la cámara se aleja y se pone casi
@@ -67,9 +69,11 @@ extends Node3D
 ##   - Sin fuerza, el deslizamiento se descarta (aviso y la barra de fuerza
 ##     tiembla), pero el giro también se anula.
 ##   El dedo que desliza no cuenta para la media vuelta.
+##   Inmunidad: el botón de arriba en el centro (RollingCube.request_immunity).
 ##   Fuerza: la barra del centro de la parte inferior (StrengthBar) muestra la
 ##   fuerza del cubo (RollingCube.strength).
-##   Teclado: ←/A gira a la izquierda, →/D a la derecha, ↑/W dash, ↓/S pisotón, R reinicia,
+##   Teclado: ←/A gira a la izquierda, →/D a la derecha, ↑/W dash, ↓/S pisotón,
+##            Espacio/E inmunidad, R reinicia,
 ##            Esc pausa o reanuda; al completar un nivel, Intro/N pasa al siguiente.
 ##   Táctil:  tocar la mitad izquierda o derecha de la pantalla gira hacia ese
 ##            lado (con dos dedos, uno en cada mitad, media vuelta). El botón Atrás de Android pausa o reanuda.
@@ -115,6 +119,9 @@ const RESPAWN_CAMERA_WAIT := 3.0
 ## Distancia (en casillas) del cubo a una bomba que explota a partir de la cual
 ## no tiembla la cámara.
 const BOMB_SHAKE_DISTANCE := 4.0
+## Zumbido de la inmunidad: volumen (dB) y lo que tarda en apagarse al acabar.
+const IMMUNITY_HUM_DB := -9.0
+const IMMUNITY_HUM_FADE := 0.25
 
 var current_level := 0
 var _hint_tweens := {}
@@ -146,6 +153,9 @@ var _run_deaths := 0
 var _run_collected := false
 var _star_turns := 0
 var _stars_tween: Tween
+## Zumbido en bucle de la inmunidad (se detiene con la pausa) y su desvanecido.
+var _immunity_hum: AudioStreamPlayer
+var _hum_tween: Tween
 
 @onready var level: Level = $Level
 @onready var cube: RollingCube = $Cube
@@ -157,6 +167,7 @@ var _stars_tween: Tween
 @onready var left_hint: Label = %LeftHint
 @onready var right_hint: Label = %RightHint
 @onready var strength_bar: StrengthBar = %StrengthBar
+@onready var immunity_button: ImmunityButton = %ImmunityButton
 @onready var pause_menu: CanvasLayer = $PauseMenu
 @onready var complete_menu: CanvasLayer = $CompleteMenu
 @onready var complete_title: Label = %CompleteTitle
@@ -242,10 +253,18 @@ func _ready() -> void:
 		_pop_stat(gold_icon)
 		_update_stats())
 	cube.door_opened.connect(func(_color: String) -> void: Sfx.play("door"))
+	cube.immunity_started.connect(func(_duration: float) -> void:
+		Sfx.play("immunity")
+		GameState.vibrate(GameState.VIBRATION_DASH)
+		_start_immunity_hum())
+	cube.immunity_ended.connect(_stop_immunity_hum)
 	cube.power_up_picked.connect(func(_power_up: PowerUp, _stacks: int) -> void:
 		Sfx.play("powerup"))
 	for button in find_children("*", "BaseButton", true, false):
-		(button as BaseButton).pressed.connect(func() -> void: Sfx.play("click"))
+		if button != immunity_button:
+			(button as BaseButton).pressed.connect(func() -> void: Sfx.play("click"))
+	immunity_button.pressed.connect(cube.request_immunity)
+	_setup_immunity_hum()
 	# La enciclopedia pone sus propios sonidos (después de lo de arriba).
 	_encyclopedia = Encyclopedia.new()
 	pause_menu.add_child(_encyclopedia)
@@ -340,6 +359,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		cube.request_dash()
 	elif event.is_action_pressed("stomp"):
 		cube.request_stomp()
+	elif event.is_action_pressed("immunity"):
+		cube.request_immunity()
 	elif event.is_action_pressed("restart"):
 		_restart_with_fade()
 	elif event.is_action_pressed("next_level") and complete_menu.visible:
@@ -429,6 +450,8 @@ func _update_gestures() -> void:
 
 func _process(_delta: float) -> void:
 	strength_bar.value = cube.strength()
+	immunity_button.strength = cube.strength()
+	immunity_button.immunity = cube.immunity_left() / maxf(cube.immunity_time, 0.001)
 	if not _gestures.is_empty() and not get_tree().paused:
 		_update_gestures()
 
@@ -727,7 +750,46 @@ func _on_play_area_resized() -> void:
 
 ## Los toques sobre los botones no cuentan como giro.
 func _is_over_buttons(pos: Vector2) -> bool:
-	return pause_button.visible and pause_button.get_global_rect().has_point(pos)
+	for button: Control in [pause_button, immunity_button]:
+		if button.is_visible_in_tree() and button.get_global_rect().has_point(pos):
+			return true
+	return false
+
+
+## Reproductor del zumbido de la inmunidad, con el sonido en bucle.
+func _setup_immunity_hum() -> void:
+	_immunity_hum = AudioStreamPlayer.new()
+	_immunity_hum.bus = &"SFX"
+	# Se detiene en la pausa (como el cubo) y sigue al reanudar.
+	_immunity_hum.process_mode = Node.PROCESS_MODE_PAUSABLE
+	var stream := load("res://audio/sfx/immunity_hum.wav") as AudioStreamWAV
+	if stream:
+		stream = stream.duplicate() as AudioStreamWAV
+		stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		stream.loop_begin = 0
+		stream.loop_end = int(stream.get_length() * stream.mix_rate)
+		_immunity_hum.stream = stream
+	add_child(_immunity_hum)
+
+
+func _start_immunity_hum() -> void:
+	if _hum_tween and _hum_tween.is_valid():
+		_hum_tween.kill()
+	_immunity_hum.volume_db = IMMUNITY_HUM_DB
+	_immunity_hum.play()
+
+
+func _stop_immunity_hum() -> void:
+	if _hum_tween and _hum_tween.is_valid():
+		_hum_tween.kill()
+	# En la pausa (p. ej. al reiniciar desde ella) el reproductor está
+	# detenido: se corta del todo para que no siga al reanudar.
+	if get_tree().paused:
+		_immunity_hum.stop()
+		return
+	_hum_tween = create_tween()
+	_hum_tween.tween_property(_immunity_hum, "volume_db", -60.0, IMMUNITY_HUM_FADE)
+	_hum_tween.tween_callback(_immunity_hum.stop)
 
 
 ## Da el foco al primer botón visible para poder usar el teclado (no en el

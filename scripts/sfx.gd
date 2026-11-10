@@ -18,7 +18,9 @@ extends RefCounted
 ## láser), laser (disparo), laser_hit (el láser choca), mortar (disparo del
 ## cañón de bombas), bomb_bounce (bote de una bomba), bomb_fuse (se enciende
 ## la mecha), bomb_explode (explosión), collect (cubito dorado), star y
-## star_miss (estrella conseguida o no en la pantalla final), page (pasar
+## star_miss (estrella conseguida o no en la pantalla final), immunity
+## (se activa la inmunidad), immunity_hum (zumbido en bucle mientras dura;
+## lo reproduce Game), page (pasar
 ## página en la enciclopedia) y click (botones de la interfaz).
 
 const POOL_SIZE := 10

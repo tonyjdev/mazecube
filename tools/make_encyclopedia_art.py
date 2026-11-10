@@ -16,6 +16,7 @@ Uso (desde la raíz del repositorio):
     uv run --with numpy --with pillow tools/make_encyclopedia_art.py [id ...]
 """
 import math
+import random
 import sys
 import zlib
 from pathlib import Path
@@ -618,6 +619,73 @@ def draw_stomp(b):
     swipe(b, 625, 470, False)
 
 
+def shield_shape(c, s):
+    """Contorno de escudo (como el icono del botón) centrado en c, alto 2s."""
+    x, y = c
+    return [(x, y - s), (x + s * 0.72, y - s * 0.72), (x + s * 0.72, y - s * 0.1),
+            (x + s * 0.55, y + s * 0.45), (x, y + s), (x - s * 0.55, y + s * 0.45),
+            (x - s * 0.72, y - s * 0.1), (x - s * 0.72, y - s * 0.72)]
+
+
+def zigzag(b, a, z, rnd, color="cyan", width=3.5, steps=5, amp=14.0):
+    """Rayo quebrado de a hasta z."""
+    dx, dy = z[0] - a[0], z[1] - a[1]
+    n = math.hypot(dx, dy) or 1.0
+    px, py = -dy / n, dx / n
+    pts = [a]
+    for i in range(1, steps):
+        t = i / steps
+        k = amp * (1 if i % 2 else -1) * rnd.uniform(0.6, 1.2)
+        pts.append((a[0] + dx * t + px * k, a[1] + dy * t + py * k))
+    pts.append(z)
+    b.line(pts, color, width)
+
+
+def draw_immunity(b):
+    rnd = random.Random(31)
+    c = (330, 320)
+    # Centro del aura (el cubo se dibuja algo por encima de c).
+    ac = (330, 290)
+    iso = Iso(b, 330, 300, 80)
+    iso.tiles([(x, y) for x in range(-2, 2) for y in range(-1, 2)], "grey", 2.2, alpha=0.4)
+    # El cubo, «disuelto»: trazos de tiza más finos y borrosos con motas.
+    b.smear(b.circle_mask(ac, 150, 130), "cyan", 0.12, 8)
+    cube_front(b, c, 110, "cyan", 3.5, hatch="cyan")
+    for k in range(26):
+        a = rnd.uniform(0, math.tau)
+        r = rnd.uniform(40, 120)
+        q = (ac[0] + math.cos(a) * r, ac[1] + math.sin(a) * r * 0.85)
+        b.smear(b.circle_mask(q, rnd.uniform(2, 5)), "white", 0.8, 0.6)
+    # Aura eléctrica alrededor, con chispas.
+    ring = [(ac[0] + math.cos(math.radians(a)) * (150 + rnd.uniform(-10, 10)),
+             ac[1] + math.sin(math.radians(a)) * (128 + rnd.uniform(-10, 10))) for a in range(0, 360, 15)]
+    b.poly(ring, "cyan", 3.5)
+    for a in (20, 95, 160, 250, 320):
+        t = math.radians(a)
+        p0 = (ac[0] + math.cos(t) * 150, ac[1] + math.sin(t) * 128)
+        p1 = (ac[0] + math.cos(t) * 200, ac[1] + math.sin(t) * 172)
+        zigzag(b, p0, p1, rnd, "cyan", 3, 3, 9)
+    # Un perseguidor rebota contra el aura.
+    e = (95, 210)
+    b.circle(e, 42, color="red", width=4.5)
+    b.hatch(b.circle_mask(e, 40), "red", 9, -40, 2.4, 0.55)
+    b.text("x", e[0] - 30, e[1] - 22, 26, "red", 3)
+    b.text("x", e[0] + 4, e[1] - 22, 26, "red", 3)
+    b.burst((185, 215), 10, 38, 9, "yellow", 3.5)
+    b.arrow([(150, 175), (85, 120)], "white", 4)
+    # Y un láser se deshace al chocar con ella.
+    s, z = (690, 370), (482, 345)
+    b.line([s, z], "red", 6)
+    b.line([s, z], "white", 2, alpha=0.8, passes=1)
+    b.burst(z, 10, 34, 9, "red", 3)
+    # Arriba, el botón del escudo.
+    sh = shield_shape((600, 105), 52)
+    b.hatch(b.poly_mask(sh), "cyan", 9, -35, 2.2, 0.45)
+    b.poly(sh, "white", 4.5)
+    b.line([(608, 72), (588, 108), (606, 108), (594, 140)], "yellow", 4.5)
+    b.line(b.ellipse_pts((600, 105), 74, 74, -90, 160), "cyan", 3.5, alpha=0.85)
+
+
 def draw_speed(b):
     c = (330, 240)
     # Cubito translúcido: apenas el contorno y un poco de color.
@@ -998,6 +1066,7 @@ def draw_mortar(b):
 DRAWINGS = {
     "chaser": draw_chaser, "patroller": draw_patroller, "blocker": draw_blocker,
     "turn": draw_turn, "reverse": draw_reverse, "dash": draw_dash, "stomp": draw_stomp,
+    "immunity": draw_immunity,
     "speed": draw_speed, "key": draw_key, "golden_cube": draw_golden,
     "breakable": draw_breakable, "door": draw_door, "bars": draw_bars, "void": draw_void,
     "bridge": draw_bridge, "teleport": draw_teleport, "spikes": draw_spikes, "laser": draw_laser,
