@@ -294,6 +294,16 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 ## 5. Presentación visual
 
 - **Efectos de sonido:** vuelco del cubo (golpe sordo, con el tono un poco al azar), rebote, giro descartado, llave cogida (campanitas), puerta abierta, golpe y derrumbe de muros destructibles, botón y barrotes, power up, media vuelta (soplido), explosión del cubo, caída al vacío (silbido), crujido de un puente colgante al gastarse y su derrumbe, meta (fanfarria), alarma cuando un perseguidor ve al cubo y clic en los botones de la interfaz. Son sonidos sintetizados (no hay grabaciones externas) con `tools/make_sfx.py` y suenan por el canal «SFX».
+- **Música:** un tema para el menú y uno por cada **zona** del mapa de niveles, compuestos y sintetizados por código (sin grabaciones ni muestras externas) con `tools/make_music.py` en `audio/music/*.ogg`. Suenan por el canal «Music», algo por debajo de los efectos.
+  - **Menú** (88 ppm): tranquilo; marimba en arpegio, pads, campanas y bajo suave.
+  - **I. El mundo de los cubos** (niveles 1-34, 116 ppm): alegre y saltarín; arpegio de cuerda pulsada, bajo que bota, melodía de onda cuadrada y batería ligera.
+  - **II. Las tierras salvajes** (35-60, 120 ppm): aventurero, en modo dórico; flauta, timbales y maracas.
+  - **III. El mundo desconocido** (61-75, 92 ppm): misterioso; pads amplios, campanas con eco y percusión escasa.
+  - **IV. Los territorios corrompidos** (76-100, 104 ppm): tenso, en modo frigio; sierras desafinadas, bajo en corcheas y arpegio rápido.
+  - **V. El núcleo enemigo** (101-115, 132 ppm): intenso; bombo a negras, arpegios de semicorcheas y melodía de sierras.
+  - Cada tema dura un minuto o algo más y suena **en bucle sin cortes**. La intro suena solo al empezar y el bucle vuelve al final de ella (`audio/music/loops.json`).
+  - **Cambios de tema:** con un fundido cruzado de 1,5 s. Al pasar a otro nivel de la misma zona, el tema sigue sin cortarse; también durante la pantalla de carga, y el nuevo tema empieza mientras se prepara el nivel.
+  - **Amortiguado:** en la **pausa** y al **completar el nivel**, la música baja de volumen y pierde los agudos (filtro paso bajo); al continuar, reiniciar o repetir vuelve a la normalidad.
 
 - **Icono de la aplicación:** un cubo isométrico con los colores de las caras del cubo del juego (amarillo, azul y rojo) y la flecha de rumbo, sobre el fondo marrón del menú con trozos de muro de laberinto. En Android se usa también como icono adaptativo (primer plano, fondo y versión monocromática). Se genera con `tools/make_icon.py`.
 - **Estilo de la interfaz — «Bloques»:** los menús y la interfaz de juego imitan bloques de vóxel, sin recargar la pantalla:
@@ -496,7 +506,7 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 ### 7.1. Menú principal
 
 - **Jugar:** abre el selector de niveles.
-- **Opciones:** volumen de **efectos de sonido** y de **música** (0-100%; canales de audio «SFX» y «Music»; todavía no hay música), **antialiasing** (activado/desactivado), **vibración** (activada/desactivada; al activarla vibra brevemente como prueba) e **idioma** (español o inglés). Los cambios se aplican al momento y se guardan en el dispositivo. Por defecto se usa el idioma del sistema si es español o inglés, y si no, inglés.
+- **Opciones:** volumen de **efectos de sonido** y de **música** (0-100%; canales de audio «SFX» y «Music»), **antialiasing** (activado/desactivado), **vibración** (activada/desactivada; al activarla vibra brevemente como prueba) e **idioma** (español o inglés). Los cambios se aplican al momento y se guardan en el dispositivo. Por defecto se usa el idioma del sistema si es español o inglés, y si no, inglés.
 - **Créditos:** equipo de desarrollo, gráficos, sonido, tipografía, herramientas y licencia del motor, en una lista que se puede desplazar.
 - **Salir:** cierra el juego (igual que pulsar Atrás en la pantalla principal).
 

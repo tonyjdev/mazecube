@@ -57,6 +57,8 @@ func _ready() -> void:
 		%LevelMap.start_tapped.connect(_on_start_tapped)
 	_show(GameState.menu_screen)
 	GameState.menu_screen = "main"
+	Music.play("menu")
+	Music.set_muffled(false)
 
 
 func _notification(what: int) -> void:

@@ -9,6 +9,9 @@ extends Node3D
 ## muros, botones y barrotes, power ups, media vuelta, muerte, meta y botones
 ## de la interfaz.
 ##
+## Música (ver Music): el tema de la zona del nivel; se amortigua en la pausa
+## y al completar el nivel.
+##
 ## Vibración (si está activada en Opciones): al destruir un muro, al pulsar
 ## un botón, al morir el cubo y, muy suave, al descartarse un giro.
 ##
@@ -400,6 +403,7 @@ func _set_paused(paused: bool) -> void:
 		_stop_speed_ramp()
 		get_tree().paused = true
 		pause_menu.visible = true
+		Music.set_muffled(true)
 		$UI.visible = false
 		_dragging = false
 		# En la pausa no llegan las sueltas de teclas y dedos.
@@ -410,6 +414,7 @@ func _set_paused(paused: bool) -> void:
 	if not pause_menu.visible:
 		return
 	_close_pause_menu()
+	Music.set_muffled(false)
 	camera.end_explore()
 	await camera.explore_finished
 	# Se ha vuelto a pausar mientras la cámara volvía.
@@ -483,6 +488,7 @@ func _restart() -> void:
 	complete_menu.visible = false
 	pause_button.visible = true
 	_stop_speed_ramp()
+	Music.set_muffled(false)
 	_play_intro()
 
 
@@ -530,6 +536,7 @@ func _load_level(index: int) -> void:
 	GameState.current_level = current_level
 	var data := Levels.get_level(current_level)
 	level.configure(data)
+	Music.play(Music.track_for_level(current_level))
 	_update_level_label()
 	_restart()
 	camera.frame_level(data.get("camera_distance", 0.0))
@@ -548,6 +555,7 @@ func _next_level() -> void:
 
 func _on_reached_goal() -> void:
 	Sfx.play("goal")
+	Music.set_muffled(true)
 	GameState.mark_completed(current_level)
 	pause_button.visible = false
 	var last := current_level >= Levels.count() - 1

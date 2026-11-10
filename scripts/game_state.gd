@@ -67,6 +67,7 @@ func _ready() -> void:
 	_load_progress()
 	apply_settings()
 	_build_fader()
+	Music.attach(self)
 
 
 # --- Fundidos a negro -------------------------------------------------------
