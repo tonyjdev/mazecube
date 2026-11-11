@@ -26,6 +26,9 @@ var _levels: Array[int] = []
 ## Modo «frames»: juega cada nivel FRAMES_TIME segundos y apunta los
 ## fotogramas lentos (más de SLOW_FRAME_MS) con los disparos y explosiones.
 var _frames_mode := false
+## Modo «sky»: solo las variantes del fondo y la luz ambiente, con capturas
+## (user://shot_<nivel>_<n>.png) para comparar el aspecto.
+var _sky_mode := false
 const FRAMES_TIME := 40.0
 const SLOW_FRAME_MS := 25.0
 var _lines: PackedStringArray = []
@@ -41,6 +44,8 @@ static func maybe_start(tree: SceneTree) -> bool:
 	for word in FileAccess.get_file_as_string(REQUEST).split(" ", false):
 		if word.strip_edges() == "frames":
 			bench._frames_mode = true
+		elif word.strip_edges() == "sky":
+			bench._sky_mode = true
 		elif word.strip_edges().is_valid_int():
 			bench._levels.append(int(word.strip_edges()))
 	tree.root.add_child.call_deferred(bench)
@@ -92,34 +97,120 @@ func _bench_level(number: int) -> void:
 	var camera: Node = game.get_node("Camera3D")
 	var atlas: int = ProjectSettings.get_setting_with_override(
 		"rendering/lights_and_shadows/directional_shadow/size")
-	var scale := viewport.scaling_3d_scale
+	var env: Environment = game.get_node("WorldEnvironment").environment
+	var bg := env.background_mode
+	var bg_color := env.background_color
+	var refl := env.reflected_light_source
+	var radiance := env.sky.radiance_size
+	var ambient := env.ambient_light_source
+	var tonemap := env.tonemap_mode
 	var setups := [
-		["normal", {}],
+		["normal (3D al 75 %)", {"scale": 0.75}],
+		["3D al 67 %", {"scale": 0.67}],
+		["3D al 60 %", {"scale": 0.6}],
+		["BASE: 3D al 100 %", {}],
 		["sin MSAA", {"msaa": false}],
-		["3D al 100 %", {"scale": 1.0}],
-		["3D al 100 % + sombra 4096", {"scale": 1.0, "atlas": 4096}],
 		["sin sombras", {"shadows": false}],
+		["fondo de color (sin cielo)", {"sky": false}],
+		["sin tonemap", {"tonemap": false}],
+		["luz por vértice", {"shading": BaseMaterial3D.SHADING_MODE_PER_VERTEX}],
+		["sin iluminación", {"shading": BaseMaterial3D.SHADING_MODE_UNSHADED}],
+		["sin transparentes", {"no_alpha": true}],
+		["solo terreno", {"terrain_only": true}],
+		["sin UI", {"ui": false}],
+		["cielo+vértice+sin MSAA", {"sky": false, "msaa": false,
+			"shading": BaseMaterial3D.SHADING_MODE_PER_VERTEX}],
 		["sin 3D ni UI", {"no3d": true, "ui": false}],
-		["normal (otra vez)", {}],
+		["base 100 % (otra vez)", {}],
 	]
+	if _sky_mode:
+		setups = [
+			["actual", {"shot": true}],
+			["reflejos de 64", {"radiance": Sky.RADIANCE_SIZE_64}],
+			["reflejos de 32", {"radiance": Sky.RADIANCE_SIZE_32, "shot": true}],
+			["sin reflejos del cielo", {"refl": false}],
+			["actual (otra vez)", {}],
+		]
+	var shot := 0
+	var materials := _materials(game)
+	# Sin vsync para ver cuánto margen hay por encima de 60 fps.
+	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+	Engine.max_fps = 0
 	for setup: Array in setups:
 		var o: Dictionary = setup[1]
-		viewport.scaling_3d_scale = o.get("scale", scale)
+		# Base al 100 % para que la GPU no llegue a 60 fps y se vea lo que
+		# ahorra cada cambio (Android no deja quitar la vsync).
+		viewport.scaling_3d_scale = o.get("scale", 1.0)
 		RenderingServer.directional_shadow_atlas_set_size(o.get("atlas", atlas), true)
 		RenderingServer.directional_soft_shadow_filter_set_quality(o.get("quality", shadow_quality))
 		sun.directional_shadow_max_distance = o.get("distance", 40.0)
 		sun.shadow_enabled = o.get("shadows", GameState.shadows)
 		game.get_node("UI").visible = o.get("ui", true)
-		level.visible = not o.get("hide", false)
-		cube.visible = not o.get("hide", false)
 		viewport.disable_3d = o.get("no3d", false)
 		viewport.msaa_3d = Viewport.MSAA_4X if o.get("msaa", GameState.antialiasing) else Viewport.MSAA_DISABLED
-		get_tree().paused = o.get("pause", false)
-		level.set_process(o.get("level", true))
-		camera.set_process(o.get("camera", true))
-		game.set_process(o.get("game", true))
+		var sky: bool = o.get("sky", true)
+		env.background_mode = Environment.BG_SKY if o.get("sky_bg", false) \
+			else bg if sky else Environment.BG_COLOR
+		env.background_color = bg_color
+		env.reflected_light_source = refl if o.get("refl", true) else Environment.REFLECTION_SOURCE_BG
+		if env.sky.radiance_size != o.get("radiance", radiance):
+			env.sky.radiance_size = o.get("radiance", radiance)
+			await _wait(1.0)
+		env.ambient_light_source = ambient if sky and o.get("amb", true) else Environment.AMBIENT_SOURCE_COLOR
+		env.ambient_light_color = Color(0.5, 0.55, 0.62)
+		env.tonemap_mode = tonemap if o.get("tonemap", true) else Environment.TONE_MAPPER_LINEAR
+		var hidden: Array = []
+		for mat in materials:
+			if not is_instance_valid(mat):
+				continue
+			mat.shading_mode = o.get("shading", materials[mat]["shading"])
+			if o.get("no_alpha", false) and mat.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
+				for node in materials[mat]["nodes"]:
+					if is_instance_valid(node) and node.visible:
+						node.visible = false
+						hidden.append(node)
+		if o.get("terrain_only", false):
+			for node in level.get_children():
+				if node is Node3D and node != level._terrain and node.visible:
+					node.visible = false
+					hidden.append(node)
+			if cube.visible:
+				cube.visible = false
+				hidden.append(cube)
+		if o.has("shading"):
+			# Recompilación de los shaders.
+			await _wait(2.0)
 		await _sample(setup[0])
+		if o.get("shot", false):
+			shot += 1
+			viewport.get_texture().get_image().save_png("user://shot_%d_%d.png" % [number, shot])
+		for node in hidden:
+			if is_instance_valid(node):
+				node.visible = true
 	cube.set_process(true)
+
+
+## Materiales 3D de la escena -> { "shading": modo original, "nodes": nodos que lo usan }.
+func _materials(root: Node) -> Dictionary:
+	var result := {}
+	for node in root.find_children("*", "GeometryInstance3D", true, false):
+		var mats: Array = [node.material_override]
+		var mesh: Mesh = null
+		if node is MeshInstance3D:
+			mesh = node.mesh
+			for i in node.get_surface_override_material_count():
+				mats.append(node.get_surface_override_material(i))
+		elif node is MultiMeshInstance3D and node.multimesh:
+			mesh = node.multimesh.mesh
+		if mesh:
+			for i in mesh.get_surface_count():
+				mats.append(mesh.surface_get_material(i))
+		for mat in mats:
+			if mat is BaseMaterial3D:
+				if not result.has(mat):
+					result[mat] = {"shading": mat.shading_mode, "nodes": []}
+				result[mat]["nodes"].append(node)
+	return result
 
 
 func _log_slow_frames(number: int, level: Level) -> void:
@@ -163,6 +254,8 @@ func _sample(label: String) -> void:
 	var prims := 0.0
 	var cpu := 0.0
 	var gpu := 0.0
+	var script_ms := 0.0
+	var objects := 0.0
 	while last < end:
 		await get_tree().process_frame
 		var now := Time.get_ticks_usec()
@@ -174,9 +267,12 @@ func _sample(label: String) -> void:
 		cpu += RenderingServer.viewport_get_measured_render_time_cpu(rid) \
 			+ RenderingServer.get_frame_setup_time_cpu()
 		gpu += RenderingServer.viewport_get_measured_render_time_gpu(rid)
+		script_ms += Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
+		objects += Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)
 	var ms := (last - start) / 1000.0 / frames
-	_log("  %-22s %5.1f fps %5.1f ms/f peor %5.1f | render CPU %4.1f GPU %5.1f ms | draws %4d tris %4dk" % [
-		label, 1000.0 / ms, ms, worst, cpu / frames, gpu / frames, draws / frames, prims / frames / 1000.0])
+	_log("  %-22s %5.1f fps %5.1f ms/f peor %5.1f | render CPU %4.1f GPU %5.1f ms | proceso %4.1f ms | objs %4d draws %4d tris %4dk" % [
+		label, 1000.0 / ms, ms, worst, cpu / frames, gpu / frames, script_ms / frames,
+		objects / frames, draws / frames, prims / frames / 1000.0])
 
 
 func _wait(seconds: float) -> void:

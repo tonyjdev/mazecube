@@ -20,9 +20,11 @@
 sky_material = SubResource("ProceduralSkyMaterial_sgp6g")
 
 [sub_resource type="Environment" id="Environment_0wfyh"]
-background_mode = 2
+background_mode = 1
+background_color = Color(0.239, 0.2, 0.145, 1)
 sky = SubResource("Sky_o5qli")
 ambient_light_source = 3
+reflected_light_source = 2
 tonemap_mode = 2
 
 [node name="Game" type="Node3D" unique_id=2002183193]
