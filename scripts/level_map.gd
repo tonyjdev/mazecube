@@ -91,6 +91,15 @@ var _image_size := Vector2.ONE
 var _circles: Array[Dictionary] = []
 var _zones: Array[Rect2] = []
 var _start_label := Rect2()
+## Capas del dibujo (ver _create_layers).
+var _content: Node2D
+var _active_node: Node2D
+var _ring_node: Node2D
+var _badge_nodes: Array[Node2D] = []
+var _star_nodes: Array[Node2D] = []
+## Nivel activo y tamaño de letra de los carteles (calculados en _rebuild).
+var _active := 0
+var _zone_font_size := 0
 
 
 func _ready() -> void:
@@ -98,7 +107,15 @@ func _ready() -> void:
 	focus_mode = Control.FOCUS_ALL
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	resized.connect(_on_resized)
+	focus_entered.connect(_update_ring)
+	focus_exited.connect(_update_ring)
 	_load_layout()
+	_create_layers()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSLATION_CHANGED:
+		_rebuild()
 
 
 ## Rehace el mapa (progreso o idioma cambiados) y centra el nivel activo.
@@ -108,13 +125,14 @@ func refresh() -> void:
 	# Se centra en el siguiente fotograma, cuando el mapa ya tiene su tamaño.
 	_center_pending = true
 	_follow_selected = true
-	queue_redraw()
+	_rebuild()
 
 
 func _on_resized() -> void:
 	if _follow_selected and size.y > 0.0:
 		_center_on(_selected)
 	_clamp_scroll()
+	_rebuild()
 
 
 func _load_layout() -> void:
@@ -151,7 +169,8 @@ func _process(delta: float) -> void:
 		_scroll += _velocity * delta
 		_velocity *= maxf(0.0, 1.0 - FRICTION * delta)
 		_clamp_scroll()
-	queue_redraw()
+	if _active_node and _active_node.visible:
+		_active_node.scale = Vector2.ONE * (1.0 + PULSE_AMOUNT * sin(_time * PULSE_SPEED))
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -207,91 +226,165 @@ func _gui_input(event: InputEvent) -> void:
 
 
 # --- Dibujo -------------------------------------------------------------------
+#
+# Para que el desplazamiento sea fluido no se redibuja nada al mover el mapa:
+# todo cuelga de _content, que se dibuja una sola vez (en _rebuild) en
+# coordenadas de la imagen ya escalada, y al desplazarse solo cambia su
+# posición. Cada círculo es su propio CanvasItem (insignia y estrellas), así
+# que el motor descarta los que quedan fuera de la pantalla. El círculo activo
+# late cambiando la escala de su nodo, sin redibujarlo.
 
-func _draw() -> void:
+func _create_layers() -> void:
+	_content = Node2D.new()
+	_content.name = "Content"
+	add_child(_content)
+	_content.draw.connect(_draw_content)
+	var badges := Node2D.new()
+	badges.name = "Badges"
+	_content.add_child(badges)
+	_active_node = Node2D.new()
+	_active_node.name = "Active"
+	_content.add_child(_active_node)
+	_active_node.draw.connect(_draw_active)
+	var stars := Node2D.new()
+	stars.name = "Stars"
+	_content.add_child(stars)
+	_ring_node = Node2D.new()
+	_ring_node.name = "Ring"
+	_content.add_child(_ring_node)
+	_ring_node.draw.connect(_draw_ring)
+	for i in _circles.size():
+		var badge := Node2D.new()
+		badges.add_child(badge)
+		badge.draw.connect(_draw_badge.bind(badge, i))
+		_badge_nodes.append(badge)
+		var star := Node2D.new()
+		stars.add_child(star)
+		star.draw.connect(_draw_stars.bind(star, i))
+		_star_nodes.append(star)
+
+
+## Vuelve a dibujar todo el mapa (tamaño, progreso o idioma cambiados).
+func _rebuild() -> void:
+	if _content == null or size.x <= 0.0 or size.y <= 0.0:
+		return
 	var scale := _scale()
-	var origin := _image_origin()
-	draw_texture_rect(MAP_TEXTURE, Rect2(origin, _image_size * scale), false)
 	var font := get_theme_default_font()
 	# Todos los carteles con el mismo tamaño de letra: el que cabe en todos.
-	var zone_font_size := 0
+	_zone_font_size = 0
 	for i in _zones.size():
-		var fit := _fit_font_size(_zone_text_area(_to_screen_rect(_zones[i])), _zone_words(i), font)
-		zone_font_size = fit if zone_font_size == 0 else mini(zone_font_size, fit)
-	for i in _zones.size():
-		var rect := _to_screen_rect(_zones[i])
-		if rect.end.y < 0.0 or rect.position.y > size.y:
-			continue
-		_draw_fitted_text(_zone_text_area(rect), _zone_words(i), font, TEXT_COLOR,
-			HORIZONTAL_ALIGNMENT_LEFT, zone_font_size)
-	_draw_fitted_text(_to_screen_rect(_start_label), [tr("MAP_START")], font, TEXT_COLOR)
-	var active := _next_level()
-	var visible_circles: Array[int] = []
+		var fit := _fit_font_size(_zone_text_area(_scaled_rect(_zones[i])), _zone_words(i), font)
+		_zone_font_size = fit if _zone_font_size == 0 else mini(_zone_font_size, fit)
+	_active = _next_level()
 	for i in _circles.size():
-		var center := _circle_center(i)
-		if center.y < -60.0 or center.y > size.y + 60.0:
-			continue
-		visible_circles.append(i)
-		_draw_circle_state(i, center, i == active, font)
-	# Las estrellas, encima de todos los círculos.
-	for i in visible_circles:
-		if i < Levels.count() and GameState.is_completed(i):
-			_draw_level_stars(i, _circle_center(i))
+		var center: Vector2 = _circles[i]["pos"] * scale
+		_badge_nodes[i].position = center
+		_badge_nodes[i].queue_redraw()
+		_star_nodes[i].position = center
+		_star_nodes[i].visible = i < Levels.count() and GameState.is_completed(i)
+		_star_nodes[i].queue_redraw()
+	_active_node.visible = _has_active()
+	if _active < _circles.size():
+		_active_node.position = _circles[_active]["pos"] * scale
+	_active_node.queue_redraw()
+	_update_ring()
+	_content.queue_redraw()
+	_update_content_position()
 
 
-func _draw_circle_state(i: int, center: Vector2, is_active: bool, font: Font) -> void:
-	var circle_size: Vector2 = _circles[i]["size"] * _scale()
-	var exists := i < Levels.count()
-	var completed := exists and GameState.is_completed(i)
-	var texture: Texture2D = null
-	var outline := LOCKED_OUTLINE
-	var text_color := LOCKED_TEXT
-	var grow := 1.0
+func _has_active() -> bool:
+	return _active < Levels.count() and _active < _circles.size() and GameState.is_unlocked(_active)
+
+
+func _update_content_position() -> void:
+	if _content:
+		var origin := _image_origin()
+		if _content.position != origin:
+			_content.position = origin
+
+
+func _update_ring() -> void:
+	if _ring_node == null:
+		return
+	_ring_node.visible = has_focus() and _selected < _circles.size()
+	if _ring_node.visible:
+		_ring_node.position = _circles[_selected]["pos"] * _scale()
+		_ring_node.queue_redraw()
+
+
+## La imagen y los rótulos de las zonas y de «INICIO».
+func _draw_content() -> void:
+	var scale := _scale()
+	_content.draw_texture_rect(MAP_TEXTURE, Rect2(Vector2.ZERO, _image_size * scale), false)
+	var font := get_theme_default_font()
+	for i in _zones.size():
+		_draw_fitted_text(_content, _zone_text_area(_scaled_rect(_zones[i])), _zone_words(i), font,
+			TEXT_COLOR, HORIZONTAL_ALIGNMENT_LEFT, _zone_font_size)
+	_draw_fitted_text(_content, _scaled_rect(_start_label), [tr("MAP_START")], font, TEXT_COLOR)
+
+
+## Círculo `i` (completado, bloqueado o que aún no existe); el activo lo
+## dibuja _active_node.
+func _draw_badge(canvas: Node2D, i: int) -> void:
+	if i == _active and _has_active():
+		return
+	var completed := i < Levels.count() and GameState.is_completed(i)
 	if completed:
-		texture = DONE_TEXTURE
-		outline = DONE_OUTLINE
-		text_color = TEXT_COLOR
-	if is_active and exists and GameState.is_unlocked(i):
-		texture = ACTIVE_TEXTURE
-		outline = ACTIVE_OUTLINE
-		text_color = TEXT_COLOR
-		grow = 1.0 + PULSE_AMOUNT * sin(_time * PULSE_SPEED)
+		_draw_circle_face(canvas, i, DONE_TEXTURE, DONE_OUTLINE, TEXT_COLOR)
+	else:
+		_draw_circle_face(canvas, i, null, LOCKED_OUTLINE, LOCKED_TEXT)
+
+
+func _draw_active() -> void:
+	if _has_active():
+		_draw_circle_face(_active_node, _active, ACTIVE_TEXTURE, ACTIVE_OUTLINE, TEXT_COLOR)
+
+
+## Dibuja el círculo `i` centrado en el origen de `canvas`: el sprite
+## coloreado (si hay) y el número.
+func _draw_circle_face(canvas: CanvasItem, i: int, texture: Texture2D, outline: Color,
+		text_color: Color) -> void:
+	var circle_size: Vector2 = _circles[i]["size"] * _scale()
 	if texture:
-		var k := circle_size.x / SPRITE_INNER_W * grow
+		var k := circle_size.x / SPRITE_INNER_W
 		var tex_size := Vector2(texture.get_width(), texture.get_height()) * k
-		var top_left := center - Vector2(tex_size.x * 0.5, SPRITE_FACE_Y * k)
-		draw_texture_rect(texture, Rect2(top_left, tex_size), false)
-	if i == _selected and has_focus():
-		_draw_ellipse_ring(center, circle_size * 0.5 + Vector2(10, 8), SELECTED_RING, 3.0)
+		var top_left := -Vector2(tex_size.x * 0.5, SPRITE_FACE_Y * k)
+		canvas.draw_texture_rect(texture, Rect2(top_left, tex_size), false)
+	var font := get_theme_default_font()
 	var number := str(i + 1)
-	var font_size := maxi(8, int(circle_size.y * NUMBER_SCALE * grow))
+	var font_size := maxi(8, int(circle_size.y * NUMBER_SCALE))
 	var text_size := font.get_string_size(number, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
-	var baseline := center + Vector2(-text_size.x * 0.5,
+	var baseline := Vector2(-text_size.x * 0.5,
 		font.get_ascent(font_size) * 0.5 - font.get_descent(font_size) * 0.3)
-	draw_string_outline(font, baseline, number, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size,
+	canvas.draw_string_outline(font, baseline, number, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size,
 		maxi(2, font_size / 6), outline)
-	draw_string(font, baseline, number, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, text_color)
+	canvas.draw_string(font, baseline, number, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, text_color)
 
 
 ## Las tres estrellas de la mejor partida, en arco bajo el círculo.
-func _draw_level_stars(i: int, center: Vector2) -> void:
+func _draw_stars(canvas: Node2D, i: int) -> void:
+	if i >= Levels.count() or not GameState.is_completed(i):
+		return
 	var circle_size: Vector2 = _circles[i]["size"] * _scale()
 	var stars := GameState.best_stars(i)
 	var radius := circle_size.x * STAR_RADIUS
 	var spacing := circle_size.x * STAR_SPACING
-	var base := center + Vector2(0, circle_size.y * 0.5 + radius * 0.9)
+	var base := Vector2(0, circle_size.y * 0.5 + radius * 0.9)
 	for k in 3:
 		var offset := k - 1
 		var pos := base + Vector2(offset * spacing, absf(offset) * circle_size.x * STAR_ARC)
-		StarIcon.draw_star(self, pos, radius, stars.size() == 3 and stars[k])
+		StarIcon.draw_star(canvas, pos, radius, stars.size() == 3 and stars[k])
 
 
-func _draw_ellipse_ring(center: Vector2, radii: Vector2, color: Color, width: float) -> void:
+func _draw_ring() -> void:
+	if _selected >= _circles.size():
+		return
+	var radii: Vector2 = _circles[_selected]["size"] * _scale() * 0.5 + Vector2(10, 8)
 	var points := PackedVector2Array()
 	for s in 41:
 		var a := TAU * s / 40.0
-		points.append(center + Vector2(cos(a) * radii.x, sin(a) * radii.y))
-	draw_polyline(points, color, width, true)
+		points.append(Vector2(cos(a) * radii.x, sin(a) * radii.y))
+	_ring_node.draw_polyline(points, SELECTED_RING, 3.0, true)
 
 
 ## Texto del cartel de la zona `i`: el número romano seguido del nombre
@@ -325,10 +418,10 @@ func _fit_font_size(rect: Rect2, words: Array[String], font: Font) -> int:
 	return font_size
 
 
-## Escribe `words` en `rect`, repartidas en líneas y centradas en vertical.
+## Escribe `words` en `rect` (en `canvas`), repartidas en líneas y centradas en vertical.
 ## `align` es la alineación horizontal de cada línea (izquierda o centro) y
 ## `font_size` el tamaño de letra (0 = el más grande que quepa).
-func _draw_fitted_text(rect: Rect2, words: Array[String], font: Font, color: Color,
+func _draw_fitted_text(canvas: CanvasItem, rect: Rect2, words: Array[String], font: Font, color: Color,
 		align := HORIZONTAL_ALIGNMENT_CENTER, font_size := 0) -> void:
 	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
 		return
@@ -344,8 +437,8 @@ func _draw_fitted_text(rect: Rect2, words: Array[String], font: Font, color: Col
 		if align == HORIZONTAL_ALIGNMENT_CENTER:
 			x += (rect.size.x - w) * 0.5
 		var pos := Vector2(x, y)
-		draw_string_outline(font, pos, line, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, outline_size, LABEL_OUTLINE)
-		draw_string(font, pos, line, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
+		canvas.draw_string_outline(font, pos, line, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, outline_size, LABEL_OUTLINE)
+		canvas.draw_string(font, pos, line, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, color)
 		y += line_h
 
 
@@ -393,6 +486,11 @@ func _to_screen_rect(rect: Rect2) -> Rect2:
 	return Rect2(_to_screen(rect.position), rect.size * _scale())
 
 
+## `rect` de la imagen, escalado (en coordenadas de _content).
+func _scaled_rect(rect: Rect2) -> Rect2:
+	return Rect2(rect.position * _scale(), rect.size * _scale())
+
+
 func _circle_center(i: int) -> Vector2:
 	return _to_screen(_circles[i]["pos"])
 
@@ -416,6 +514,7 @@ func _tap(at: Vector2) -> void:
 func _select(index: int) -> void:
 	_selected = clampi(index, 0, _selectable_count() - 1)
 	_center_on(_selected, false)
+	_update_ring()
 
 
 func _selectable_count() -> int:
@@ -459,6 +558,7 @@ func _clamp_scroll() -> void:
 	if clamped != _scroll:
 		_velocity = 0.0
 	_scroll = clamped
+	_update_content_position()
 
 
 func _now() -> float:

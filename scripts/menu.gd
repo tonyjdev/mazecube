@@ -113,6 +113,9 @@ func _show(screen: String) -> void:
 	_current = screen
 	for name in _screens:
 		_screens[name].visible = name == screen
+	# El mapa de niveles tapa toda la pantalla: el fondo animado no se ve y
+	# solo gastaría tiempo de dibujo.
+	$Background.visible = screen != "levels"
 	match screen:
 		"levels":
 			_build_level_grid()
