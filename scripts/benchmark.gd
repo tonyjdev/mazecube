@@ -29,6 +29,11 @@ var _frames_mode := false
 ## Modo «sky»: solo las variantes del fondo y la luz ambiente, con capturas
 ## (user://shot_<nivel>_<n>.png) para comparar el aspecto.
 var _sky_mode := false
+## Modo «matte»: brillo especular desactivado en los materiales mates o en
+## todos, con capturas.
+var _matte_mode := false
+## Modo «repeat»: la misma medida varias veces sin tocar nada.
+var _repeat_mode := false
 const FRAMES_TIME := 40.0
 const SLOW_FRAME_MS := 25.0
 var _lines: PackedStringArray = []
@@ -46,6 +51,10 @@ static func maybe_start(tree: SceneTree) -> bool:
 			bench._frames_mode = true
 		elif word.strip_edges() == "sky":
 			bench._sky_mode = true
+		elif word.strip_edges() == "matte":
+			bench._matte_mode = true
+		elif word.strip_edges() == "repeat":
+			bench._repeat_mode = true
 		elif word.strip_edges().is_valid_int():
 			bench._levels.append(int(word.strip_edges()))
 	tree.root.add_child.call_deferred(bench)
@@ -131,6 +140,15 @@ func _bench_level(number: int) -> void:
 			["sin reflejos del cielo", {"refl": false}],
 			["actual (otra vez)", {}],
 		]
+	if _matte_mode:
+		setups = [
+			["actual", {"shot": true}],
+			["mates sin especular", {"specular": "matte", "shot": true}],
+			["todos sin especular", {"specular": "all", "shot": true}],
+			["actual (otra vez)", {}],
+		]
+	if _repeat_mode:
+		setups = [["actual 1", {}], ["actual 2", {}], ["actual 3", {}], ["actual 4", {}]]
 	var shot := 0
 	var materials := _materials(game)
 	# Sin vsync para ver cuánto margen hay por encima de 60 fps.
@@ -164,6 +182,10 @@ func _bench_level(number: int) -> void:
 			if not is_instance_valid(mat):
 				continue
 			mat.shading_mode = o.get("shading", materials[mat]["shading"])
+			var spec: String = o.get("specular", "")
+			var matte: bool = mat.roughness >= 0.8 and mat.metallic == 0.0
+			mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED \
+				if spec == "all" or (spec == "matte" and matte) else materials[mat]["specular"]
 			if o.get("no_alpha", false) and mat.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
 				for node in materials[mat]["nodes"]:
 					if is_instance_valid(node) and node.visible:
@@ -177,7 +199,7 @@ func _bench_level(number: int) -> void:
 			if cube.visible:
 				cube.visible = false
 				hidden.append(cube)
-		if o.has("shading"):
+		if o.has("shading") or o.has("specular"):
 			# Recompilación de los shaders.
 			await _wait(2.0)
 		await _sample(setup[0])
@@ -208,7 +230,7 @@ func _materials(root: Node) -> Dictionary:
 		for mat in mats:
 			if mat is BaseMaterial3D:
 				if not result.has(mat):
-					result[mat] = {"shading": mat.shading_mode, "nodes": []}
+					result[mat] = {"shading": mat.shading_mode, "specular": mat.specular_mode, "nodes": []}
 				result[mat]["nodes"].append(node)
 	return result
 

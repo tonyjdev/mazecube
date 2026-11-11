@@ -89,6 +89,10 @@ static func material(id: String, face: String, tint := Color.WHITE) -> StandardM
 	mat.roughness = info.get("roughness", 0.9)
 	mat.metallic = info.get("metallic", 0.0)
 	mat.metallic_specular = info.get("specular", 0.5)
+	# Sin el destello directo del sol: con el ángulo de la cámara no se llega
+	# a ver y en el móvil cuesta hasta 9 fps en pantallas llenas de bloques.
+	# Los reflejos del cielo (lo que da el brillo al metal o al hielo) siguen.
+	mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 	if info.has("emission"):
 		mat.emission_enabled = true
 		mat.emission = Color.BLACK
