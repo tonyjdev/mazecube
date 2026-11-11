@@ -36,9 +36,10 @@ extends Node3D
 ## lo que hubiera pendiente.
 ## - Dash: el cubo se arrastra sin volcar hasta la casilla de delante en
 ##   DASH_TIME segundos. Antes destruye a cualquier enemigo que la ocupe y, si
-##   es un muro destructible, lo rompe de una vez y pasa sin rebotar. Si
-##   delante hay una pared, puerta, barrotes o un botón, el dash se queda en un
-##   choque normal (rebote). Si es vacío, se cae.
+##   es un muro destructible, lo rompe de una vez y pasa sin rebotar. Si es
+##   un cofre, lo abre (ver Level.open_chest) y rebota. Si delante hay una
+##   pared, puerta, barrotes o un botón, el dash se queda en un choque normal
+##   (rebote). Si es vacío, se cae.
 ## - Pisotón: salta y cae con fuerza en su casilla (STOMP_TIME en total). Al
 ##   caer destruye a los enemigos a `stomp_radius` casillas o menos (cuadrado,
 ##   diagonales incluidas, sin importar las paredes) y quita
@@ -56,7 +57,9 @@ extends Node3D
 ##
 ## Enemigos: si un perseguidor o un patrullero lo toca (lo comprueba Level),
 ## el cubo explota en pedazos de sus colores (ver CubeExplosion) y, cuando
-## termina la explosión, vuelve a su casilla de salida con el rumbo inicial. Conserva la
+## termina la explosión, vuelve a la casilla de inicio activada (ver
+## Level.respawn_cell: la salida, con el rumbo inicial, o la última casilla de
+## inicio por la que ha pasado, con el rumbo que llevaba). Conserva la
 ## llave que llevaba, pierde los power ups y el tablero se queda como estaba.
 ## Al reaparecer hace la animación de aparición (ver más abajo) y después
 ## se «disuelve» a medias (ver CubeDissolve) y es invulnerable durante
@@ -85,6 +88,9 @@ extends Node3D
 ## Durante todo el teletransporte no atiende giros ni acciones (lo pendiente
 ## se olvida) y es invulnerable. Salir de la casilla de destino rodando no
 ## lo teletransporta; volver a entrar en ella, sí.
+##
+## Monedas: las coge Level al pasar el cubo por encima; con el imán
+## (`magnet_radius` > 0) las atrae desde esa distancia (ver Level._update_coins).
 ##
 ## Power ups: al llegar a su casilla el cubo lo coge y se activa su efecto.
 ## Las reglas de cada tipo (acumulación, duración, fin al rebotar...) las
@@ -234,6 +240,9 @@ static var _smoke_material: StandardMaterial3D
 ## Segundos que dura la inmunidad. Podrá cambiar con otros eventos del juego
 ## (se lee al activarla).
 @export var immunity_time := 3.0
+## Casillas alrededor desde las que atrae las monedas (0 = sin imán; ver
+## Abilities.MAGNET).
+@export var magnet_radius := 0.0
 
 var level: Level
 var cell := Vector2i.ZERO
@@ -537,6 +546,7 @@ func _try_advance() -> void:
 		# botón) o es vacío, sigue como un avance normal: choque o caída.
 		var target := cell + heading
 		level.destroy_enemies_at(target)
+		level.open_chest(target)
 		if level.breakable_hits(target) > 0:
 			level.smash_breakable(target, heading)
 			breakable_hit.emit(target, 0)
@@ -828,6 +838,7 @@ func _on_roll_finished(next: Vector2i) -> void:
 		_pick_power_up(power_up)
 	if level.take_collectible(cell):
 		collectible_picked.emit()
+	level.cube_entered(cell, heading)
 	_update_held_key(Vector3.ZERO)
 	rolled.emit(cell)
 	var partner := level.teleport_partner(cell)
@@ -1048,8 +1059,8 @@ func _respawn() -> void:
 		return
 	_explosion = null
 	_dead = false
-	cell = level.start_cell
-	heading = level.start_heading
+	cell = level.respawn_cell()
+	heading = level.respawn_heading()
 	global_position = level.cell_to_world(cell)
 	_cooldown = 0.3
 	# Espera oculto en la salida a que se llame a appear() (cuando la cámara

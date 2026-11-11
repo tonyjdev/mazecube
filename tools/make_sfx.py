@@ -345,6 +345,23 @@ def main():
         for j, v in enumerate(tick):
             hum[(start + j) % n] += v
     save("immunity_hum", hum, peak=0.45)
+    # Moneda cogida: «cling» corto de dos campanitas agudas.
+    save("coin", mix(tone(1975.5, 0.22, "bell", decay=0.07, volume=0.8),
+                     offset(tone(2637.0, 0.3, "bell", decay=0.1, volume=0.9), 0.055)), peak=0.45)
+    # Cofre abierto: golpe de madera, crujido de la tapa y lluvia de brillos.
+    chest = [tone(110, 0.25, "triangle", decay=0.06, sweep_to=70, volume=0.9),
+             noise(0.12, decay=0.03, lowpass=0.12, volume=0.8),
+             offset(tone(320, 0.18, "square", attack=0.02, decay=0.07, sweep_to=520, volume=0.18), 0.03)]
+    for k, f in enumerate((1046.5, 1318.5, 1568.0, 2093.0)):
+        chest.append(offset(tone(f, 0.6, "bell", decay=0.2, volume=0.55), 0.12 + k * 0.06))
+    for k in range(8):
+        chest.append(offset(tone(rng.uniform(2800, 4000), 0.1, decay=0.025, volume=0.2), 0.2 + k * 0.05))
+    save("chest", mix(*chest), peak=0.6)
+    # Casilla de inicio activada: acorde que sube suave (do-mi-sol) con brillo.
+    chime = [offset(tone(f, 0.7, "bell", decay=0.25, volume=0.6), i * 0.07)
+             for i, f in enumerate((523.25, 659.25, 783.99, 1046.5))]
+    chime.append(tone(392, 0.5, "triangle", attack=0.03, decay=0.2, sweep_to=784, volume=0.25))
+    save("checkpoint", mix(*chime), peak=0.5)
     print("Sonidos generados en", OUT)
 
 

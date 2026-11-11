@@ -3,12 +3,12 @@ extends Control
 ## Pantalla de la tienda: se abre al chocar con una tienda del mapa (ver
 ## ShopBuilding y Game) con el juego en pausa.
 ##
-## Arriba, el título y los puntos que se tienen; en medio, una ficha por
+## Arriba, el título y las monedas que se tienen; en medio, una ficha por
 ## habilidad (ver Abilities) con su dibujo de la enciclopedia, el nombre, el
 ## nivel comprado, qué hace, el efecto del siguiente nivel y el botón de
-## comprar o mejorar con su precio (desactivado si no llegan los puntos, si
+## comprar o mejorar con su precio (desactivado si no llegan las monedas, si
 ## ya está al máximo o si le falta una habilidad que necesita); abajo, de
-## dónde salen los puntos y el botón Salir. Esc o Atrás también la cierran.
+## dónde salen las monedas y el botón Salir. Esc o Atrás también la cierran.
 ## Funciona con el juego en pausa (process_mode = ALWAYS).
 
 signal closed
@@ -21,11 +21,16 @@ const CARD_OWNED_COLOR := Color(0.24, 0.3, 0.2, 1.0)
 const CARD_BORDER := Color(0.45, 0.36, 0.27, 1.0)
 const GOLD := Color(0.98, 0.85, 0.3)
 const SOFT := Color(0.85, 0.8, 0.72)
-const CARD_WIDTH := 212.0
-const IMAGE_SIZE := Vector2(184, 130)
+const CARD_WIDTH := 180.0
+const IMAGE_SIZE := Vector2(156, 110)
 const OPEN_TIME := 0.18
+## Margen mínimo (px) entre el panel y el borde de la pantalla.
+const FIT_MARGIN := 16.0
 const ART_DIR := "res://ui/encyclopedia/"
-const ART_OVERRIDES := {Abilities.RECHARGE: "res://ui/shop/recharge.svg"}
+const ART_OVERRIDES := {
+	Abilities.RECHARGE: "res://ui/shop/recharge.svg",
+	Abilities.MAGNET: "res://ui/shop/magnet.svg",
+}
 ## Clave del nombre de cada habilidad (las de la enciclopedia cuando existen).
 const NAME_KEYS := {
 	Abilities.REVERSE: "ENC_REVERSE_NAME",
@@ -33,9 +38,10 @@ const NAME_KEYS := {
 	Abilities.STOMP: "ENC_STOMP_NAME",
 	Abilities.IMMUNITY: "ENC_IMMUNITY_NAME",
 	Abilities.RECHARGE: "SHOP_RECHARGE_NAME",
+	Abilities.MAGNET: "SHOP_MAGNET_NAME",
 }
 
-var _points_label: Label
+var _coins_label: Label
 var _panel: PanelContainer
 ## id -> { "card", "level", "value", "button" }
 var _cards := {}
@@ -54,7 +60,7 @@ func _init() -> void:
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_TRANSLATION_CHANGED and _points_label != null:
+	if what == NOTIFICATION_TRANSLATION_CHANGED and _coins_label != null:
 		_refresh()
 
 
@@ -65,11 +71,12 @@ func open() -> void:
 	if _tween and _tween.is_valid():
 		_tween.kill()
 	modulate.a = 0.0
-	_panel.pivot_offset = _panel.size * 0.5
-	_panel.scale = Vector2.ONE * 0.94
+	var fit := _fit_scale()
+	_panel.pivot_offset = _panel.get_combined_minimum_size() * 0.5
+	_panel.scale = Vector2.ONE * fit * 0.94
 	_tween = create_tween().set_parallel()
 	_tween.tween_property(self, "modulate:a", 1.0, OPEN_TIME)
-	_tween.tween_property(_panel, "scale", Vector2.ONE, OPEN_TIME * 1.4) \
+	_tween.tween_property(_panel, "scale", Vector2.ONE * fit, OPEN_TIME * 1.4) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	if not OS.has_feature("mobile"):
 		_close_button.grab_focus.call_deferred()
@@ -91,6 +98,14 @@ func is_open() -> bool:
 	return _open
 
 
+## Escala del panel para que quepa en la pantalla con un margen (1 si ya
+## cabe; con seis fichas no cabe en 16:9).
+func _fit_scale() -> float:
+	var need := _panel.get_combined_minimum_size() + Vector2(FIT_MARGIN, FIT_MARGIN) * 2.0
+	var room := get_viewport_rect().size
+	return minf(1.0, minf(room.x / need.x, room.y / need.y))
+
+
 func _input(event: InputEvent) -> void:
 	if _open and event.is_action_pressed("ui_cancel"):
 		Sfx.play("click")
@@ -103,11 +118,14 @@ func _build() -> void:
 	dim.color = DIM_COLOR
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(dim)
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(center)
+	# Anclado al centro (y no en un CenterContainer, que crecería con el panel
+	# y lo dejaría pegado a la izquierda): así se escala desde el centro (ver
+	# _fit_scale).
 	_panel = PanelContainer.new()
-	center.add_child(_panel)
+	_panel.set_anchors_preset(Control.PRESET_CENTER)
+	_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	add_child(_panel)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 12)
 	_panel.add_child(box)
@@ -127,11 +145,18 @@ func _build() -> void:
 	title.add_theme_font_size_override("font_size", 40)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
-	_points_label = Label.new()
-	_points_label.add_theme_font_size_override("font_size", 32)
-	_points_label.add_theme_color_override("font_color", GOLD)
-	_points_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	header.add_child(_points_label)
+	var coin := TextureRect.new()
+	coin.texture = load("res://ui/hud_coin.svg")
+	coin.custom_minimum_size = Vector2(36, 36)
+	coin.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	coin.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	coin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	header.add_child(coin)
+	_coins_label = Label.new()
+	_coins_label.add_theme_font_size_override("font_size", 32)
+	_coins_label.add_theme_color_override("font_color", GOLD)
+	_coins_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	header.add_child(_coins_label)
 
 	var cards := HBoxContainer.new()
 	cards.add_theme_constant_override("separation", 12)
@@ -177,7 +202,7 @@ func _build_card(id: String) -> Control:
 	box.add_child(art)
 	var name_label := Label.new()
 	name_label.text = NAME_KEYS[id]
-	name_label.add_theme_font_size_override("font_size", 26)
+	name_label.add_theme_font_size_override("font_size", 24)
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(name_label)
 	var level := Label.new()
@@ -187,7 +212,7 @@ func _build_card(id: String) -> Control:
 	box.add_child(level)
 	var desc := Label.new()
 	desc.text = "SHOP_%s_DESC" % id.to_upper()
-	desc.add_theme_font_size_override("font_size", 17)
+	desc.add_theme_font_size_override("font_size", 16)
 	desc.add_theme_color_override("font_color", SOFT)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -195,12 +220,14 @@ func _build_card(id: String) -> Control:
 	desc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	box.add_child(desc)
 	var value := Label.new()
-	value.add_theme_font_size_override("font_size", 18)
+	value.add_theme_font_size_override("font_size", 17)
 	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	value.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	value.custom_minimum_size = Vector2(CARD_WIDTH - 20.0, 0)
 	box.add_child(value)
 	var button := Button.new()
 	button.custom_minimum_size = Vector2(0, 58)
-	button.add_theme_font_size_override("font_size", 22)
+	button.add_theme_font_size_override("font_size", 20)
 	button.focus_mode = Control.FOCUS_ALL
 	button.pressed.connect(_buy.bind(id))
 	box.add_child(button)
@@ -235,7 +262,7 @@ func _buy(id: String) -> void:
 
 
 func _refresh() -> void:
-	_points_label.text = tr("SHOP_POINTS") % GameState.points()
+	_coins_label.text = tr("SHOP_COINS") % GameState.coins()
 	for id: String in _cards:
 		var parts: Dictionary = _cards[id]
 		var current := GameState.ability_level(id)
@@ -268,7 +295,7 @@ func _refresh() -> void:
 			button.text = (tr("SHOP_UPGRADE") if owned else tr("SHOP_BUY")) % price
 			button.disabled = not GameState.can_buy_ability(id)
 			button.theme_type_variation = &"" if button.disabled else &"PrimaryButton"
-		button.add_theme_font_size_override("font_size", 22)
+		button.add_theme_font_size_override("font_size", 20)
 		button.autowrap_mode = TextServer.AUTOWRAP_OFF
 
 
@@ -282,6 +309,10 @@ func _effect_text(id: String, at_level: int) -> String:
 			return tr("SHOP_IMMUNITY_VALUE") % _number(Abilities.value(id, at_level))
 		Abilities.RECHARGE:
 			return tr("SHOP_RECHARGE_VALUE") % _number(Abilities.value(id, at_level))
+		Abilities.MAGNET:
+			var reach: float = Abilities.value(id, at_level)
+			return tr("SHOP_MAGNET_VALUE_ONE") if is_equal_approx(reach, 1.0) \
+				else tr("SHOP_MAGNET_VALUE") % _number(reach)
 	return ""
 
 

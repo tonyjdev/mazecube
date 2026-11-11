@@ -1,8 +1,7 @@
 class_name ShopBuilding
 extends Node3D
 ## Tienda en el mapa: una casita blanca con toldo de rayas rojas y blancas,
-## escaparate y puerta, y el letrero «TIENDA» flotando encima (siempre de
-## cara a la cámara). Ocupa una casilla de muro (lo tapa entero) y mira hacia
+## escaparate y puerta. Ocupa una casilla de muro (lo tapa entero) y mira hacia
 ## la casilla libre desde la que se entra: al chocar con ella de frente se
 ## abre la tienda (ver Level.is_shop, RollingCube.shop_reached y Shop).
 ##
@@ -19,15 +18,8 @@ const BODY_HEIGHT := 0.95
 const AWNING_STRIPES := 7
 const AWNING_OUT := 0.32
 const AWNING_DROP := 0.16
-const SIGN_HEIGHT := 1.32
-## Balanceo suave del letrero (altura y periodo en segundos).
-const SIGN_BOB := 0.04
-const SIGN_BOB_TIME := 2.4
 
 static var _materials := {}
-
-var _sign: Label3D
-var _time := 0.0
 
 
 func _ready() -> void:
@@ -48,19 +40,6 @@ func _ready() -> void:
 	_box(Vector3(0.23, 0.025, 0.035), Vector3(0.24, 0.36, front + 0.03), WOOD)
 	_box(Vector3(0.03, 0.03, 0.03), Vector3(0.16, 0.36, front + 0.05), WHITE)
 	_add_awning(front)
-	_add_sign()
-
-
-func _process(delta: float) -> void:
-	_time = fmod(_time + delta, SIGN_BOB_TIME)
-	_sign.position.y = SIGN_HEIGHT + sin(TAU * _time / SIGN_BOB_TIME) * SIGN_BOB
-
-
-## Fundido de la aparición del nivel (ver Level._apply_reveal): el letrero
-## no es una malla y se funde aparte.
-func set_reveal_alpha(alpha: float) -> void:
-	_sign.modulate.a = alpha
-	_sign.outline_modulate.a = alpha
 
 
 ## Toldo inclinado de rayas rojas y blancas que sale por delante, con un
@@ -89,22 +68,6 @@ func _add_awning(front: float) -> void:
 		scallop.rotation.x = PI
 		scallop.position = top + Vector3(x, -AWNING_DROP, AWNING_OUT)
 		add_child(scallop)
-
-
-func _add_sign() -> void:
-	_sign = Label3D.new()
-	_sign.text = "SHOP_SIGN"
-	_sign.font = load("res://ui/fonts/RussoOne-Regular.ttf")
-	_sign.font_size = 72
-	_sign.pixel_size = 0.0036
-	_sign.outline_size = 28
-	_sign.modulate = WHITE
-	_sign.outline_modulate = RED
-	_sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_sign.no_depth_test = false
-	_sign.position = Vector3(0, SIGN_HEIGHT, 0)
-	_sign.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(_sign)
 
 
 func _box(size: Vector3, at: Vector3, color: Color) -> MeshInstance3D:

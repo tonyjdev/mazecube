@@ -1,7 +1,7 @@
 class_name Abilities
 extends RefCounted
 ## Habilidades del cubo que se compran en las tiendas (ver Shop y
-## ShopBuilding) y reglas de los puntos con que se pagan.
+## ShopBuilding) y reglas de las monedas con que se pagan.
 ##
 ## Girar es el movimiento básico y siempre está disponible. El resto empieza
 ## bloqueado (nivel 0) y cada compra sube un nivel: el primero la
@@ -19,33 +19,44 @@ extends RefCounted
 ##   needs    habilidades de las que hace falta tener alguna para comprarla
 ##
 ## Los precios son provisionales: hay que calibrarlos con lo que se gana de
-## verdad (ver los puntos más abajo).
+## verdad (ver las monedas más abajo). Al llegar a la primera tienda (nivel
+## 10) se tienen unas 140 monedas solo de completar niveles.
 
 const REVERSE := "reverse"
 const DASH := "dash"
 const STOMP := "stomp"
 const IMMUNITY := "immunity"
 const RECHARGE := "recharge"
+const MAGNET := "magnet"
 
 const CATALOG: Array[Dictionary] = [
-	{"id": REVERSE, "prices": [150]},
-	{"id": DASH, "prices": [300]},
+	{"id": REVERSE, "prices": [60]},
+	{"id": DASH, "prices": [100]},
 	# Radio del pisotón en casillas (2 = cuadrado de 5×5).
-	{"id": STOMP, "prices": [400, 900], "values": [0, 2, 3]},
+	{"id": STOMP, "prices": [140, 300], "values": [0, 2, 3]},
 	# Segundos de inmunidad.
-	{"id": IMMUNITY, "prices": [500, 800, 1200], "values": [0.0, 3.0, 4.5, 6.0]},
+	{"id": IMMUNITY, "prices": [180, 300, 450], "values": [0.0, 3.0, 4.5, 6.0]},
 	# Segundos que tarda la fuerza en volver a llenarse.
-	{"id": RECHARGE, "prices": [400, 800], "values": [2.0, 1.5, 1.0],
+	{"id": RECHARGE, "prices": [150, 300], "values": [2.0, 1.5, 1.0],
 		"needs": [DASH, STOMP, IMMUNITY]},
+	# Casillas alrededor del cubo desde las que atrae las monedas.
+	{"id": MAGNET, "prices": [80, 160, 260], "values": [0.0, 1.0, 2.0, 3.0]},
 ]
 
-## Puntos de una partida (ver points_for_run): cada giro que sobra respecto
-## al reto de giros, cada estrella y cada enemigo destruido, según su tipo.
-const POINTS_PER_SPARE_TURN := 1
-const POINTS_PER_STAR := 50
-const POINTS_PATROLLER := 10
-const POINTS_BLOCKER := 15
-const POINTS_CHASER := 25
+## Monedas (ver GameState.coins): las que se recogen del suelo (cada una vale
+## COINS_PER_PICKUP; salen de los enemigos destruidos y de los cofres) y la
+## recompensa por completar un nivel (ver reward_for_run).
+const COINS_PER_PICKUP := 1
+const COINS_LEVEL_COMPLETE := 10
+const COINS_PER_SPARE_TURN := 1
+## Monedas que suelta cada enemigo al destruirlo: obstáculo (dodecaedro),
+## patrullero (octaedro) y perseguidor (esfera).
+const COINS_BLOCKER := 2
+const COINS_PATROLLER := 3
+const COINS_CHASER := 5
+## Monedas que suelta un cofre al abrirse (al azar, ambos incluidos).
+const CHEST_COINS_MIN := 4
+const CHEST_COINS_MAX := 7
 
 
 static func ids() -> Array[String]:
@@ -87,23 +98,20 @@ static func needs(id: String) -> Array:
 	return entry(id).get("needs", [])
 
 
-## Puntos de una partida terminada: giros sobrantes, estrellas y lo que
-## valen los enemigos destruidos (`enemy_points`). Devuelve el total y el
-## desglose: { "total", "turns", "stars", "enemies" }.
-static func points_for_run(turns_used: int, star_turns: int, stars: int, enemy_points: int) -> Dictionary:
-	var turns := maxi(star_turns - turns_used, 0) * POINTS_PER_SPARE_TURN
-	var star_points := stars * POINTS_PER_STAR
-	return {"total": turns + star_points + enemy_points, "turns": turns,
-		"stars": star_points, "enemies": enemy_points}
+## Recompensa por completar un nivel: COINS_LEVEL_COMPLETE más una moneda por
+## cada giro que sobra respecto al reto de giros. Devuelve el total y el
+## desglose: { "total", "level", "spare" }.
+static func reward_for_run(turns_used: int, star_turns: int) -> Dictionary:
+	var spare := maxi(star_turns - turns_used, 0) * COINS_PER_SPARE_TURN
+	return {"total": COINS_LEVEL_COMPLETE + spare, "level": COINS_LEVEL_COMPLETE, "spare": spare}
 
 
-## Puntos por destruir a este enemigo: patrullero (octaedro), obstáculo
-## (dodecaedro) o perseguidor (esfera).
-static func enemy_points(enemy: Node) -> int:
-	if enemy is Patroller:
-		return POINTS_PATROLLER
+## Monedas que suelta este enemigo al destruirlo.
+static func enemy_coins(enemy: Node) -> int:
 	if enemy is Blocker:
-		return POINTS_BLOCKER
+		return COINS_BLOCKER
+	if enemy is Patroller:
+		return COINS_PATROLLER
 	if enemy is Chaser:
-		return POINTS_CHASER
+		return COINS_CHASER
 	return 0

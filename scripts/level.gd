@@ -65,11 +65,29 @@ extends Node3D
 ##   dorado (GoldenCube; lo colocan tools/place_collectibles.py). El cubo lo
 ##   coge al llegar a su casilla (take_collectible) y no vuelve a salir hasta
 ##   reiniciar el nivel.
-## Tienda (ver ShopBuilding y Shop): los niveles con "shop" (cada
-##   Levels.SHOP_EVERY) tienen una en un muro al fondo de un callejón (o, si
-##   no hay, de un tramo recto), elegida sola en build() (ver _place_shop):
-##   al chocar el cubo con ella de frente se abre la tienda. Para todo lo demás
-##   es un muro.
+## Tienda (ver ShopBuilding y Shop): los niveles con tienda (cada
+##   Levels.SHOP_EVERY) traen en "shop" su muro y en "shop_front" la casilla
+##   libre desde la que se entra (los coloca tools/place_extras.py, donde el
+##   cubo puede chocar con ella de frente); si "shop" es solo true, se elige
+##   sola en build() (ver _place_shop). Al chocar el cubo con ella de frente
+##   se abre la tienda. Para todo lo demás es un muro. Su zona de entrada (la
+##   casilla de delante y las que están a SHOP_GUARD_STEPS pasos o menos) es
+##   protegida: los enemigos no la pisan.
+## Cofres (ver TreasureChest): el campo "chests" del nivel da sus casillas
+##   (tools/place_extras.py). Son obstáculos como un muro que solo se abren
+##   con un dash contra ellos (open_chest) o un pisotón que los alcance
+##   (stomp); al abrirse sueltan entre Abilities.CHEST_COINS_MIN y
+##   CHEST_COINS_MAX monedas y a los dos segundos desaparecen. Los ya abiertos
+##   (opened_chests, ver GameState.open_chest) no salen.
+## Monedas (ver Coin): salen de los cofres y de los enemigos destruidos
+##   (Abilities.enemy_coins), se dispersan con físicas y el cubo las coge al
+##   pasar por encima o, con el imán (RollingCube.magnet_radius), las atrae
+##   desde lejos. Se quedan en el suelo al morir y se pierden al reiniciar.
+## Casillas de inicio (ver CheckpointTile): la salida 'A' y las del campo
+##   "checkpoints" del nivel (mapas grandes, tools/place_extras.py). Solo una
+##   está activada; al pasar el cubo por otra, se activa esa (cube_entered) y
+##   al morir reaparece en ella (respawn_cell, respawn_heading). Al empezar o
+##   reiniciar el nivel, la activada es la salida. Los enemigos no las pisan.
 ## Materiales (ver BlockCatalog): el campo "theme" del nivel elige el bloque
 ## del suelo ("floor"), de los muros ("wall") y, opcionalmente, de la roca de
 ## debajo ("foundation"; si no se da, la que va bajo el suelo). Lo que falte
@@ -88,8 +106,15 @@ extends Node3D
 signal reveal_finished
 ## Ha explotado una bomba a `distance` casillas del cubo (INF si no está).
 signal bomb_exploded(distance: float)
-## Se ha destruido un enemigo (dash o pisotón del cubo; ver Abilities.enemy_points).
+## Se ha destruido un enemigo (dash o pisotón del cubo; suelta monedas, ver
+## Abilities.enemy_coins).
 signal enemy_destroyed(enemy: Enemy)
+## El cubo ha cogido monedas (ver Coin).
+signal coins_collected(amount: int)
+## Se ha abierto el cofre de esa casilla (ver open_chest).
+signal chest_opened(cell: Vector2i)
+## Se ha activado la casilla de inicio de esa casilla (ver cube_entered).
+signal checkpoint_activated(cell: Vector2i)
 
 const CELL_SIZE := 1.0
 ## Tipo de caja del terreno (ver _add_terrain_box).
@@ -197,6 +222,15 @@ const DIRECTIONS: Array[Vector2i] = [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN,
 ## Pasos mínimos por el recorrido desde la salida hasta la entrada de la
 ## tienda (si hay sitio así).
 const SHOP_MIN_STEPS := 4
+## Pasos desde la entrada de la tienda que forman su zona protegida.
+const SHOP_GUARD_STEPS := 2
+## Monedas: velocidad de salida al azar (horizontal y vertical, casillas/s),
+## distancia (en casillas, de centro a centro) a la que el cubo las coge y
+## altura máxima a la que las coge.
+const COIN_SPEED_H := Vector2(0.8, 2.6)
+const COIN_SPEED_V := Vector2(3.0, 4.6)
+const COIN_PICK_DISTANCE := 0.62
+const COIN_PICK_HEIGHT := 1.4
 ## Radio (en casillas) alrededor del cubo que queda explorado para el mapa de
 ## la pausa (ver mark_seen_around). Lo que ha quedado a más de
 ## SEEN_CLEAR_RADIUS se dibuja más transparente cuanto más lejos, hasta
@@ -241,8 +275,28 @@ const REVEAL_FADE_TIME := 0.45
 @export var mortar_settings := {}
 ## Casilla del cubito dorado (campo "collectible"); NO_CELL si no hay.
 var collectible_cell := NO_CELL
-## El nivel tiene tienda (ver _place_shop).
+## El nivel tiene tienda, y su muro y su entrada si los trae el nivel (ver
+## la leyenda del principio y _place_shop).
 var has_shop := false
+var _shop_config := NO_CELL
+var _shop_front_config := NO_CELL
+## Casillas de la zona protegida de la tienda (los enemigos no las pisan).
+var _protected := {}
+## Casillas de los cofres del nivel (campo "chests") y de los ya abiertos,
+## que no salen (los pone Game antes de build()).
+var chest_cells: Array = []
+var opened_chests: Array = []
+## casilla -> TreasureChest (los que están en el mapa, abiertos o no).
+var _chests := {}
+## Monedas en el suelo (o volando).
+var _coins: Array = []
+## Casillas de inicio extra (campo "checkpoints") y, en el tablero, todas
+## (con la salida): casilla -> CheckpointTile.
+var checkpoint_cells: Array = []
+var _checkpoints := {}
+## Casilla de inicio activada y rumbo con el que el cubo pasó por ella.
+var active_checkpoint := NO_CELL
+var _checkpoint_heading := Vector2i.ZERO
 ## Muro de la tienda y casilla libre de delante, desde la que se entra
 ## (NO_CELL si no hay tienda).
 var shop_cell := NO_CELL
@@ -345,7 +399,12 @@ func configure(data: Dictionary) -> void:
 	block_regions = data.get("theme_regions", [])
 	mortar_settings = data.get("mortars", {})
 	collectible_cell = data.get("collectible", NO_CELL)
-	has_shop = data.get("shop", false)
+	var shop: Variant = data.get("shop", false)
+	has_shop = shop is Vector2i or shop == true
+	_shop_config = shop if shop is Vector2i else NO_CELL
+	_shop_front_config = data.get("shop_front", NO_CELL)
+	chest_cells = data.get("chests", [])
+	checkpoint_cells = data.get("checkpoints", [])
 
 
 func build() -> void:
@@ -379,6 +438,11 @@ func build() -> void:
 	_map_revealed = false
 	shop_cell = NO_CELL
 	shop_front = NO_CELL
+	_protected.clear()
+	_chests.clear()
+	_coins.clear()
+	_checkpoints.clear()
+	active_checkpoint = NO_CELL
 	var enemy_cells := {}
 	var mortar_cells: Array[Vector2i] = []
 	## símbolo -> casillas de teletransporte
@@ -387,7 +451,6 @@ func build() -> void:
 
 	_terrain_builder = TerrainBuilder.new()
 	_wall_set.clear()
-	var start_mat := _make_material(START_COLOR)
 	var goal_mat := _make_material(GOAL_COLOR)
 	# Muros y baldosas normales se dibujan con MultiMesh (una llamada de dibujo
 	# por tipo de bloque): los mapas grandes tienen miles de casillas.
@@ -422,10 +485,10 @@ func build() -> void:
 				bridge_cells[cell] = true
 				continue
 			var tile := Vector3(CELL_SIZE * 0.96, FLOOR_THICKNESS, CELL_SIZE * 0.96)
-			if symbol == "A":
-				start_cell = cell
-				_add_box(cell, tile, -FLOOR_THICKNESS * 0.5, start_mat)
-				_add_glow(cell, START_COLOR)
+			if symbol == "A" or (symbol == "." and checkpoint_cells.has(cell)):
+				if symbol == "A":
+					start_cell = cell
+				_add_checkpoint(cell)
 			elif symbol == "B":
 				goal_cell = cell
 				_add_box(cell, tile, -FLOOR_THICKNESS * 0.5, goal_mat)
@@ -476,14 +539,23 @@ func build() -> void:
 		_collectible = GoldenCube.new()
 		_collectible.position = Vector3(collectible_cell.x * CELL_SIZE, 0.0, collectible_cell.y * CELL_SIZE)
 		add_child(_collectible)
+	# Antes que los enemigos: la tienda (su zona protegida) y los cofres
+	# cambian por dónde pueden pasar.
+	if has_shop:
+		_place_shop()
+	for cell: Variant in chest_cells:
+		if cell is Vector2i and _walkable.has(cell) and not opened_chests.has(cell):
+			_add_chest(cell)
 	for cell: Vector2i in enemy_cells:
 		_add_spawner(cell, enemy_cells[cell])
 	for cell in mortar_cells:
 		_add_mortar(cell)
 	for button in _buttons.values():
 		button["near"] = _cells_within(button["front"], BUTTON_APPROACH_CELLS)
-	if has_shop:
-		_place_shop()
+	active_checkpoint = start_cell
+	_checkpoint_heading = start_heading
+	for cell: Vector2i in _checkpoints:
+		_checkpoints[cell].set_active(cell == start_cell)
 	_warm_up_effects.call_deferred()
 
 
@@ -577,6 +649,7 @@ func _process(delta: float) -> void:
 		_update_lasers(delta)
 		_update_mortars(delta)
 		_update_bombs(delta)
+		_update_coins(delta)
 	_check_enemy_hits()
 	_check_spike_hits()
 	for item in _keys.values():
@@ -596,7 +669,7 @@ func is_walkable(cell: Vector2i) -> bool:
 ## pie (sin tener en cuenta a los enemigos).
 func is_terrain_walkable(cell: Vector2i) -> bool:
 	return _walkable.has(cell) and not _doors.has(cell) and not _breakables.has(cell) \
-		and not bars_closed(cell)
+		and not bars_closed(cell) and not _chests.has(cell)
 
 
 ## Casilla de vacío ('~' o fuera del mapa): el cubo que entra en ella se cae.
@@ -653,11 +726,13 @@ func has_floor(cell: Vector2i) -> bool:
 
 
 ## Casilla por la que pueden pasar los enemigos (sin contar a los demás
-## enemigos): libre, sin puerta, barrotes cerrados ni muro destructible, y
-## que no sea la salida, la meta ni un puente colgante.
+## enemigos): libre, sin puerta, barrotes cerrados, muro destructible ni
+## cofre, y que no sea una casilla de inicio, la meta, un puente colgante, un
+## teletransporte, unos pinchos ni la zona protegida de la tienda.
 func enemy_can_pass(cell: Vector2i) -> bool:
 	return is_terrain_walkable(cell) and cell != start_cell and cell != goal_cell \
-		and not is_bridge(cell) and not _teleports.has(cell) and not _spikes.has(cell)
+		and not is_bridge(cell) and not _teleports.has(cell) and not _spikes.has(cell) \
+		and not _checkpoints.has(cell) and not _protected.has(cell)
 
 
 ## Casilla de teletransporte conectada con `cell`, o NO_CELL si `cell` no es
@@ -1002,7 +1077,8 @@ func _mortar_target(cell: Vector2i, cannon: MortarCannon) -> Vector2i:
 ## Casilla en la que puede caer una bomba: libre (por donde pasan el cubo y
 ## los enemigos), sin ser la salida ni la meta.
 func _bomb_target_ok(cell: Vector2i) -> bool:
-	return is_terrain_walkable(cell) and cell != start_cell and cell != goal_cell and not _void.has(cell)
+	return is_terrain_walkable(cell) and cell != start_cell and cell != goal_cell and not _void.has(cell) \
+		and not _checkpoints.has(cell)
 
 
 ## Casillas por las que pasará el cubo si nadie gira, empezando por la suya:
@@ -1222,6 +1298,10 @@ func bomb_boxes(cell: Vector2i) -> Array[AABB]:
 		var across_x: bool = is_zero_approx(_bars[cell]["node"].rotation.y)
 		var size := Vector3(CELL_SIZE, 0.55, 0.16) if across_x else Vector3(0.16, 0.55, CELL_SIZE)
 		boxes.append(AABB(center - Vector3(size.x * 0.5, 0.0, size.z * 0.5), size))
+	elif _chests.has(cell):
+		var size := TreasureChest.BASE_SIZE + Vector3(0.0, TreasureChest.LID_HEIGHT, 0.0)
+		var side := maxf(size.x, size.z)
+		boxes.append(AABB(center - Vector3(side * 0.5, 0.0, side * 0.5), Vector3(side, size.y, side)))
 	return boxes
 
 
@@ -1326,9 +1406,13 @@ func destroy_enemies_at(cell: Vector2i) -> int:
 
 ## Pisotón del cubo en `center`: destruye a los enemigos que ocupan alguna
 ## casilla a `radius` o menos (en cuadrado, diagonales incluidas, sin que lo
-## frenen las paredes) y quita `wall_hits` golpes a los muros destructibles
-## de esa zona.
+## frenen las paredes), abre los cofres y quita `wall_hits` golpes a los
+## muros destructibles de esa zona.
 func stomp(center: Vector2i, radius: int, wall_hits: int) -> void:
+	for cell: Vector2i in _chests.keys():
+		var offset := cell - center
+		if maxi(absi(offset.x), absi(offset.y)) <= radius:
+			open_chest(cell)
 	for enemy in _enemies.duplicate():
 		for dy in range(-radius, radius + 1):
 			for dx in range(-radius, radius + 1):
@@ -1359,8 +1443,146 @@ func stomp(center: Vector2i, radius: int, wall_hits: int) -> void:
 func _destroy_enemy(enemy: Enemy) -> void:
 	_enemies.erase(enemy)
 	_solid_dirty = true
+	var at := enemy.board_position()
+	var coins := Abilities.enemy_coins(enemy)
 	enemy.destroy()
+	spawn_coins(Vector3(at.x, 0.45, at.y) * CELL_SIZE, coins)
 	enemy_destroyed.emit(enemy)
+
+
+# --- Cofres y monedas ---------------------------------------------------------
+
+func is_chest(cell: Vector2i) -> bool:
+	return _chests.has(cell)
+
+
+## El cofre se orienta con el cierre hacia su casilla libre de al lado.
+func _add_chest(cell: Vector2i) -> void:
+	var facing := Vector2i.DOWN
+	for dir: Vector2i in DIRECTIONS:
+		if is_terrain_walkable(cell + dir):
+			facing = dir
+			break
+	var chest := TreasureChest.new()
+	chest.position = Vector3(cell.x, 0.0, cell.y) * CELL_SIZE
+	chest.rotation.y = atan2(facing.x, facing.y)
+	add_child(chest)
+	_chests[cell] = chest
+	chest.vanished.connect(func() -> void:
+		_chests.erase(cell)
+		_topology_version += 1)
+
+
+## Abre el cofre de la casilla (dash o pisotón): suelta sus monedas y, al
+## rato, desaparece y la casilla queda libre. Devuelve true si se ha abierto.
+func open_chest(cell: Vector2i) -> bool:
+	var chest: TreasureChest = _chests.get(cell)
+	if chest == null or chest.is_open:
+		return false
+	chest.open()
+	spawn_coins(chest.position + Vector3(0.0, TreasureChest.BASE_SIZE.y + 0.1, 0.0),
+		randi_range(Abilities.CHEST_COINS_MIN, Abilities.CHEST_COINS_MAX))
+	chest_opened.emit(cell)
+	return true
+
+
+## Suelta `count` monedas en `at` (posición en el tablero), que salen
+## disparadas en direcciones al azar (ver Coin).
+func spawn_coins(at: Vector3, count: int) -> void:
+	for i in count:
+		var angle := randf() * TAU
+		var speed := randf_range(COIN_SPEED_H.x, COIN_SPEED_H.y)
+		var velocity := Vector3(cos(angle) * speed, randf_range(COIN_SPEED_V.x, COIN_SPEED_V.y),
+			sin(angle) * speed)
+		var coin := Coin.create(at, velocity)
+		add_child(coin)
+		_coins.append(coin)
+
+
+## Mueve las monedas, las atrae hacia el cubo si tiene imán y coge las que
+## toca.
+func _update_coins(delta: float) -> void:
+	if _coins.is_empty():
+		return
+	var can_pick := cube != null and cube.is_alive() and not cube.is_appearing() \
+		and not cube.is_teleporting() and not cube.is_finished
+	var anchor := Vector3.ZERO
+	var magnet := 0.0
+	if can_pick:
+		anchor = to_local(cube.get_trail_anchor()) + Vector3(0.0, 0.35, 0.0)
+		magnet = cube.magnet_radius
+	var picked := 0
+	for item: Variant in _coins.duplicate():
+		if not is_instance_valid(item):
+			_coins.erase(item)
+			continue
+		var coin := item as Coin
+		coin.update(delta, _coin_blocked, has_floor)
+		if not can_pick or not coin.can_pick():
+			continue
+		var flat := coin.board_position().distance_to(Vector2(anchor.x, anchor.z)) / CELL_SIZE
+		var reached := flat < COIN_PICK_DISTANCE and coin.position.y < COIN_PICK_HEIGHT
+		if not reached and (coin.magnetized or (magnet > 0.0 and flat <= magnet + 0.5)):
+			reached = coin.attract(anchor, delta) < 0.15
+		if reached:
+			_coins.erase(coin)
+			coin.collect()
+			picked += Abilities.COINS_PER_PICKUP
+	if picked > 0:
+		coins_collected.emit(picked)
+
+
+## Casilla que frena las monedas: no se puede pasar (muro, puerta, barrotes
+## cerrados, muro destructible, cofre) o es vacío.
+func _coin_blocked(cell: Vector2i) -> bool:
+	return not is_terrain_walkable(cell)
+
+
+# --- Casillas de inicio -------------------------------------------------------
+
+func _add_checkpoint(cell: Vector2i) -> void:
+	var tile := CheckpointTile.new()
+	tile.position = Vector3(cell.x, 0.0, cell.y) * CELL_SIZE
+	add_child(tile)
+	_checkpoints[cell] = tile
+
+
+func is_checkpoint(cell: Vector2i) -> bool:
+	return _checkpoints.has(cell)
+
+
+## El cubo acaba de llegar a `cell` con rumbo `heading`: si es una casilla de
+## inicio desactivada, se activa y las demás se apagan.
+func cube_entered(cell: Vector2i, heading: Vector2i) -> void:
+	if not _checkpoints.has(cell) or cell == active_checkpoint:
+		return
+	if _checkpoints.has(active_checkpoint):
+		_checkpoints[active_checkpoint].set_active(false)
+	active_checkpoint = cell
+	_checkpoint_heading = heading
+	_checkpoints[cell].set_active(true, true)
+	checkpoint_activated.emit(cell)
+
+
+## Casilla donde reaparece el cubo al morir: la casilla de inicio activada.
+func respawn_cell() -> Vector2i:
+	return active_checkpoint if active_checkpoint != NO_CELL else start_cell
+
+
+## Rumbo con el que reaparece: el que llevaba al pasar por la casilla de
+## inicio (el inicial en la salida), salvo que lleve al vacío; entonces el
+## de una casilla libre de al lado.
+func respawn_heading() -> Vector2i:
+	var cell := respawn_cell()
+	if cell == start_cell and active_checkpoint == start_cell:
+		return start_heading
+	var heading := _checkpoint_heading
+	if heading != Vector2i.ZERO and not is_void(cell + heading):
+		return heading
+	for dir: Vector2i in DIRECTIONS:
+		if is_terrain_walkable(cell + dir):
+			return dir
+	return start_heading
 
 
 ## Muro de la tienda (ver _place_shop).
@@ -1368,13 +1590,35 @@ func is_shop(cell: Vector2i) -> bool:
 	return cell == shop_cell and shop_cell != NO_CELL
 
 
-## Pone la tienda en un muro '#' contra el que el cubo choca de frente: el de
-## detrás de una casilla '.' (sin nada) a la que se llega en línea recta desde
-## la casilla opuesta. Prefiere el fondo de un callejón (la casilla '.' solo
+## Pone la tienda en el muro que trae el nivel ("shop" y "shop_front") o, si
+## no, en uno elegido aquí: un muro '#' contra el que el cubo choca de frente,
+## el de detrás de una casilla '.' (sin nada) a la que se llega en línea recta
+## desde la casilla opuesta (sin comprobar las reglas del cubo: mejor
+## colocarla con tools/place_extras.py). Prefiere el fondo de un callejón (la casilla '.' solo
 ## tiene una salida) y, entre ellos, el más cercano a la salida por el
 ## recorrido, a SHOP_MIN_STEPS pasos o más (para no chocar con ella nada más
 ## empezar).
 func _place_shop() -> void:
+	if _shop_config != NO_CELL and _is_plain_wall(_shop_config) and _walkable.has(_shop_front_config) \
+			and (_shop_config - _shop_front_config).length_squared() == 1:
+		shop_cell = _shop_config
+		shop_front = _shop_front_config
+	else:
+		_choose_shop_cell()
+	if shop_cell == NO_CELL:
+		push_warning("Nivel sin sitio para la tienda")
+		return
+	_protected = _cells_within(shop_front, SHOP_GUARD_STEPS + 1)
+	var facing := shop_front - shop_cell
+	var building := ShopBuilding.new()
+	building.name = "Shop"
+	building.position = Vector3(shop_cell.x, 0.0, shop_cell.y) * CELL_SIZE
+	building.rotation.y = atan2(facing.x, facing.y)
+	add_child(building)
+
+
+## Elige sola la tienda (niveles sin "shop_front", ver _place_shop).
+func _choose_shop_cell() -> void:
 	var steps := _path_steps(start_cell)
 	var best_score := INF
 	for cell: Vector2i in steps:
@@ -1395,15 +1639,6 @@ func _place_shop() -> void:
 				best_score = score
 				shop_cell = wall
 				shop_front = cell
-	if shop_cell == NO_CELL:
-		push_warning("Nivel sin sitio para la tienda")
-		return
-	var facing := shop_front - shop_cell
-	var building := ShopBuilding.new()
-	building.name = "Shop"
-	building.position = Vector3(shop_cell.x, 0.0, shop_cell.y) * CELL_SIZE
-	building.rotation.y = atan2(facing.x, facing.y)
-	add_child(building)
 
 
 func _is_plain_wall(cell: Vector2i) -> bool:
@@ -1646,6 +1881,9 @@ func map_snapshot() -> Dictionary:
 		"floor": floor_cells,
 		"bridges": bridges,
 		"start": start_cell if is_seen(start_cell) else NO_CELL,
+		"checkpoints": _seen_checkpoints(),
+		"chests": _chests.keys().filter(func(c: Vector2i) -> bool:
+			return is_seen(c) and not _chests[c].is_open),
 		"goal": goal_cell if is_seen(goal_cell) else NO_CELL,
 		"keys": keys,
 		"doors": doors,
@@ -1662,6 +1900,15 @@ func map_snapshot() -> Dictionary:
 		"shop": shop_cell if shop_cell != NO_CELL and is_seen(shop_cell) else NO_CELL,
 		"shop_facing": shop_front - shop_cell,
 	}
+
+
+## Casillas de inicio ya vistas: casilla -> activada.
+func _seen_checkpoints() -> Dictionary:
+	var found := {}
+	for cell: Vector2i in _checkpoints:
+		if is_seen(cell):
+			found[cell] = cell == active_checkpoint
+	return found
 
 
 ## Rectángulo `bounds` ampliado para abarcar `cell` (vacío = todavía nada).

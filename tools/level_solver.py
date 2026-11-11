@@ -70,6 +70,10 @@ Simula las reglas de scripts/rolling_cube.gd:
   "validate" comprueba que cada cañón tiene alguna casilla libre a su
   alcance (10 casillas en cualquier dirección, porque gira 360°, o lo que
   diga el campo "mortars" del nivel).
+- Cofres (campo "chests", los coloca place_extras.py): obstáculos que solo
+  se abren con un dash o un pisotón; "validate" los trata como muros (el
+  nivel debe poder resolverse sin abrirlos). La tienda ("shop") y las
+  casillas de inicio extra ("checkpoints") no cambian las reglas.
 - Al llegar a la meta B termina el nivel.
 - Cubito dorado (campo "collectible", lo colocan place_collectibles.py): con
   solve(..., collectible=casilla) solo vale llegar a la meta tras pasar por
@@ -463,10 +467,23 @@ def read_levels(path=LEVELS_GD):
             collectible = (int(found.group(1)), int(found.group(2)))
         found = re.search(r'"star_turns":\s*(\d+)', extra)
         star = int(found.group(1)) if found else None
+        # Tienda, cofres y casillas de inicio extra (ver place_extras.py).
+        shop = None
+        found = re.search(r'"shop":\s*Vector2i\((\d+),\s*(\d+)\),\s*"shop_front":\s*'
+                          r'Vector2i\((\d+),\s*(\d+)\)', extra)
+        if found:
+            v = [int(n) for n in found.groups()]
+            shop = ((v[0], v[1]), (v[2], v[3]))
+        cells = {}
+        for field in ("chests", "checkpoints"):
+            found = re.search(r'"' + field + r'":\s*\[(.*?)\]', extra)
+            cells[field] = [(int(a), int(b)) for a, b in
+                            re.findall(r'Vector2i\((\d+),\s*(\d+)\)', found.group(1))] if found else []
         levels.append({"name": name, "turns": int(turns),
                        "heading": (int(hx), int(hz)), "layout": rows, "buttons": buttons,
                        "patrols": patrols, "mortars": mortars, "collectible": collectible,
-                       "star_turns": star})
+                       "star_turns": star, "shop": shop, "chests": cells["chests"],
+                       "checkpoints": cells["checkpoints"]})
     declared = len(re.findall(r'^\t\t"name":', source, re.M))
     if declared != len(levels):
         raise SystemExit(f"Solo se han podido leer {len(levels)} de los {declared} niveles de "
@@ -754,6 +771,35 @@ def check_collectible(lvl):
     return []
 
 
+def with_chests(rows, chests):
+    """Mapa con los cofres como muros."""
+    out = [list(r) for r in rows]
+    for x, z in chests:
+        out[z][x] = "#"
+    return ["".join(r) for r in out]
+
+
+def check_extras(lvl):
+    """La tienda está en un muro con su entrada libre al lado, y los cofres y
+    las casillas de inicio en casillas de suelo '.' (ver place_extras.py)."""
+    rows, problems = lvl["layout"], []
+
+    def char(cell):
+        x, z = cell
+        return rows[z][x] if 0 <= z < len(rows) and 0 <= x < len(rows[z]) else "~"
+
+    if lvl["shop"]:
+        wall, front = lvl["shop"]
+        if char(wall) != "#" or char(front) != "." \
+                or abs(wall[0] - front[0]) + abs(wall[1] - front[1]) != 1:
+            problems.append(f"la tienda {wall} no está en un muro junto a su entrada {front}")
+    for field in ("chests", "checkpoints"):
+        for cell in lvl[field]:
+            if char(cell) != "." or cell == lvl["collectible"]:
+                problems.append(f"{field}: {cell} no es una casilla de suelo libre")
+    return problems
+
+
 def cmd_validate(_args):
     levels = read_levels()
     if not levels:
@@ -771,6 +817,10 @@ def cmd_validate(_args):
         problems += check_teleports(rows)
         problems += check_lasers(rows)
         problems += check_mortars(rows, lvl["mortars"])
+        problems += check_extras(lvl)
+        # Los cofres son obstáculos fijos (hasta que se abren): cuentan como muros.
+        rows = with_chests(rows, lvl["chests"])
+        lvl = dict(lvl, layout=rows)
         result = None if problems else solve(rows, lvl["heading"], buttons=lvl["buttons"])
         if not problems and result is None:
             problems.append("sin solución")

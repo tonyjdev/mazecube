@@ -134,7 +134,7 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 - Al pulsar **izquierda y derecha a la vez**, el cubo cambia al **sentido contrario** al que lleva, igual que si chocara contra una pared. Si va hacia arriba, pasa a ir hacia abajo.
 - Cuentan como «a la vez» si al pulsar un lado el otro **sigue pulsado** o se pulsó hace **menos de 0,15 s**. La primera pulsación pide un giro, pero la media vuelta lo sustituye.
 - Se aplica en el **siguiente límite entre casillas**, como los giros (apartado 2.7): el cubo termina el vuelco en curso y da la media vuelta al llegar a la casilla.
-- Es un movimiento **grande y costoso**: el cubo se queda **parado unos 200 ms**; por sus **cuatro lados sale humo gris** que se expande y se desvanece (≈0,8 s); la **cámara tiembla** levemente (≈0,25 s) y el móvil **vibra** (si la vibración está activada). En el futuro podría penalizar puntos.
+- Es un movimiento **grande y costoso**: el cubo se queda **parado unos 200 ms**; por sus **cuatro lados sale humo gris** que se expande y se desvanece (≈0,8 s); la **cámara tiembla** levemente (≈0,25 s) y el móvil **vibra** (si la vibración está activada). En el futuro podría penalizar monedas.
 - Para los power ups tiene su propia regla de fin (por ejemplo, se pierde la velocidad).
 - El resolvedor de niveles **no la usa**: los niveles se diseñan y miden sin media vuelta, que queda como ayuda extra para el jugador. Para la estrella de giros cuenta como **2 giros** (apartado 2.21).
 
@@ -312,37 +312,41 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 - Se pierde al **morir** (caída al vacío), al **reiniciar** el nivel y al **llegar a la meta**.
 - No cuenta como giro para las estrellas y el resolvedor de niveles no la usa.
 
-### 2.23. Puntos — En pruebas en el prototipo
+### 2.23. Monedas, cofres y casillas de inicio — En pruebas en el prototipo
 
-- Al llegar a la meta, la partida da **puntos** (los valores son orientativos; hay que calibrarlos):
-  - **1 por cada giro que sobra** respecto al reto de giros de la estrella (`star_turns` menos los giros usados; si se pasa, 0);
-  - **50 por cada estrella** conseguida;
-  - por cada **enemigo destruido** (con el dash o el pisotón): **10** el patrullero (octaedro), **15** el obstáculo (dodecaedro) y **25** el perseguidor (esfera).
-- Cada nivel guarda los puntos de su **mejor partida**. Repetir un nivel solo da puntos si se **supera ese récord**, y entonces se gana la **diferencia** (así no se pueden acumular repitiendo el mismo nivel). Los puntos que se tienen son la suma de los récords menos lo gastado en las tiendas.
-- La pantalla de **nivel completado**, después de las estrellas, muestra los puntos de la partida con su desglose y lo ganado («+40 para la tienda · tienes 620»), o el récord del nivel si no se ha superado.
-- Al llegar esta versión, cada nivel ya completado cuenta como una partida con las estrellas que tenía (50 por estrella), para no empezar de cero.
-- En el futuro podrá haber otros coleccionables que den puntos.
+- Las **monedas** son lo que se gasta en las tiendas (apartado 2.24); sustituyen a los puntos de la versión anterior. Se ven arriba, junto a los retos, en una placa con una moneda y las que se tienen. Se consiguen así (y nada más da monedas):
+  - **Completar un nivel: 10**, más **1 por cada giro que sobra** respecto al reto de giros de la estrella (`star_turns` menos los giros usados; si se pasa, 0). Cada nivel guarda su **mejor recompensa**: repetirlo solo da la **diferencia** si se mejora (así no se pueden acumular repitiendo un nivel fácil). La pantalla de nivel completado, después de las estrellas, muestra la recompensa con su desglose y las monedas recogidas en la partida, y lo ganado («+14 monedas · tienes 230») o lo que ya se cobró.
+  - **Monedas recogidas: 1 cada una.** Son un objeto del mapa: monedas doradas de canto que giran. Salen de los **enemigos destruidos** (con el dash o el pisotón): **2 el dodecaedro** (obstáculo), **3 el octaedro** (patrullero) y **5 la esfera** (perseguidor), y de los **cofres**. Salen disparadas al azar con físicas sencillas (botan, ruedan, rebotan contra muros, puertas, barrotes y cofres, y no caen al vacío), y nunca se alejan más de unas **2,5 casillas** de donde salen. El cubo las coge al **pasar por encima** (a partir de 0,35 s de salir), con un «cling» y un saltito del icono del marcador. Se suman y se guardan **al momento**: no se pierden al morir ni al salir. Las que quedan en el suelo siguen ahí tras morir y desaparecen al reiniciar el nivel; si cae un puente con monedas encima, caen con él.
+  - Como los enemigos se regeneran (apartado 2.13), se pueden seguir consiguiendo monedas destruyéndolos.
+- **Cofres:** baúles de madera con herrajes dorados repartidos por los mapas (desde el nivel 5; 1 por cada 250 casillas pisables más uno, hasta 4). Son un **obstáculo como un muro** (el cubo rebota y los enemigos no pasan). **Solo se abren con un dash** contra ellos (el cubo rebota) **o con un pisotón** que los alcance. Al abrirse, la tapa salta, sale un destello dorado y sueltan **entre 4 y 7 monedas** al azar; a los **2 s** el cofre encoge y desaparece y la casilla queda libre. Un cofre abierto **no vuelve a salir nunca** en ese nivel (se guarda en el progreso), aunque se reinicie o se repita. Salen en el mapa de la pausa y en su leyenda mientras están cerrados.
+  - Los coloca `tools/place_extras.py` en casillas alcanzables fuera del recorrido óptimo, mejor en **fondos de saco**, a las que el cubo puede llegar de frente (para el dash) y repartidas por el mapa; comprueba que con ellos el nivel sigue necesitando los mismos giros (también cogiendo el cubito dorado). `level_solver.py validate` los trata como muros.
+- **Casillas de inicio:** en los **mapas grandes** (300 casillas pisables o más: una por cada 300, hasta 3) hay casillas de inicio además de la salida. Tienen dos estados: **activada** (la baldosa azul de la salida con su haz de luz) y **desactivada** (baldosa azul apagada, sin luz). Solo una está activada a la vez: al empezar o reiniciar el nivel es la **salida**; al **pasar el cubo** por otra, se activa (anillo de luz y un acorde que sube) y las demás se apagan. Al **morir**, el cubo reaparece en la activada, con el rumbo que llevaba al pasar por ella (salvo que lleve al vacío). Los enemigos no las pisan. En el mapa de la pausa la activada se ve resaltada y las demás apagadas.
+  - Las coloca `tools/place_extras.py` en el **recorrido óptimo**, repartidas a partes iguales entre la salida y la meta, en casillas de suelo normal que no están junto a un teletransporte, un puente o unos pinchos, ni en la ruta de un patrullero, ni cerca de un punto de origen de enemigos, de la salida o de la meta; mejor con tres o más casillas libres al lado, para que no corten un pasillo a los enemigos.
 
 ### 2.24. Tiendas y habilidades — En pruebas en el prototipo
 
-- Todas las habilidades empiezan **bloqueadas** salvo **girar** (el movimiento básico). Se consiguen y se mejoran en las **tiendas**, pagando con puntos.
-- **Catálogo** (`scripts/abilities.gd`; precios provisionales):
+- Todas las habilidades empiezan **bloqueadas** salvo **girar** (el movimiento básico). Se consiguen y se mejoran en las **tiendas**, pagando con **monedas** (apartado 2.23).
+- **Catálogo** (`scripts/abilities.gd`; precios provisionales, pensados para tener unas 140 monedas al llegar a la primera tienda solo completando niveles):
 
 | Habilidad | Niveles y precio | Efecto |
 |---|---|---|
-| Media vuelta | 150 | desbloquearla |
-| Dash | 300 | desbloquearlo |
-| Pisotón | 400 · 900 | zona de 5×5 · 7×7 |
-| Inmunidad | 500 · 800 · 1200 | 3 s · 4,5 s · 6 s |
-| Recarga | 400 · 800 | la fuerza se llena en 2 s (sin comprar) · 1,5 s · 1 s |
+| Media vuelta | 60 | desbloquearla |
+| Dash | 100 | desbloquearlo |
+| Pisotón | 140 · 300 | zona de 5×5 · 7×7 |
+| Inmunidad | 180 · 300 · 450 | 3 s · 4,5 s · 6 s |
+| Recarga | 150 · 300 | la fuerza se llena en 2 s (sin comprar) · 1,5 s · 1 s |
+| Imán | 80 · 160 · 260 | atrae las monedas a 1 · 2 · 3 casillas |
 
   - La **recarga** no es una acción: mejora la fuerza que gastan el dash, el pisotón y la inmunidad, y solo se puede comprar teniendo alguna de las tres.
+  - El **imán** tampoco es una acción: las monedas que están a su alcance del cubo (y ya se pueden coger) vuelan hacia él cada vez más deprisa, atravesando lo que haya por medio.
 - **Habilidad bloqueada:** pedirla (deslizar el dedo o su tecla) no hace nada salvo avisar con el sonido de descarte, una vibración leve y el letrero «Aún no tienes esta habilidad: consíguela en una tienda» abajo en el centro. Sin la media vuelta, tocar los dos lados a la vez son dos giros normales. Sin dash, pisotón ni inmunidad no se ve la barra de fuerza.
-- **Tiendas en el mapa:** hay una en los niveles **5, 10, 15…** (uno de cada 5; `Levels.SHOP_EVERY`, o el campo `"shop"` del nivel). Es una **casita blanca** con **toldo de rayas rojas y blancas**, escaparate y puerta, que ocupa una casilla de **muro**, y encima el letrero **«TIENDA»** flotando, siempre de cara a la cámara.
-  - Se coloca sola: en el muro del **fondo de un callejón** (o, si no hay, al final de un tramo recto), el más cercano a la salida por el recorrido y a 4 pasos o más de ella. La casilla de delante tiene que ser de suelo normal, sin nada.
+- **Tiendas en el mapa:** hay una en los niveles **10, 20, 30…** (uno de cada 10; `Levels.SHOP_EVERY`). Es una **casita blanca** con **toldo de rayas rojas y blancas**, escaparate y puerta, que ocupa una casilla de **muro** (sin letrero encima).
+  - La coloca `tools/place_extras.py` (campos `"shop"` y `"shop_front"` del nivel) con las **reglas reales del cubo** (los estados alcanzables del resolvedor desde la salida, sin pasar por la meta): en un muro contra el que el cubo **puede chocar de frente**, llegando a la casilla de delante con ese rumbo (antes se elegía sola en el juego mirando solo el suelo y en algunos niveles quedaba donde no se podía llegar). Mejor al **fondo de un callejón** y a 6 pasos o más de la salida. La casilla de delante es de suelo normal, sin nada. Si un nivel no trae la tienda, el juego la elige solo como antes.
+  - **Zona protegida:** la casilla de delante y las que están a **2 pasos o menos** de ella: los **enemigos no la pisan** (ni aparecen en ella). La herramienta solo la pone donde esa zona no toca rutas de patrulla, puntos de origen de enemigos, teletransportes, la salida ni la meta.
   - **Para entrar**, el cubo **choca con ella de frente** (también con el dash): rebota como contra un muro y se abre la tienda. Para todo lo demás es un muro.
   - Sale en el **mapa de la pausa** (una casita con el toldo hacia la entrada) y en su leyenda, cuando se ha explorado.
-- **Pantalla de la tienda:** el juego se detiene y se ve encima, sobre un fondo oscuro: el título y los **puntos** que se tienen; una **ficha por habilidad** con su dibujo de la enciclopedia, el nombre, el nivel comprado, qué hace, el efecto del siguiente nivel y el botón **Comprar · precio** / **Mejorar · precio** (desactivado si no llegan los puntos, «Al máximo» o lo que le falta); debajo, de dónde salen los puntos, y el botón **Salir** (o Esc / Atrás). Al comprar, sonido, vibración y la ficha da un saltito y se vuelve verdosa. Al salir, el juego se reanuda con la aceleración de la pausa y las mejoras ya se aplican.
+- **Pantalla de la tienda:** el juego se detiene y se ve encima, sobre un fondo oscuro: el título y las **monedas** que se tienen; una **ficha por habilidad** con su dibujo, el nombre, el nivel comprado, qué hace, el efecto del siguiente nivel y el botón **Comprar · precio** / **Mejorar · precio** (desactivado si no llegan las monedas, «Al máximo» o lo que le falta); debajo, de dónde salen las monedas, y el botón **Salir** (o Esc / Atrás). Si no cabe en la pantalla, se escala para que quepa. Al comprar, sonido, vibración y la ficha da un saltito y se vuelve verdosa. Al salir, el juego se reanuda con la aceleración de la pausa y las mejoras ya se aplican.
+- Las partidas guardadas de antes de las monedas **conservan las habilidades compradas**, pero empiezan con 0 monedas.
 
 ## 3. Escenario y objetivo — Confirmados
 
@@ -594,7 +598,7 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 
 - **Jugar:** abre el selector de niveles.
 - **Enciclopedia:** abre la enciclopedia (apartado 7.6) encima del menú.
-- **Opciones:** volumen de **efectos de sonido** y de **música** (0-100%; canales de audio «SFX» y «Music»), **antialiasing** (activado/desactivado; MSAA 4x con la calidad alta y FXAA con la baja y la media, porque MSAA con el 3D escalado pierde memoria en cada fotograma con el driver de Mali hasta que Android cierra el juego), **calidad gráfica** (baja, media o alta: el 3D se pinta al 60, 75 o 100 % de la resolución de la pantalla, la interfaz siempre a la resolución completa, y el mapa de sombras es de 1024, 2048 o 4096; por defecto media en el móvil y alta en el PC), **sombras** (activadas/desactivadas), **vibración** (activada/desactivada; al activarla vibra brevemente como prueba) e **idioma** (español o inglés). Los cambios se aplican al momento y se guardan en el dispositivo. Por defecto se usa el idioma del sistema si es español o inglés, y si no, inglés.
+- **Opciones** (en tres pestañas: **Audio**, **Gráficos** y **Otros**): volumen de **efectos de sonido** y de **música** (0-100%; canales de audio «SFX» y «Music»), **antialiasing** (activado/desactivado; MSAA 4x con la calidad alta y FXAA con la baja y la media, porque MSAA con el 3D escalado pierde memoria en cada fotograma con el driver de Mali hasta que Android cierra el juego), **calidad gráfica** (baja, media o alta: el 3D se pinta al 60, 75 o 100 % de la resolución de la pantalla, la interfaz siempre a la resolución completa, y el mapa de sombras es de 1024, 2048 o 4096; por defecto media en el móvil y alta en el PC), **sombras** (activadas/desactivadas), **vibración** (activada/desactivada; al activarla vibra brevemente como prueba) e **idioma** (español o inglés). Los cambios se aplican al momento y se guardan en el dispositivo. Por defecto se usa el idioma del sistema si es español o inglés, y si no, inglés. En la pestaña Otros, debajo del idioma, está **Borrar progreso**: tras confirmarlo en una ventana («¿Borrar el progreso?», con Cancelar y Borrar) se pierden los niveles completados, las estrellas, las monedas, los cofres abiertos y las habilidades compradas, y se empieza desde cero; los ajustes se conservan.
 - **Créditos:** equipo de desarrollo, gráficos, sonido, tipografía, herramientas y licencia del motor, en una lista que se puede desplazar. Al final, tras «¡Gracias por jugar!», un apartado «Sígueme» con los **iconos de Instagram y X**, que abren los perfiles (instagram.com/tonyjdev y x.com/tonyjdev) en el navegador o en su aplicación, y debajo «@tonyjdev».
 - **Salir:** cierra el juego (igual que pulsar Atrás en la pantalla principal).
 

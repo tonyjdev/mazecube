@@ -5,6 +5,7 @@ extends Node3D
 ## selector de niveles del menú).
 ##
 ## Sonidos (ver Sfx): vuelcos, rebotes, giros descartados, dash, pisotón,
+## monedas, cofres, casillas de inicio,
 ## inmunidad (chispazo al activarla y zumbido en bucle mientras dura),
 ## enemigos destruidos, llaves, puertas,
 ## muros, botones y barrotes, power ups, media vuelta, muerte, meta y botones
@@ -47,11 +48,14 @@ extends Node3D
 ## hace falta alguna estrella, en esta partida o en una anterior del nivel
 ## (que el siguiente esté desbloqueado); si no, se avisa.
 ##
-## Puntos (ver Abilities.points_for_run): al llegar a la meta, la partida
-## suma los giros que sobran respecto al reto de giros, 50 por estrella y lo
-## que valen los enemigos destruidos (Level.enemy_destroyed). Si supera el
-## récord del nivel, se ganan los de diferencia (GameState.record_points); la
-## pantalla de nivel completado lo cuenta después de las estrellas.
+## Monedas (ver Abilities y GameState.coins): las que coge el cubo del suelo
+## (salen de los enemigos destruidos y de los cofres, ver Level) se suman al
+## momento; arriba, junto a los retos, se ve cuántas se tienen. Al llegar a
+## la meta, la recompensa del nivel (Abilities.reward_for_run: 10 más una por
+## giro sobrante respecto al reto de giros) se cobra si supera la mejor del
+## nivel, y solo la diferencia (GameState.record_reward); la pantalla de
+## nivel completado lo cuenta después de las estrellas. Los cofres abiertos
+## se apuntan al momento (GameState.open_chest) y no vuelven a salir.
 ##
 ## Tienda (ver Shop): al chocar con la tienda del nivel (ver ShopBuilding) el
 ## juego se detiene y se abre la tienda encima; al salir, se reanuda como
@@ -61,8 +65,8 @@ extends Node3D
 ## media vuelta, tocar los dos lados a la vez son dos giros normales. Sin
 ## dash, pisotón ni inmunidad no se ve la barra de fuerza. Las mejoras
 ## compradas se aplican al cubo (radio del pisotón, duración de la
-## inmunidad, recarga de la fuerza) al empezar el nivel y al salir de la
-## tienda.
+## inmunidad, recarga de la fuerza, alcance del imán) al empezar el nivel y
+## al salir de la tienda.
 ##
 ## Controles:
 ##   Media vuelta: pulsar izquierda y derecha a la vez (con el otro lado aún
@@ -180,15 +184,18 @@ var _restarting := false
 var _run_turns := 0
 var _run_deaths := 0
 var _run_collected := false
-## Puntos de los enemigos destruidos en la partida.
-var _run_enemy_points := 0
+## Monedas cogidas en la partida.
+var _run_coins := 0
 ## Tienda (ver Shop), en su propia capa, y aviso de habilidad bloqueada.
 var _shop: Shop
 var _locked_toast: Label
 var _toast_tween: Tween
-## Pantalla de nivel completado: puntos de la partida y lo ganado.
-var _points_label: Label
-var _points_gained_label: Label
+## Pantalla de nivel completado: recompensa de la partida y lo ganado.
+var _reward_label: Label
+var _reward_gained_label: Label
+## Monedas que se tienen (arriba, junto a los retos).
+var _coins_label: Label
+var _coins_icon: TextureRect
 var _star_turns := 0
 var _stars_tween: Tween
 ## Zumbido en bucle de la inmunidad (se detiene con la pausa) y su desvanecido.
@@ -236,7 +243,8 @@ func _ready() -> void:
 	# La cámara se procesa siempre (ver FollowCamera) para explorar en la pausa.
 	for node: Node in [level, cube, $UI]:
 		node.process_mode = Node.PROCESS_MODE_PAUSABLE
-	_build_points_labels()
+	_build_reward_labels()
+	_build_coins_badge()
 	_build_locked_toast()
 
 	cube.reached_goal.connect(_on_reached_goal)
@@ -313,8 +321,18 @@ func _ready() -> void:
 		_start_immunity_hum())
 	cube.immunity_ended.connect(_stop_immunity_hum)
 	cube.shop_reached.connect(func(_cell: Vector2i) -> void: _open_shop())
-	level.enemy_destroyed.connect(func(enemy: Enemy) -> void:
-		_run_enemy_points += Abilities.enemy_points(enemy))
+	level.coins_collected.connect(func(amount: int) -> void:
+		GameState.add_coins(amount)
+		_run_coins += amount
+		Sfx.play("coin", 0.08)
+		_update_coins(true))
+	level.chest_opened.connect(func(cell: Vector2i) -> void:
+		GameState.open_chest(current_level, cell)
+		Sfx.play("chest", 0.05)
+		GameState.vibrate(GameState.VIBRATION_BUTTON))
+	level.checkpoint_activated.connect(func(_cell: Vector2i) -> void:
+		Sfx.play("checkpoint")
+		GameState.vibrate(GameState.VIBRATION_BUTTON))
 	cube.power_up_picked.connect(func(_power_up: PowerUp, _stacks: int) -> void:
 		Sfx.play("powerup"))
 	for button in find_children("*", "BaseButton", true, false):
@@ -532,21 +550,55 @@ func _build_locked_toast() -> void:
 	$UI.add_child(_locked_toast)
 
 
-## Textos de los puntos en la pantalla de nivel completado, bajo las estrellas.
-func _build_points_labels() -> void:
+## Textos de las monedas en la pantalla de nivel completado, bajo las estrellas.
+func _build_reward_labels() -> void:
 	var stars: Control = $CompleteMenu/Center/Panel/VBox/Stars
-	_points_label = Label.new()
-	_points_label.add_theme_font_size_override("font_size", 26)
-	_points_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_points_gained_label = Label.new()
-	_points_gained_label.add_theme_font_size_override("font_size", 24)
-	_points_gained_label.add_theme_color_override("font_color", Color(0.98, 0.85, 0.3))
-	_points_gained_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_reward_label = Label.new()
+	_reward_label.add_theme_font_size_override("font_size", 26)
+	_reward_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_reward_gained_label = Label.new()
+	_reward_gained_label.add_theme_font_size_override("font_size", 24)
+	_reward_gained_label.add_theme_color_override("font_color", Shop.GOLD)
+	_reward_gained_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var box := stars.get_parent()
-	box.add_child(_points_label)
-	box.move_child(_points_label, stars.get_index() + 1)
-	box.add_child(_points_gained_label)
-	box.move_child(_points_gained_label, _points_label.get_index() + 1)
+	box.add_child(_reward_label)
+	box.move_child(_reward_label, stars.get_index() + 1)
+	box.add_child(_reward_gained_label)
+	box.move_child(_reward_gained_label, _reward_label.get_index() + 1)
+
+
+## Marcador de las monedas que se tienen, junto al de los retos.
+func _build_coins_badge() -> void:
+	var stats_badge: Control = $UI/Margin/VBox/TopBar/StatsBadge
+	var badge := PanelContainer.new()
+	badge.theme_type_variation = &"HudBadge"
+	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.add_child(row)
+	_coins_icon = TextureRect.new()
+	_coins_icon.texture = load("res://ui/hud_coin.svg")
+	_coins_icon.custom_minimum_size = Vector2(32, 32)
+	_coins_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_coins_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_coins_icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_coins_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(_coins_icon)
+	_coins_label = Label.new()
+	_coins_label.add_theme_font_size_override("font_size", 28)
+	_coins_label.add_theme_color_override("font_color", Shop.GOLD)
+	_coins_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(_coins_label)
+	stats_badge.add_sibling(badge)
+
+
+## Monedas que se tienen en el marcador; con `pop`, el icono da un salto.
+func _update_coins(pop := false) -> void:
+	_coins_label.text = str(GameState.coins())
+	if pop:
+		_pop_stat(_coins_icon)
 
 
 ## Aplica al cubo las mejoras compradas y enseña la barra de fuerza solo si
@@ -557,6 +609,7 @@ func _apply_abilities() -> void:
 	if GameState.has_ability(Abilities.IMMUNITY):
 		cube.immunity_time = GameState.ability_value(Abilities.IMMUNITY)
 	cube.strength_recharge_time = GameState.ability_value(Abilities.RECHARGE)
+	cube.magnet_radius = GameState.ability_value(Abilities.MAGNET)
 	var uses_strength := false
 	for id: String in [Abilities.DASH, Abilities.STOMP, Abilities.IMMUNITY]:
 		uses_strength = uses_strength or GameState.has_ability(id)
@@ -578,6 +631,7 @@ func _open_shop() -> void:
 
 func _on_shop_closed() -> void:
 	_apply_abilities()
+	_update_coins()
 	$UI.visible = true
 	_clear_held_sides()
 	Music.set_muffled(false)
@@ -768,7 +822,9 @@ func _restart_with_fade() -> void:
 
 
 func _restart() -> void:
-	# Reconstruir el tablero devuelve a su sitio llaves, puertas y muros.
+	# Reconstruir el tablero devuelve a su sitio llaves, puertas y muros (los
+	# cofres ya abiertos no vuelven).
+	level.opened_chests = GameState.opened_chests(current_level)
 	level.build()
 	cube.reset(level)
 	camera.snap()
@@ -783,9 +839,10 @@ func _restart() -> void:
 	_run_turns = 0
 	_run_deaths = 0
 	_run_collected = false
-	_run_enemy_points = 0
+	_run_coins = 0
 	_apply_abilities()
 	_update_stats()
+	_update_coins()
 	_play_intro()
 
 
@@ -859,18 +916,19 @@ func _on_reached_goal() -> void:
 	var stars := [_run_deaths == 0, _run_turns <= _star_turns,
 		_run_collected or not level.has_collectible()]
 	var record := GameState.record_result(current_level, stars)
-	var points := Abilities.points_for_run(_run_turns, _star_turns, stars.count(true), _run_enemy_points)
-	var gained := GameState.record_points(current_level, points["total"])
+	var reward := Abilities.reward_for_run(_run_turns, _star_turns)
+	var gained := GameState.record_reward(current_level, reward["total"])
+	_update_coins(gained > 0)
 	pause_button.visible = false
 	await get_tree().create_timer(COMPLETE_MENU_DELAY).timeout
 	if cube.is_finished:
-		_show_complete_menu(stars, record, points, gained)
+		_show_complete_menu(stars, record, reward, gained)
 
 
 ## Pantalla de nivel completado: las estrellas aparecen una a una (con su
 ## campanada, o un golpe apagado si no se ha conseguido) y luego el aviso de
 ## récord.
-func _show_complete_menu(stars: Array, record: bool, points: Dictionary, gained: int) -> void:
+func _show_complete_menu(stars: Array, record: bool, reward: Dictionary, gained: int) -> void:
 	var last := current_level >= Levels.count() - 1
 	complete_title.text = "COMPLETE_ALL" if last else "COMPLETE_TITLE"
 	next_button.visible = not last
@@ -882,12 +940,12 @@ func _show_complete_menu(stars: Array, record: bool, points: Dictionary, gained:
 		star_icons[i].reset()
 		star_labels[i].text = texts[i]
 		star_labels[i].modulate = Color(1, 1, 1, 0)
-	_points_label.text = tr("COMPLETE_POINTS") % [points["total"], points["turns"], points["stars"],
-		points["enemies"]]
-	_points_gained_label.text = tr("COMPLETE_POINTS_GAINED") % [gained, GameState.points()] if gained > 0 \
-		else tr("COMPLETE_POINTS_BEST") % [GameState.best_points(current_level), GameState.points()]
-	_points_label.modulate.a = 0.0
-	_points_gained_label.modulate.a = 0.0
+	_reward_label.text = tr("COMPLETE_REWARD") % [reward["total"], reward["level"], reward["spare"],
+		_run_coins]
+	_reward_gained_label.text = tr("COMPLETE_COINS_GAINED") % [gained, GameState.coins()] if gained > 0 \
+		else tr("COMPLETE_COINS_BEST") % [GameState.best_reward(current_level), GameState.coins()]
+	_reward_label.modulate.a = 0.0
+	_reward_gained_label.modulate.a = 0.0
 	complete_menu.visible = true
 	_focus_first(complete_menu)
 	if _stars_tween and _stars_tween.is_valid():
@@ -905,12 +963,12 @@ func _show_complete_menu(stars: Array, record: bool, points: Dictionary, gained:
 		_stars_tween.tween_property(star_labels[i], "modulate",
 			Color(1, 1, 1, 1.0) if got else Color(1, 1, 1, 0.5), 0.2)
 		_stars_tween.tween_interval(STAR_INTERVAL - 0.2)
-	_stars_tween.tween_property(_points_label, "modulate:a", 1.0, 0.2)
-	_stars_tween.tween_property(_points_gained_label, "modulate:a", 1.0, 0.2)
+	_stars_tween.tween_property(_reward_label, "modulate:a", 1.0, 0.2)
+	_stars_tween.tween_property(_reward_gained_label, "modulate:a", 1.0, 0.2)
 	if gained > 0:
 		_stars_tween.tween_callback(func() -> void:
-			Sfx.play("collect")
-			_pop_stat(_points_gained_label))
+			Sfx.play("coin")
+			_pop_stat(_reward_gained_label))
 	if record and stars.count(true) > 0:
 		_stars_tween.tween_callback(func() -> void:
 			%RecordLabel.visible = true

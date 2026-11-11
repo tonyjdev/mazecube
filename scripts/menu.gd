@@ -6,9 +6,13 @@ extends Control
 ##
 ## Los textos fijos de la escena son claves de traducción (ver Translations);
 ## los que se generan aquí se rehacen al cambiar de idioma.
-## Atrás (Esc o el botón Atrás de Android) cierra la enciclopedia si está
-## abierta; si no, vuelve a la pantalla principal y, desde ella, cierra el
-## juego.
+## Atrás (Esc o el botón Atrás de Android) cierra la enciclopedia o la
+## confirmación de borrar el progreso si están abiertas; si no, vuelve a la
+## pantalla principal y, desde ella, cierra el juego.
+##
+## Las opciones van en pestañas (Audio, Gráficos, Otros); en Otros está el
+## botón de borrar el progreso, que pide confirmación (ver
+## GameState.reset_progress).
 ##
 ## Truco (solo en builds de depuración): tocar 5 veces seguidas el rótulo
 ## «INICIO» del mapa de niveles desbloquea todos los niveles.
@@ -17,6 +21,8 @@ const LANGUAGE_NAMES := {"es": "Español", "en": "English"}
 ## Truco de desbloqueo: toques necesarios y tiempo máximo entre dos toques.
 const UNLOCK_TAPS := 5
 const UNLOCK_TAP_WINDOW := 0.6
+## Segundos que el botón de borrar el progreso dice «Progreso borrado».
+const RESET_DONE_TIME := 2.0
 
 ## Créditos: (clave del encabezado, texto o clave). Los textos que no son
 ## claves (nombres propios) se muestran tal cual.
@@ -44,6 +50,8 @@ var _current := "main"
 var _unlock_taps := 0
 var _last_unlock_tap := 0.0
 var _encyclopedia: Encyclopedia
+## Pestañas de las opciones: botón -> página.
+var _option_tabs: Dictionary
 
 
 func _ready() -> void:
@@ -99,7 +107,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _go_back() -> void:
-	if _encyclopedia.is_open():
+	if %ResetConfirm.visible:
+		_close_reset_confirm()
+	elif _encyclopedia.is_open():
 		_encyclopedia.close()
 	elif _current == "main":
 		get_tree().quit()
@@ -119,6 +129,8 @@ func _show(screen: String) -> void:
 	match screen:
 		"levels":
 			_build_level_grid()
+		"options":
+			_show_option_tab(%AudioTab)
 		"credits":
 			_build_credits()
 			%Scroll.scroll_vertical = 0
@@ -188,6 +200,48 @@ func _setup_options() -> void:
 	%VibrationToggle.toggled.connect(GameState.set_vibration)
 	language.item_selected.connect(func(index: int) -> void:
 		GameState.set_locale(GameState.LOCALES[index]))
+
+	_option_tabs = {%AudioTab: %AudioPage, %GraphicsTab: %GraphicsPage, %OtherTab: %OtherPage}
+	var group := ButtonGroup.new()
+	for tab: Button in _option_tabs:
+		tab.button_group = group
+		tab.pressed.connect(_show_option_tab.bind(tab))
+	_show_option_tab(%AudioTab)
+
+	%ResetButton.pressed.connect(_open_reset_confirm)
+	%ResetCancel.pressed.connect(_close_reset_confirm)
+	%ResetAccept.pressed.connect(_on_reset_accepted)
+
+
+## Enseña la página de una pestaña; la elegida se resalta en dorado.
+func _show_option_tab(tab: Button) -> void:
+	for other: Button in _option_tabs:
+		var selected := other == tab
+		other.set_pressed_no_signal(selected)
+		other.theme_type_variation = &"PrimaryButton" if selected else &""
+		_option_tabs[other].visible = selected
+
+
+func _open_reset_confirm() -> void:
+	%ResetConfirm.show()
+	_focus_first(%ResetConfirm)
+
+
+func _close_reset_confirm() -> void:
+	%ResetConfirm.hide()
+	_focus_first(%OtherPage)
+
+
+func _on_reset_accepted() -> void:
+	GameState.reset_progress()
+	GameState.vibrate(GameState.VIBRATION_PREVIEW)
+	_close_reset_confirm()
+	var button: Button = %ResetButton
+	button.text = "OPT_RESET_DONE"
+	button.disabled = true
+	get_tree().create_timer(RESET_DONE_TIME).timeout.connect(func() -> void:
+		button.text = "OPT_RESET_BUTTON"
+		button.disabled = false)
 
 
 # --- Créditos ---------------------------------------------------------------

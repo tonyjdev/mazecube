@@ -8,12 +8,16 @@ extends Node
 ##   sin morir, en «star_turns» giros o menos y con el cubito dorado (ver
 ##   record_result). Solo cuenta la mejor partida (la de más estrellas); no
 ##   se suman estrellas de partidas distintas.
-## - Puntos y habilidades (también en user://progress.cfg): cada nivel guarda
-##   los puntos de su mejor partida (ver Abilities.points_for_run y
-##   record_points); los puntos que se tienen son la suma de esos récords
-##   menos lo gastado en las tiendas. Así repetir un nivel solo da puntos si
-##   se mejora su récord (y la diferencia). Las habilidades compradas se
-##   guardan con su nivel (ver Abilities y buy_ability).
+## - Monedas y habilidades (también en user://progress.cfg, sección "coins"):
+##   las monedas que se tienen (coins) suben al recoger monedas del suelo
+##   (add_coins, se guardan al momento) y con la recompensa de completar un
+##   nivel (ver Abilities.reward_for_run y record_reward: cada nivel guarda
+##   su mejor recompensa y repetirlo solo da la diferencia si se mejora), y
+##   bajan al comprar en las tiendas. Las habilidades compradas se guardan
+##   con su nivel (ver Abilities y buy_ability). Los cofres abiertos de cada
+##   nivel no vuelven a salir (ver open_chest y opened_chests).
+##   Las partidas de antes de las monedas (sección "points") conservan las
+##   habilidades compradas, pero empiezan sin monedas.
 ## - Ajustes (user://settings.cfg): volumen de efectos y de música (buses
 ##   "SFX" y "Music", ver default_bus_layout.tres), antialiasing, calidad
 ##   gráfica, sombras, idioma y vibración.
@@ -90,10 +94,14 @@ var _completed: Array[int] = []
 var _stars := {}
 ## Truco para pruebas: todos los niveles desbloqueados (ver unlock_all_levels).
 var _all_unlocked := false
-## Índice del nivel -> puntos de su mejor partida.
-var _level_points := {}
-## Puntos gastados en las tiendas.
-var _spent_points := 0
+## Monedas que se tienen.
+var _coins := 0
+## Índice del nivel -> mejor recompensa cobrada por completarlo.
+var _level_rewards := {}
+## Índice del nivel -> casillas de sus cofres ya abiertos.
+var _opened_chests := {}
+## Hay cambios sin guardar (las monedas se guardan una vez por fotograma).
+var _save_queued := false
 ## Habilidad -> nivel comprado (las que no están, nivel 0: bloqueadas).
 var _abilities := {}
 ## Capa negra de los fundidos y su animación en curso.
@@ -191,30 +199,52 @@ func record_result(index: int, stars: Array) -> bool:
 	return record
 
 
-# --- Puntos y habilidades ---------------------------------------------------
+# --- Monedas y habilidades -------------------------------------------------
 
-## Puntos disponibles para gastar en las tiendas.
-func points() -> int:
-	var total := 0
-	for value: int in _level_points.values():
-		total += value
-	return maxi(total - _spent_points, 0)
+## Monedas para gastar en las tiendas.
+func coins() -> int:
+	return _coins
 
 
-## Puntos de la mejor partida del nivel.
-func best_points(index: int) -> int:
-	return _level_points.get(index, 0)
+## Suma monedas (recogidas del suelo) y las guarda.
+func add_coins(amount: int) -> void:
+	if amount <= 0:
+		return
+	_coins += amount
+	_queue_save()
 
 
-## Puntos de una partida del nivel: si supera su récord, pasa a serlo y se
-## ganan los de diferencia. Devuelve los puntos ganados (0 si no lo supera).
-func record_points(index: int, earned: int) -> int:
-	var gained := earned - best_points(index)
+## Mejor recompensa cobrada por completar el nivel.
+func best_reward(index: int) -> int:
+	return _level_rewards.get(index, 0)
+
+
+## Recompensa de una partida completada (ver Abilities.reward_for_run): si
+## supera la mejor del nivel, pasa a serlo y se cobran las monedas de
+## diferencia. Devuelve las monedas ganadas (0 si no la supera).
+func record_reward(index: int, earned: int) -> int:
+	var gained := earned - best_reward(index)
 	if gained <= 0:
 		return 0
-	_level_points[index] = earned
+	_level_rewards[index] = earned
+	_coins += gained
 	_save_progress()
 	return gained
+
+
+## Casillas de los cofres ya abiertos del nivel.
+func opened_chests(index: int) -> Array:
+	return _opened_chests.get(index, [])
+
+
+## Apunta el cofre de esa casilla como abierto (no vuelve a salir).
+func open_chest(index: int, cell: Vector2i) -> void:
+	var list: Array = _opened_chests.get(index, [])
+	if list.has(cell):
+		return
+	list.append(cell)
+	_opened_chests[index] = list
+	_queue_save()
 
 
 ## Nivel comprado de la habilidad (0 = bloqueada; ver Abilities).
@@ -232,12 +262,12 @@ func ability_value(id: String) -> Variant:
 
 
 ## Se puede comprar el siguiente nivel de la habilidad: no está al máximo,
-## se tiene alguna de las que necesita y hay puntos suficientes.
+## se tiene alguna de las que necesita y hay monedas suficientes.
 func can_buy_ability(id: String) -> bool:
 	var current := ability_level(id)
 	if current >= Abilities.max_level(id) or not meets_ability_needs(id):
 		return false
-	return points() >= Abilities.price(id, current)
+	return _coins >= Abilities.price(id, current)
 
 
 func meets_ability_needs(id: String) -> bool:
@@ -255,7 +285,7 @@ func buy_ability(id: String) -> bool:
 	if not can_buy_ability(id):
 		return false
 	var current := ability_level(id)
-	_spent_points += Abilities.price(id, current)
+	_coins -= Abilities.price(id, current)
 	_abilities[id] = current + 1
 	_save_progress()
 	return true
@@ -272,18 +302,23 @@ func _load_progress() -> void:
 			var value: Variant = saved_stars[key]
 			if value is Array and value.size() == 3:
 				_stars[int(key)] = [bool(value[0]), bool(value[1]), bool(value[2])]
-	var saved_points: Variant = cfg.get_value("points", "levels", {}) \
-		if cfg.has_section_key("points", "levels") else null
-	if saved_points is Dictionary:
-		for key: Variant in saved_points:
-			_level_points[int(key)] = int(saved_points[key])
-	else:
-		# Progreso de antes de los puntos: cada nivel con estrellas cuenta como
-		# una partida con esas estrellas (sin giros sobrantes ni enemigos).
-		for index: int in _stars:
-			_level_points[index] = star_count(index) * Abilities.POINTS_PER_STAR
-	_spent_points = int(cfg.get_value("points", "spent", 0))
-	var saved_abilities: Variant = cfg.get_value("points", "abilities", {})
+	_coins = maxi(int(cfg.get_value("coins", "coins", 0)), 0)
+	var saved_rewards: Variant = cfg.get_value("coins", "levels", {})
+	if saved_rewards is Dictionary:
+		for key: Variant in saved_rewards:
+			_level_rewards[int(key)] = int(saved_rewards[key])
+	var saved_chests: Variant = cfg.get_value("coins", "chests", {})
+	if saved_chests is Dictionary:
+		for key: Variant in saved_chests:
+			var cells: Array = []
+			for cell: Variant in saved_chests[key]:
+				if cell is Vector2i:
+					cells.append(cell)
+			_opened_chests[int(key)] = cells
+	# Las habilidades se guardan en "coins"; las partidas de antes de las
+	# monedas las tenían en "points".
+	var section := "coins" if cfg.has_section_key("coins", "abilities") else "points"
+	var saved_abilities: Variant = cfg.get_value(section, "abilities", {})
 	if saved_abilities is Dictionary:
 		for key: Variant in saved_abilities:
 			var id := str(key)
@@ -300,13 +335,38 @@ func _load_progress() -> void:
 		_save_progress()
 
 
+## Borra todo el progreso (niveles, estrellas, monedas, cofres abiertos y
+## habilidades) para empezar desde cero. Los ajustes no se tocan.
+func reset_progress() -> void:
+	_completed.clear()
+	_stars.clear()
+	_all_unlocked = false
+	_coins = 0
+	_level_rewards.clear()
+	_opened_chests.clear()
+	_abilities.clear()
+	current_level = 0
+	_save_progress()
+
+
+## Guarda el progreso al final del fotograma (varias monedas seguidas, una
+## sola escritura).
+func _queue_save() -> void:
+	if _save_queued:
+		return
+	_save_queued = true
+	_save_progress.call_deferred()
+
+
 func _save_progress() -> void:
+	_save_queued = false
 	var cfg := ConfigFile.new()
 	cfg.set_value("progress", "completed", _completed)
 	cfg.set_value("progress", "stars", _stars)
-	cfg.set_value("points", "levels", _level_points)
-	cfg.set_value("points", "spent", _spent_points)
-	cfg.set_value("points", "abilities", _abilities)
+	cfg.set_value("coins", "coins", _coins)
+	cfg.set_value("coins", "levels", _level_rewards)
+	cfg.set_value("coins", "chests", _opened_chests)
+	cfg.set_value("coins", "abilities", _abilities)
 	if _all_unlocked:
 		cfg.set_value("progress", "all_unlocked", true)
 	cfg.save(PROGRESS_PATH)

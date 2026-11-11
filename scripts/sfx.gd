@@ -20,7 +20,8 @@ extends RefCounted
 ## la mecha), bomb_explode (explosión), collect (cubito dorado), star y
 ## star_miss (estrella conseguida o no en la pantalla final), immunity
 ## (se activa la inmunidad), immunity_hum (zumbido en bucle mientras dura;
-## lo reproduce Game), page (pasar
+## lo reproduce Game), coin (moneda cogida), chest (cofre abierto),
+## checkpoint (casilla de inicio activada), page (pasar
 ## página en la enciclopedia) y click (botones de la interfaz).
 
 const POOL_SIZE := 10

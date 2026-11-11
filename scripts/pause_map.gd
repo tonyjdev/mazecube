@@ -2,7 +2,8 @@ class_name PauseMap
 extends Control
 ## Mapa 2D del nivel en la pausa, al estilo de los metroidvania: sobre un
 ## fondo negro medio transparente (detrás se ve la partida congelada, ver
-## Game) se dibujan los límites del tablero, lo que se puede coger y los
+## Game) se dibujan los límites del tablero, las casillas de inicio (la
+## activada resaltada), lo que se puede coger, los cofres sin abrir y los
 ## obstáculos fijos, tal como están ahora y solo en la zona ya explorada
 ## (ver Level.map_snapshot y Level.mark_seen_around). Nunca los enemigos ni
 ## lo que se mueve. El borde de lo explorado (lo que solo se ha visto de
@@ -350,7 +351,13 @@ func _build_legend() -> void:
 ## [tipo, texto, datos] de lo que hay ahora en el nivel.
 func _legend_entries() -> Array:
 	var entries := [["cube", "MAP_LEGEND_CUBE", {}]]
-	if _data["start"] != Level.NO_CELL:
+	var checkpoints: Dictionary = _data["checkpoints"]
+	if checkpoints.size() > 1 or (checkpoints.size() == 1 and checkpoints.keys()[0] != _data["start"]):
+		if checkpoints.values().has(true):
+			entries.append(["start", "MAP_LEGEND_CHECKPOINT", {"active": true}])
+		if checkpoints.values().has(false):
+			entries.append(["start", "MAP_LEGEND_CHECKPOINT_OFF", {"active": false}])
+	elif _data["start"] != Level.NO_CELL:
 		entries.append(["start", "MAP_LEGEND_START", {}])
 	if _data["goal"] != Level.NO_CELL:
 		entries.append(["goal", "MAP_LEGEND_GOAL", {}])
@@ -391,6 +398,8 @@ func _legend_entries() -> Array:
 		entries.append(["laser", "ENC_LASER_NAME", {"dir": Vector2i.DOWN}])
 	if not _data["mortars"].is_empty():
 		entries.append(["mortar", "ENC_MORTAR_NAME", {}])
+	if not _data["chests"].is_empty():
+		entries.append(["chest", "MAP_LEGEND_CHEST", {}])
 	if _data["shop"] != Level.NO_CELL:
 		entries.append(["shop", "MAP_LEGEND_SHOP", {"dir": Vector2i.DOWN}])
 	return entries
@@ -412,7 +421,18 @@ static func draw_item(ci: CanvasItem, kind: String, o: Vector2, info: Dictionary
 			ci.draw_rect(Rect2(c - Vector2(0.34, 0.34), Vector2(0.68, 0.68)), OUTLINE_COLOR)
 			ci.draw_rect(Rect2(c - Vector2(0.27, 0.27), Vector2(0.54, 0.54)), CUBE_COLOR)
 		"start":
-			ci.draw_rect(Rect2(o + Vector2(0.12, 0.12), Vector2(0.76, 0.76)), Level.START_COLOR)
+			# Casilla de inicio: la activada, del color de la salida; las demás, apagadas.
+			var active: bool = info.get("active", true)
+			ci.draw_rect(Rect2(o + Vector2(0.12, 0.12), Vector2(0.76, 0.76)),
+				Level.START_COLOR if active else CheckpointTile.OFF_COLOR)
+			if active:
+				ci.draw_rect(Rect2(o + Vector2(0.34, 0.34), Vector2(0.32, 0.32)), Level.START_COLOR.lightened(0.5))
+		"chest":
+			ci.draw_rect(Rect2(o + Vector2(0.12, 0.22), Vector2(0.76, 0.6)), OUTLINE_COLOR)
+			ci.draw_rect(Rect2(o + Vector2(0.17, 0.27), Vector2(0.66, 0.5)), TreasureChest.WOOD)
+			ci.draw_rect(Rect2(o + Vector2(0.17, 0.27), Vector2(0.66, 0.16)), TreasureChest.WOOD.lightened(0.15))
+			ci.draw_rect(Rect2(o + Vector2(0.17, 0.42), Vector2(0.66, 0.04)), OUTLINE_COLOR)
+			ci.draw_rect(Rect2(o + Vector2(0.44, 0.38), Vector2(0.12, 0.16)), TreasureChest.METAL)
 		"goal":
 			ci.draw_rect(Rect2(o + Vector2(0.12, 0.12), Vector2(0.76, 0.76)), Level.GOAL_COLOR)
 			# Bandera de meta: ajedrezado blanco en el centro.
@@ -580,9 +600,11 @@ void fragment() {
 		var bridges: Dictionary = data["bridges"]
 		for cell: Vector2i in bridges:
 			PauseMap.draw_item(self, "bridge", Vector2(cell), {"horizontal": bridges[cell]})
-		for key in ["start", "goal"]:
-			if data[key] != Level.NO_CELL:
-				PauseMap.draw_item(self, key, Vector2(data[key]), {})
+		var checkpoints: Dictionary = data["checkpoints"]
+		for cell: Vector2i in checkpoints:
+			PauseMap.draw_item(self, "start", Vector2(cell), {"active": checkpoints[cell]})
+		if data["goal"] != Level.NO_CELL:
+			PauseMap.draw_item(self, "goal", Vector2(data["goal"]), {})
 		for cell: Vector2i in data["spikes"]:
 			PauseMap.draw_item(self, "spikes", Vector2(cell), {})
 		var teleports: Dictionary = data["teleports"]
@@ -610,6 +632,8 @@ void fragment() {
 		var power_ups: Dictionary = data["power_ups"]
 		for cell: Vector2i in power_ups:
 			PauseMap.draw_item(self, "power_up", Vector2(cell), {})
+		for cell: Vector2i in data["chests"]:
+			PauseMap.draw_item(self, "chest", Vector2(cell), {})
 		if data["collectible"] != Level.NO_CELL:
 			PauseMap.draw_item(self, "gold", Vector2(data["collectible"]), {})
 		if data["shop"] != Level.NO_CELL:
