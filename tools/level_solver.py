@@ -68,8 +68,8 @@ Simula las reglas de scripts/rolling_cube.gd:
 - Cañones de bombas ('M'): son muros con un cañón encima que lanza bombas en
   tiempo real, así que el resolvedor no los simula y cuentan como muros.
   "validate" comprueba que cada cañón tiene alguna casilla libre a su
-  alcance (10 casillas hacia delante y 5 a cada lado, o lo que diga el campo
-  "mortars" del nivel).
+  alcance (10 casillas en cualquier dirección, porque gira 360°, o lo que
+  diga el campo "mortars" del nivel).
 - Al llegar a la meta B termina el nivel.
 - Cubito dorado (campo "collectible", lo colocan place_collectibles.py): con
   solve(..., collectible=casilla) solo vale llegar a la meta tras pasar por
@@ -120,8 +120,9 @@ TELEPORT_CHARS = "6789"
 SPIKE_CHAR = "^"
 LASER_CHAR = "L"
 MORTAR_CHAR = "M"
-# Alcance por defecto de los cañones de bombas: hacia delante y a cada lado.
-MORTAR_RANGE = (10, 5)
+# Alcance por defecto de los cañones de bombas (casillas en cualquier
+# dirección: giran 360°).
+MORTAR_RANGE = 10
 # Salidas del cubo que aguanta cada casilla de puente colgante.
 BRIDGE_STABILITY = 4
 ENEMY_CHARS = CHASER_CHAR + BLOCKER_CHAR + PATROL_CHARS
@@ -443,7 +444,7 @@ def read_levels(path=LEVELS_GD):
         block = re.search(r'"patrols":\s*\{(.*?)\}', extra, re.S)
         if block:
             patrols = dict(re.findall(r'"(\w)":\s*"([^"]*)"', block.group(1)))
-        # "mortars": {Vector2i(x, z): {"facing": Vector2i(a, b), "range": Vector2i(f, s)}}
+        # "mortars": {Vector2i(x, z): {"facing": Vector2i(a, b), "range": r o Vector2i(r, s)}}
         mortars = {}
         block = re.search(r'"mortars":\s*\{((?:[^{}]|\{[^{}]*\})*)\}', extra, re.S)
         if block:
@@ -451,6 +452,9 @@ def read_levels(path=LEVELS_GD):
                 settings = {}
                 for key, a, b in re.findall(r'"(facing|range)":\s*Vector2i\((-?\d+),\s*(-?\d+)\)', body_m):
                     settings[key] = (int(a), int(b))
+                number = re.search(r'"range":\s*(\d+)', body_m)
+                if number:
+                    settings["range"] = int(number.group(1))
                 mortars[(int(mx), int(mz))] = settings
         # Coleccionable y giros de la estrella (ver place_collectibles.py).
         collectible = None
@@ -608,16 +612,14 @@ def check_lasers(rows):
 
 def check_mortars(rows, mortars):
     """Problemas de los cañones de bombas (lista de textos): cada uno debe
-    tener alguna casilla libre a su alcance mirando hacia donde mira (la de
-    "mortars" o, si no se indica, la que tiene más casillas libres)."""
+    tener alguna casilla libre a su alcance (gira 360°: "range" casillas en
+    cualquier dirección; si es una pareja, cuenta la primera)."""
     problems = []
     free, _, _ = parse(rows)
 
-    def in_reach(cell, facing, reach, target):
+    def in_reach(cell, reach, target):
         ox, oz = target[0] - cell[0], target[1] - cell[1]
-        forward = ox * facing[0] + oz * facing[1]
-        side = ox * facing[1] - oz * facing[0]
-        return 1 <= forward <= reach[0] and abs(side) <= reach[1]
+        return (ox, oz) != (0, 0) and ox * ox + oz * oz <= reach * reach
 
     for z, row in enumerate(rows):
         for x, c in enumerate(row):
@@ -625,8 +627,9 @@ def check_mortars(rows, mortars):
                 continue
             settings = mortars.get((x, z), {})
             reach = settings.get("range", MORTAR_RANGE)
-            facings = [settings["facing"]] if "facing" in settings else DIRS
-            best = max(sum(1 for t in free if in_reach((x, z), f, reach, t)) for f in facings)
+            if isinstance(reach, (tuple, list)):
+                reach = reach[0]
+            best = sum(1 for t in free if in_reach((x, z), min(reach, MORTAR_RANGE), t))
             if best == 0:
                 problems.append(f"el cañón de bombas en {(x, z)} no tiene ninguna casilla libre a su alcance")
     for cell in mortars:

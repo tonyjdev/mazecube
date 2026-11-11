@@ -4,9 +4,9 @@ extends Node3D
 ## base redonda de hierro sobre la que gira una cureña con el cañón, que
 ## apunta hacia arriba.
 ##
-## Mira hacia `facing` (en casillas) y solo dispara si el cubo está dentro de
-## su alcance: hasta RANGE_FORWARD casillas hacia delante y RANGE_SIDE a cada
-## lado (lo comprueba Level). Entre disparo y disparo espera entre MIN_WAIT y
+## En reposo mira hacia `facing` (en casillas), pero gira 360° hacia el cubo:
+## solo dispara si el cubo está a `reach` casillas o menos en cualquier
+## dirección (como mucho RANGE; lo comprueba Level). Entre disparo y disparo espera entre MIN_WAIT y
 ## MAX_WAIT segundos; cuando le toca (wants_to_fire) y el cubo está a su
 ## alcance, Level calcula la trayectoria de la bomba y llama a aim(): la
 ## cureña gira, el cañón se inclina (AIM_TIME) y dispara: retroceso, destello
@@ -23,9 +23,8 @@ const MIN_WAIT := 10.0
 const MAX_WAIT := 15.0
 ## Espera antes del primer disparo (para que no disparen todos a la vez).
 const FIRST_WAIT := Vector2(1.5, 4.0)
-## Alcance (en casillas) por defecto y máximo: hacia delante y a cada lado.
-const RANGE_FORWARD := 10
-const RANGE_SIDE := 5
+## Alcance (en casillas, en cualquier dirección) por defecto y máximo.
+const RANGE := 10
 ## Lo que tarda en girar e inclinarse hacia el blanco antes de disparar.
 const AIM_TIME := 0.55
 ## Inclinación del cañón en reposo (radianes sobre la horizontal).
@@ -62,9 +61,10 @@ static var _bore_mesh: ArrayMesh
 static var _flash_mesh: QuadMesh
 static var _smoke_mesh: QuadMesh
 
-## Hacia dónde mira (en casillas) y su alcance (hacia delante, a cada lado).
+## Hacia dónde mira en reposo (en casillas) y su alcance (casillas en
+## cualquier dirección).
 var facing := Vector2i.DOWN
-var reach := Vector2i(RANGE_FORWARD, RANGE_SIDE)
+var reach := RANGE
 var _time_left := 0.0
 var _aiming := false
 var _yaw_pivot: Node3D
@@ -74,10 +74,10 @@ var _flash: MeshInstance3D
 var _smoke: CPUParticles3D
 
 
-static func create(dir: Vector2i, range_cells: Vector2i) -> MortarCannon:
+static func create(dir: Vector2i, range_cells: int) -> MortarCannon:
 	var cannon := MortarCannon.new()
 	cannon.facing = dir
-	cannon.reach = Vector2i(clampi(range_cells.x, 1, RANGE_FORWARD), clampi(range_cells.y, 0, RANGE_SIDE))
+	cannon.reach = clampi(range_cells, 1, RANGE)
 	cannon._time_left = randf_range(FIRST_WAIT.x, FIRST_WAIT.y)
 	return cannon
 

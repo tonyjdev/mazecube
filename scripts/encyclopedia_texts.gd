@@ -96,7 +96,7 @@ const MESSAGES := {
 
 		"ENC_MORTAR_NAME": "Cañón de bombas",
 		"ENC_MORTAR_DESC": "Un mortero encima de un muro. Cuando estás a su alcance, te lanza bombas que caen en tu camino. Las casillas a las que llega la explosión se tiñen de rojo: sal de ellas antes de que estalle.",
-		"ENC_MORTAR_FACTS": "Solo dispara si estás a 10 casillas o menos por delante y 5 a cada lado.\nLa bomba explota de 2 a 3 segundos después de tocar el suelo, y alcanza 2 casillas a la redonda.\nLas bombas son muy pesadas: rebotan poco y el cubo puede empujarlas.\nA los enemigos no les hacen nada.",
+		"ENC_MORTAR_FACTS": "Gira hacia ti en cualquier dirección y dispara si estás a 10 casillas o menos.\nLa bomba explota de 2 a 3 segundos después de tocar el suelo, y alcanza 2 casillas a la redonda.\nLas bombas son muy pesadas: rebotan poco y el cubo puede empujarlas.\nA los enemigos no les hacen nada.",
 	},
 	"en": {
 		"MENU_ENCYCLOPEDIA": "Encyclopedia",
@@ -187,6 +187,6 @@ const MESSAGES := {
 
 		"ENC_MORTAR_NAME": "Bomb cannon",
 		"ENC_MORTAR_DESC": "A mortar on top of a wall. When you're in range, it lobs bombs that land in your path. The tiles the blast will reach turn red: get off them before it goes off.",
-		"ENC_MORTAR_FACTS": "It only fires if you're within 10 tiles ahead and 5 to each side.\nA bomb explodes 2 to 3 seconds after touching the ground, reaching 2 tiles all around.\nBombs are very heavy: they barely bounce and the cube can push them.\nThey don't hurt enemies.",
+		"ENC_MORTAR_FACTS": "It turns to face you in any direction and fires if you're within 10 tiles.\nA bomb explodes 2 to 3 seconds after touching the ground, reaching 2 tiles all around.\nBombs are very heavy: they barely bounce and the cube can push them.\nThey don't hurt enemies.",
 	},
 }

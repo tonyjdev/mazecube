@@ -64,9 +64,9 @@ extends RefCounted
 ## cuyos disparos cruzan el camino: el 65 con un perseguidor; el 66 con una
 ## llave lejana, un perseguidor y una «galería» de tres cañones que cruzan el
 ## último pasillo largo.
-## Cañones de bombas (niveles 67-68): 'M' = muro con un cañón encima que, si
-## el cubo está a su alcance (10 casillas hacia delante y 5 a cada lado, o lo
-## que diga "mortars"), lanza cada 10-15 s una bomba que cae en el camino
+## Cañones de bombas (niveles 67-68): 'M' = muro con un cañón encima que gira
+## 360° y, si el cubo está a su alcance (10 casillas en cualquier dirección,
+## o lo que diga "mortars"), lanza cada 10-15 s una bomba que cae en el camino
 ## previsto del cubo, rebota y explota a los 2-3 s. El resolvedor los trata
 ## como muros. Los dos niveles parten de laberintos de tools/level_solver.py
 ## generate con salas abiertas, con los cañones en los bordes y en muros
@@ -77,7 +77,7 @@ extends RefCounted
 ## tools/build_zones.py a partir de los generadores anteriores (laberintos,
 ## salas e islas) y les añade portales (que cortan el camino o hacen de
 ## atajo), pinchos, cañones láser y cañones de bombas ("mortars" dice hacia
-## dónde mira cada uno). 69-75: desierto y cuevas de cristal; 76-100:
+## dónde mira cada uno en reposo). 69-75: desierto y cuevas de cristal; 76-100:
 ## archipiélagos corrompidos, tierra volcánica y algún laberinto; 101-115:
 ## la fortaleza del núcleo enemigo (salas y pasillos).
 ##

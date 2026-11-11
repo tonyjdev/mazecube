@@ -47,18 +47,19 @@ extends Node3D
 ##   avanza en línea recta hasta chocar con un muro, una puerta, unos
 ##   barrotes cerrados, un enemigo o el cubo (al que mata). Pasa por encima
 ##   del vacío. Ver LaserCannon y LaserBolt.
-##   Cañón de bombas: 'M' = muro con un cañón encima. Mira hacia `facing` y
-##   solo dispara (cada 10-15 s, al azar) si el cubo está a su alcance: hasta
-##   10 casillas hacia delante y 5 a cada lado. Lanza bombas con una
+##   Cañón de bombas: 'M' = muro con un cañón encima. Gira 360° hacia el
+##   cubo y solo dispara (cada 10-15 s, al azar) si el cubo está a su
+##   alcance: 10 casillas o menos en cualquier dirección. Lanza bombas con una
 ##   trayectoria calculada para que caigan en una casilla libre del camino
 ##   del cubo; las bombas se mueven con físicas, rebotan un poco y explotan a
 ##   los 2-3 s de tocar el suelo, matando al cubo si está a 2 casillas o
 ##   menos (en cuadrado, diagonales incluidas; esas casillas se ven rojas
 ##   mientras arde la mecha). A los enemigos no les hacen nada. `mortar_settings` (campo "mortars" del
-##   nivel) fija hacia dónde mira y el alcance de cada cañón:
-##   {Vector2i(10, 0): {"facing": Vector2i(0, 1), "range": Vector2i(14, 4)}}
-##   ("range" = casillas hacia delante y a cada lado). Si no se indica, mira
-##   hacia donde tiene más casillas libres a su alcance. Ver MortarCannon y
+##   nivel) fija hacia dónde mira en reposo y el alcance de cada cañón:
+##   {Vector2i(10, 0): {"facing": Vector2i(0, 1), "range": 8}}
+##   ("range" = casillas en cualquier dirección; si es un Vector2i, cuenta su
+##   x). Si no se indica, en reposo mira hacia donde tiene más casillas libres
+##   a su alcance. Ver MortarCannon y
 ##   Bomb.
 ## Coleccionable: el campo "collectible" del nivel es la casilla del cubito
 ##   dorado (GoldenCube; lo colocan tools/place_collectibles.py). El cubo lo
@@ -880,17 +881,19 @@ func is_mortar(cell: Vector2i) -> bool:
 
 
 ## Cañón de bombas encima del muro de `cell`, con lo que diga mortar_settings
-## o, si no, mirando hacia donde tiene más casillas libres a su alcance.
+## o, si no, mirando en reposo hacia donde tiene más casillas libres a su
+## alcance (luego gira hacia el cubo).
 func _add_mortar(cell: Vector2i) -> void:
 	var settings: Dictionary = mortar_settings.get(cell, {})
-	var reach: Vector2i = settings.get("range", Vector2i(MortarCannon.RANGE_FORWARD, MortarCannon.RANGE_SIDE))
+	var range_value: Variant = settings.get("range", MortarCannon.RANGE)
+	var reach: int = range_value.x if range_value is Vector2i else int(range_value)
 	var facing: Vector2i = settings.get("facing", Vector2i.ZERO)
 	if facing == Vector2i.ZERO:
 		var best := -1
 		for dir: Vector2i in [Vector2i.DOWN, Vector2i.RIGHT, Vector2i.UP, Vector2i.LEFT]:
 			var count := 0
 			for c: Vector2i in _walkable:
-				if _in_reach(cell, dir, reach, c):
+				if _in_reach(cell, reach, c) and (c.x - cell.x) * dir.x + (c.y - cell.y) * dir.y >= 1:
 					count += 1
 			if count > best:
 				best = count
@@ -902,13 +905,11 @@ func _add_mortar(cell: Vector2i) -> void:
 	cannon.fired.connect(_on_mortar_fired.bind(cell))
 
 
-## La casilla `target` está al alcance de un cañón en `cell` que mira hacia
-## `facing` con alcance `reach` (hacia delante, a cada lado).
-static func _in_reach(cell: Vector2i, facing: Vector2i, reach: Vector2i, target: Vector2i) -> bool:
+## La casilla `target` está al alcance de un cañón en `cell` con alcance
+## `reach` (casillas en cualquier dirección: gira 360°).
+static func _in_reach(cell: Vector2i, reach: int, target: Vector2i) -> bool:
 	var offset := target - cell
-	var forward := offset.x * facing.x + offset.y * facing.y
-	var side := offset.x * facing.y - offset.y * facing.x
-	return forward >= 1 and forward <= reach.x and absi(side) <= reach.y
+	return offset != Vector2i.ZERO and offset.length_squared() <= reach * reach
 
 
 ## El cubo está en el tablero y se le puede apuntar.
@@ -922,7 +923,7 @@ func _update_mortars(delta: float) -> void:
 		var cannon: MortarCannon = _mortars[cell]
 		cannon.update(delta)
 		if cannon.wants_to_fire() and _cube_targetable() \
-				and _in_reach(cell, cannon.facing, cannon.reach, cube.cell):
+				and _in_reach(cell, cannon.reach, cube.cell):
 			var target := _mortar_target(cell, cannon)
 			if target == NO_CELL:
 				continue
@@ -948,7 +949,7 @@ func _mortar_target(cell: Vector2i, cannon: MortarCannon) -> Vector2i:
 			flight = shot["time"]
 	for k in range(index, -1, -1):
 		var c: Vector2i = path[k]
-		if _bomb_target_ok(c) and _in_reach(cell, cannon.facing, cannon.reach, c):
+		if _bomb_target_ok(c) and _in_reach(cell, cannon.reach, c):
 			return c
 	return NO_CELL
 
