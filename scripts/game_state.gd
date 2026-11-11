@@ -433,13 +433,22 @@ func setup_environment(environment: Environment, sun: DirectionalLight3D) -> voi
 	environment.ambient_light_energy = COMPAT_AMBIENT_ENERGY
 
 
+## Antialiasing: MSAA 4x solo con el 3D a resolución completa; con el 3D
+## escalado (calidad baja o media) se usa FXAA. MSAA con el 3D escalado pierde
+## memoria en cada fotograma con el driver de Mali (unos 6 MB/s en un Redmi
+## Note 11S, Godot 4.7.2 Compatibility) hasta que Android cierra el juego.
 func _apply_antialiasing() -> void:
-	get_tree().root.msaa_3d = Viewport.MSAA_4X if antialiasing else Viewport.MSAA_DISABLED
+	var root := get_tree().root
+	var msaa := antialiasing and is_equal_approx(QUALITY_3D_SCALES[graphics_quality], 1.0)
+	root.msaa_3d = Viewport.MSAA_4X if msaa else Viewport.MSAA_DISABLED
+	root.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA if antialiasing and not msaa \
+		else Viewport.SCREEN_SPACE_AA_DISABLED
 
 
 func _apply_graphics() -> void:
 	get_tree().root.scaling_3d_scale = QUALITY_3D_SCALES[graphics_quality]
 	RenderingServer.directional_shadow_atlas_set_size(QUALITY_SHADOW_SIZES[graphics_quality], true)
+	_apply_antialiasing()
 
 
 # --- Navegación -------------------------------------------------------------

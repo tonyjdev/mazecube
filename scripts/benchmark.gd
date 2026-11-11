@@ -41,6 +41,10 @@ var _map_mode := false
 ## Modo «shop»: captura del nivel (con la tienda) y de la tienda abierta
 ## (user://shop_<nivel>_<n>.png), sin comprar nada.
 var _shop_mode := false
+## Modo «leak»: deja jugar el nivel un rato con los ajustes del jugador
+## para mirar desde fuera si la memoria nativa crece (ver _leak_check).
+var _leak_mode := false
+const LEAK_PHASE := 15.0
 const FRAMES_TIME := 40.0
 const SLOW_FRAME_MS := 25.0
 var _lines: PackedStringArray = []
@@ -66,6 +70,8 @@ static func maybe_start(tree: SceneTree) -> bool:
 			bench._map_mode = true
 		elif word.strip_edges() == "shop":
 			bench._shop_mode = true
+		elif word.strip_edges() == "leak":
+			bench._leak_mode = true
 		elif word.strip_edges().is_valid_int():
 			bench._levels.append(int(word.strip_edges()))
 	tree.root.add_child.call_deferred(bench)
@@ -106,6 +112,9 @@ func _bench_level(number: int) -> void:
 		return
 	if _shop_mode:
 		await _shop_shots(number, game)
+		return
+	if _leak_mode:
+		await _leak_check(number, game)
 		return
 	var cube: RollingCube = game.get_node("Cube")
 	var sun: DirectionalLight3D = game.get_node("Sun")
@@ -292,6 +301,32 @@ func _shop_shots(number: int, game: Node) -> void:
 	await _shot("shop_%d_2" % number)
 	game._shop.close()
 	await _wait(1.0)
+
+
+func _leak_check(number: int, game: Node) -> void:
+	# La memoria nativa (fuera de Godot, p. ej. la del driver) se mira desde
+	# fuera con `adb shell dumpsys meminfo com.tonyjdev.mazecube` y se cruza
+	# con la hora de cada línea. Con los ajustes del jugador tal cual.
+	var viewport := get_viewport()
+	_log_memory("nivel %d: MSAA %d, FXAA %s, escala %.2f" % [number, viewport.msaa_3d,
+		viewport.screen_space_aa == Viewport.SCREEN_SPACE_AA_FXAA, viewport.scaling_3d_scale])
+	for i in 3:
+		await _wait(LEAK_PHASE)
+		_log_memory("%d s" % ((i + 1) * LEAK_PHASE))
+
+
+func _log_memory(label: String) -> void:
+	var rss := ""
+	var file := FileAccess.open("/proc/self/status", FileAccess.READ)
+	if file:
+		while not file.eof_reached():
+			var line := file.get_line()
+			if line.begins_with("VmRSS") or line.begins_with("VmSwap"):
+				rss += " " + line.replace("\t", "").replace(" ", "")
+	_log("  %-24s Godot %.1f MB, objetos %d, nodos %d, vídeo %.1f MB,%s" % [label,
+		OS.get_static_memory_usage() / 1048576.0, Performance.get_monitor(Performance.OBJECT_COUNT),
+		Performance.get_monitor(Performance.OBJECT_NODE_COUNT),
+		Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0, rss])
 
 
 func _shot(file: String) -> void:
