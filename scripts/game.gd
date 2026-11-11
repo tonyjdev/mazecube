@@ -19,13 +19,12 @@ extends Node3D
 ## Interfaz: número de nivel arriba a la izquierda, botón de pausa arriba a la
 ## derecha e indicaciones de giro abajo, con la barra de fuerza entre ellas. La pausa oculta esa interfaz y
 ## muestra a la izquierda cuatro botones con iconos (Continuar, Enciclopedia,
-## Reiniciar, Salir al selector de niveles); la cámara se aleja y se pone casi
-## vertical, y arrastrando el dedo se recorre el mapa (ver
-## FollowCamera.start_explore). El botón de la enciclopedia la muestra u
-## oculta encima del mapa (ver Encyclopedia); mientras se ve, los botones de
-## la pausa se esconden y Atrás o Esc la cierran (sin salir de la pausa).
-## Al continuar, la cámara vuelve a su sitio y después se reanuda el juego:
-## la velocidad del juego (Engine.time_scale) sube de 0 a la normal en
+## Reiniciar, Salir al selector de niveles) y el mapa 2D del nivel sobre la
+## partida congelada en una imagen (ver PauseMap; mientras tanto no se dibuja
+## el 3D). El botón de la enciclopedia la muestra en lugar del mapa (ver
+## Encyclopedia); mientras se ve, los botones de la pausa se esconden y Atrás
+## o Esc la cierran (sin salir de la pausa). Al continuar se reanuda el
+## juego: la velocidad del juego (Engine.time_scale) sube de 0 a la normal en
 ## RESUME_RAMP_TIME segundos con una curva ease-in cúbica (empieza muy
 ## despacio y acelera).
 ##
@@ -139,10 +138,15 @@ var _touches := {}
 ## "time": int (ms), "committed": bool (ya ha pedido su giro), "done": bool
 ## (ya ha deslizado o se ha descartado: no hace nada más) }.
 var _gestures := {}
-## Arrastre del mapa en la pausa: si hay un dedo (o el ratón) pulsado y
-## dónde estaba en el último movimiento.
-var _dragging := false
-var _drag_last := Vector2.ZERO
+## Mapa 2D de la pausa (ver PauseMap) e imagen congelada de la partida que
+## se ve detrás (mientras tanto no se dibuja el 3D).
+var _map: PauseMap
+var _snapshot: TextureRect
+## Esperando el fotograma sin interfaz para congelar la partida (ver _set_paused).
+var _pausing := false
+## Casilla del cubo la última vez que se apuntó lo explorado alrededor (para
+## el mapa de la pausa, ver _mark_seen).
+var _seen_cell := Level.NO_CELL
 ## Aceleración tras la pausa (anima Engine.time_scale).
 var _speed_tween: Tween
 ## Cuenta de inicios del nivel: un reinicio cancela la secuencia anterior.
@@ -183,6 +187,20 @@ var _hum_tween: Tween
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	GameState.setup_environment($WorldEnvironment.environment, $Sun)
+	# Pausa: imagen congelada de la partida y, encima, el mapa 2D (antes de los
+	# botones de la pausa, que quedan por encima). Se crean antes de conectar
+	# el sonido de los botones para que los del mapa también lo tengan.
+	_snapshot = TextureRect.new()
+	_snapshot.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_snapshot.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_snapshot.stretch_mode = TextureRect.STRETCH_SCALE
+	_snapshot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_snapshot.visible = false
+	pause_menu.add_child(_snapshot)
+	pause_menu.move_child(_snapshot, 0)
+	_map = PauseMap.new()
+	pause_menu.add_child(_map)
+	pause_menu.move_child(_map, 1)
 	# La cámara se procesa siempre (ver FollowCamera) para explorar en la pausa.
 	for node: Node in [level, cube, $UI]:
 		node.process_mode = Node.PROCESS_MODE_PAUSABLE
@@ -276,7 +294,6 @@ func _ready() -> void:
 		# Sigue en pausa mientras la pantalla funde a negro.
 		_close_pause_menu()
 		_restart_with_fade())
-	%DragArea.gui_input.connect(_on_drag_area_input)
 	%QuitButton.pressed.connect(GameState.go_to_menu.bind("levels"))
 	next_button.pressed.connect(_next_level)
 	%RetryButton.pressed.connect(_restart_with_fade)
@@ -451,6 +468,8 @@ func _update_gestures() -> void:
 
 
 func _process(_delta: float) -> void:
+	if not get_tree().paused:
+		_mark_seen()
 	strength_bar.value = cube.strength()
 	strength_bar.immunity = cube.immunity_left() / maxf(cube.immunity_time, 0.001)
 	if not _gestures.is_empty() and not get_tree().paused:
@@ -475,34 +494,62 @@ func _toggle_pause() -> void:
 	_set_paused(not pause_menu.visible)
 
 
-## Pausa: menú de pausa y cámara de exploración. Al reanudar, la cámara
-## vuelve a su sitio con el juego aún en pausa y después se reanuda.
+## Pausa: menú de pausa con el mapa 2D encima de la partida congelada. Al
+## reanudar, la partida sigue con la aceleración de _start_speed_ramp.
 func _set_paused(paused: bool) -> void:
 	if paused:
-		if complete_menu.visible or pause_menu.visible or _restarting:
+		if complete_menu.visible or pause_menu.visible or _restarting or _pausing:
 			return
 		_stop_speed_ramp()
 		get_tree().paused = true
-		pause_menu.visible = true
 		Music.set_muffled(true)
 		$UI.visible = false
-		_dragging = false
 		# En la pausa no llegan las sueltas de teclas y dedos.
 		_clear_held_sides()
-		camera.start_explore()
+		# Un fotograma sin la interfaz para congelar la partida en una imagen.
+		_pausing = true
+		await RenderingServer.frame_post_draw
+		_pausing = false
+		if not is_inside_tree() or not get_tree().paused or _restarting or complete_menu.visible:
+			return
+		_freeze_backdrop()
+		pause_menu.visible = true
+		_mark_seen()
+		_map.open(level, cube.cell)
 		_focus_first(pause_menu)
 		return
 	if not pause_menu.visible:
 		return
 	_close_pause_menu()
 	Music.set_muffled(false)
-	camera.end_explore()
-	await camera.explore_finished
-	# Se ha vuelto a pausar mientras la cámara volvía.
-	if pause_menu.visible or complete_menu.visible:
-		return
 	get_tree().paused = false
 	_start_speed_ramp()
+
+
+## Apunta como explorado lo que rodea al cubo (si ha cambiado de casilla
+## desde la última vez).
+func _mark_seen() -> void:
+	if cube.cell == _seen_cell:
+		return
+	_seen_cell = cube.cell
+	level.mark_seen_around(cube.cell)
+
+
+## Detrás del mapa se ve la partida tal como estaba, en una imagen: mientras
+## dura la pausa no se dibuja el 3D (la GPU casi no trabaja).
+func _freeze_backdrop() -> void:
+	var image := get_viewport().get_texture().get_image()
+	if image == null:
+		return
+	_snapshot.texture = ImageTexture.create_from_image(image)
+	_snapshot.visible = true
+	get_viewport().disable_3d = true
+
+
+func _unfreeze_backdrop() -> void:
+	get_viewport().disable_3d = false
+	_snapshot.visible = false
+	_snapshot.texture = null
 
 
 ## La velocidad del juego sube de 0 a la normal (ease-in cúbica).
@@ -524,22 +571,25 @@ func _stop_speed_ramp() -> void:
 func _exit_tree() -> void:
 	# time_scale es global: no debe quedarse a medias al salir de la partida.
 	_stop_speed_ramp()
+	# Igual que el 3D del viewport principal (apagado en la pausa).
+	get_viewport().disable_3d = false
 
 
-## Muestra u oculta la enciclopedia encima del mapa (en la pausa).
+## Muestra u oculta la enciclopedia en lugar del mapa (en la pausa).
 func _toggle_encyclopedia() -> void:
 	if _encyclopedia.is_open():
 		_encyclopedia.close()
 		return
-	_dragging = false
 	%Buttons.visible = false
 	%ExploreHint.visible = false
+	_map.visible = false
 	_encyclopedia.open()
 
 
 func _on_encyclopedia_closed() -> void:
 	%Buttons.visible = true
 	%ExploreHint.visible = true
+	_map.visible = true
 	_focus_first(pause_menu)
 
 
@@ -547,22 +597,10 @@ func _close_pause_menu() -> void:
 	if _encyclopedia.is_open():
 		_encyclopedia.close()
 	pause_menu.visible = false
+	_map.close()
+	_unfreeze_backdrop()
 	$UI.visible = true
-	_dragging = false
 	_clear_held_sides()
-
-
-## Arrastre del mapa en la pausa (los toques llegan también como clic).
-func _on_drag_area_input(event: InputEvent) -> void:
-	var button := event as InputEventMouseButton
-	if button and button.button_index == MOUSE_BUTTON_LEFT:
-		_dragging = button.pressed
-		_drag_last = button.position
-		return
-	var motion := event as InputEventMouseMotion
-	if motion and _dragging:
-		camera.explore_drag(_drag_last, motion.position)
-		_drag_last = motion.position
 
 
 ## Reinicio con transición: el juego se detiene, la pantalla funde a negro,
@@ -584,6 +622,9 @@ func _restart() -> void:
 	level.build()
 	cube.reset(level)
 	camera.snap()
+	# El nivel ha olvidado lo explorado: se vuelve a apuntar aunque el cubo
+	# siga en la misma casilla.
+	_seen_cell = Level.NO_CELL
 	_clear_held_sides()
 	complete_menu.visible = false
 	pause_button.visible = true
@@ -745,8 +786,6 @@ func _pop_stat(control: Control) -> void:
 func _on_play_area_resized() -> void:
 	camera.refresh_layout()
 	camera.snap()
-	if pause_menu.visible:
-		camera.start_explore()
 
 
 ## Los toques sobre los botones no cuentan como giro.

@@ -186,6 +186,9 @@ const POWER_UP_FLOAT_HEIGHT := 0.5
 ## se considera cerca de un botón. Ver button_near().
 const BUTTON_APPROACH_CELLS := 4
 const NO_CELL := Vector2i(-9999, -9999)
+## Radio (en casillas) alrededor del cubo que queda explorado para el mapa de
+## la pausa (ver mark_seen_around).
+const SEEN_RADIUS := 5.0
 ## Aparición del tablero: duración total y lo que tarda cada casilla en
 ## pasar de transparente a opaca.
 const REVEAL_TIME := 1.3
@@ -296,6 +299,13 @@ var _terrain: Node3D
 static var _warmed := {}
 var _terrain_builder: TerrainBuilder
 var _wall_set := {}
+## Casillas ya exploradas (las que han estado cerca del cubo, ver
+## mark_seen_around): el mapa de la pausa solo enseña esas. Se mantienen al
+## morir y se borran al reiniciar.
+var _seen := {}
+## El mapa de la pausa enseña el tablero entero aunque no se haya visto (ver
+## reveal_whole_map).
+var _map_revealed := false
 
 
 func _ready() -> void:
@@ -342,6 +352,8 @@ func build() -> void:
 	_mortars.clear()
 	_bombs.clear()
 	_body_positions.clear()
+	_seen.clear()
+	_map_revealed = false
 	var enemy_cells := {}
 	var mortar_cells: Array[Vector2i] = []
 	## símbolo -> casillas de teletransporte
@@ -1405,6 +1417,135 @@ func cell_to_world(cell: Vector2i) -> Vector3:
 func get_center() -> Vector3:
 	var size := get_grid_size()
 	return global_transform * Vector3((size.x - 1) * CELL_SIZE * 0.5, 0.0, (size.y - 1) * CELL_SIZE * 0.5)
+
+
+## Marca como vistas las casillas a SEEN_RADIUS casillas o menos de `center`
+## (de centro a centro, en línea recta: los muros no tapan).
+func mark_seen_around(center: Vector2i) -> void:
+	var grid := get_grid_size()
+	var reach := floori(SEEN_RADIUS)
+	for dz in range(-reach, reach + 1):
+		for dx in range(-reach, reach + 1):
+			var cell := center + Vector2i(dx, dz)
+			if dx * dx + dz * dz <= SEEN_RADIUS * SEEN_RADIUS and cell.x >= 0 and cell.y >= 0 \
+					and cell.x < grid.x and cell.y < grid.y:
+				_seen[cell] = true
+
+
+## El mapa de la pausa pasa a enseñar el tablero entero, visto o no (para
+## mecánicas futuras; se olvida al reiniciar el nivel).
+func reveal_whole_map() -> void:
+	_map_revealed = true
+
+
+func is_seen(cell: Vector2i) -> bool:
+	return _map_revealed or _seen.has(cell)
+
+
+## Estado del tablero para el mapa 2D de la pausa (ver PauseMap): solo lo ya
+## explorado (ver mark_seen_around y reveal_whole_map), y de eso solo lo fijo y lo que se
+## puede coger, tal como está ahora (sin las llaves ni los power ups ya
+## cogidos, sin las puertas abiertas ni los muros rotos y sin los puentes
+## caídos). Nunca los enemigos ni lo que se mueve (láseres, bombas).
+## Los muros son solo el contorno (los que tocan, también en diagonal, una
+## casilla por la que se pasa); "bounds" es el rectángulo que abarca lo que
+## se ve.
+func map_snapshot() -> Dictionary:
+	var walls: Array[Vector2i] = []
+	var mortars: Array[Vector2i] = []
+	var bounds := Rect2i()
+	var floor_cells: Array[Vector2i] = []
+	for cell: Vector2i in _walkable:
+		if is_seen(cell) and not _bridges.has(cell):
+			floor_cells.append(cell)
+			bounds = _grow_bounds(bounds, cell)
+	for z in layout.size():
+		var row: String = layout[z]
+		for x in row.length():
+			var symbol := row[x]
+			var cell := Vector2i(x, z)
+			if not is_seen(cell) or not (symbol == "#" or symbol == LASER_CHAR \
+					or symbol == MORTAR_CHAR or BUTTON_CHARS.contains(symbol)):
+				continue
+			var outline := false
+			for dz in range(-1, 2):
+				for dx in range(-1, 2):
+					outline = outline or _walkable.has(cell + Vector2i(dx, dz))
+			if not outline:
+				continue
+			walls.append(cell)
+			bounds = _grow_bounds(bounds, cell)
+			if symbol == MORTAR_CHAR:
+				mortars.append(cell)
+	var bridges := {}
+	for cell: Vector2i in _bridges:
+		if is_seen(cell):
+			bridges[cell] = _bridges.has(cell + Vector2i.LEFT) or _bridges.has(cell + Vector2i.RIGHT) \
+				or (_is_solid(cell + Vector2i.LEFT) and _is_solid(cell + Vector2i.RIGHT))
+			bounds = _grow_bounds(bounds, cell)
+	var keys := {}
+	for cell: Vector2i in _keys:
+		if is_seen(cell):
+			keys[cell] = _keys[cell]["color"]
+	var doors := {}
+	for cell: Vector2i in _doors:
+		if is_seen(cell):
+			# La puerta cierra el pasillo de muro a muro.
+			var horizontal := _is_wall(cell + Vector2i.LEFT) or _is_wall(cell + Vector2i.RIGHT) \
+				or not (_is_wall(cell + Vector2i.UP) or _is_wall(cell + Vector2i.DOWN))
+			doors[cell] = {"color": _doors[cell]["color"], "horizontal": horizontal}
+	var power_ups := {}
+	for cell: Vector2i in _power_ups:
+		if is_seen(cell):
+			power_ups[cell] = _power_ups[cell]["power_up"].id
+	var bars := {}
+	for cell: Vector2i in _bars:
+		if is_seen(cell):
+			bars[cell] = {"group": _bars[cell]["group"], "closed": bars_closed(cell)}
+	var buttons := {}
+	for cell: Vector2i in _buttons:
+		if is_seen(cell):
+			var symbol: String = _buttons[cell]["symbol"]
+			buttons[cell] = {"front": _buttons[cell]["front"], "groups": str(button_links.get(symbol, ""))}
+	var teleports := {}
+	for cell: Vector2i in _teleports:
+		if is_seen(cell):
+			teleports[cell] = _teleports[cell]["symbol"]
+	var lasers := {}
+	for cell: Vector2i in _cannons:
+		if is_seen(cell):
+			lasers[cell] = _cannons[cell]["facing"]
+	return {
+		"size": get_grid_size(),
+		"bounds": bounds,
+		"walls": walls,
+		"floor": floor_cells,
+		"bridges": bridges,
+		"start": start_cell if is_seen(start_cell) else NO_CELL,
+		"goal": goal_cell if is_seen(goal_cell) else NO_CELL,
+		"keys": keys,
+		"doors": doors,
+		"power_ups": power_ups,
+		"collectible": collectible_cell if _collectible and is_seen(collectible_cell) else NO_CELL,
+		"breakables": _breakables.keys().filter(is_seen),
+		"bars": bars,
+		"buttons": buttons,
+		"teleports": teleports,
+		"spikes": _spikes.keys().filter(is_seen),
+		"lasers": lasers,
+		"mortars": mortars,
+	}
+
+
+## Rectángulo `bounds` ampliado para abarcar `cell` (vacío = todavía nada).
+static func _grow_bounds(bounds: Rect2i, cell: Vector2i) -> Rect2i:
+	var cell_rect := Rect2i(cell, Vector2i.ONE)
+	return cell_rect if bounds.size == Vector2i.ZERO else bounds.merge(cell_rect)
+
+
+## Casilla con suelo o muro (no vacío).
+func _is_solid(cell: Vector2i) -> bool:
+	return _walkable.has(cell) or _is_wall(cell)
 
 
 func get_grid_size() -> Vector2i:

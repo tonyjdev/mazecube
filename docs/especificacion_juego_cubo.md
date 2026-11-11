@@ -585,11 +585,18 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 
 - El botón de **pausa** (arriba a la derecha) detiene el juego. Se oculta la interfaz de juego (número de nivel, botón de pausa e indicaciones) y, sin título ni recuadro, se ven cuatro **botones con iconos** en columna, pegados a la **izquierda** y centrados en vertical:
   - **Continuar** (icono de «play»): reanuda la partida.
-  - **Enciclopedia** (libro abierto): muestra u oculta la enciclopedia (apartado 7.6) **encima del mapa**. Mientras se ve, los botones de la pausa y la indicación de abajo se esconden; al cerrarla se vuelve a la pausa.
+  - **Enciclopedia** (libro abierto): muestra u oculta la enciclopedia (apartado 7.6) **en lugar del mapa**. Mientras se ve, los botones de la pausa, el mapa y la indicación de abajo se esconden; al cerrarla se vuelve a la pausa.
   - **Reiniciar** (flecha circular): vuelve a empezar el nivel.
   - **Salir** (flecha que sale de una puerta): vuelve al selector de niveles.
-- **Explorar el mapa:** al pausar, la cámara se **aleja** (≈1,7 veces, sin pasar de lo necesario para ver el tablero entero) y se **inclina casi en vertical** (82°) con una transición suave. **Arrastrando el dedo** (o el ratón) se desplaza la vista por el mapa, sin enseñar más allá de sus bordes. Al pie de la pantalla, centrado, se lee «Desliza el dedo sobre la pantalla para navegar por el mapa».
-- Al **continuar**, la cámara vuelve suavemente a su posición e inclinación de juego y, al llegar, se reanuda la partida: la velocidad del juego sube de 0 a la normal en 1 s con una curva **ease-in cúbica** (empieza muy despacio y acelera). Al **reiniciar**, vuelve al momento.
+- **Mapa 2D:** al pausar, la partida se queda **congelada en una imagen** (mientras dura la pausa no se dibuja el 3D) y encima se ve, sobre un **fondo negro medio transparente**, un mapa 2D del nivel al estilo de los metroidvania:
+  - Muestra los **límites** (el suelo en gris azulado y solo el **contorno** de los muros en color crema; el relleno macizo entre salas no se dibuja), **lo que se puede coger** (llaves, cubito dorado, power ups) y los **obstáculos fijos** (puertas, muros agrietados, barrotes con el color de su grupo y los botones con el del grupo que cambian, puentes colgantes, teletransportes, pinchos y cañones), además de la **salida**, la **meta** y el **cubo**, marcado con un anillo que se agranda y se desvanece en bucle. **Nunca los enemigos** ni lo que se mueve (láseres, bombas).
+  - Refleja el estado actual: no salen las llaves ni los power ups ya cogidos, ni las puertas abiertas, los muros rotos o los puentes caídos.
+  - **Solo lo explorado:** el mapa enseña únicamente las casillas que han estado a **5 casillas o menos del cubo** (de centro a centro, en línea recta; los muros no tapan), allí donde haya estado: rodando, tras un teletransporte o al reaparecer en la salida. Lo no explorado no se dibuja y la leyenda solo incluye lo descubierto. Lo explorado se mantiene al morir y se olvida al reiniciar el nivel. (Una mecánica futura podrá enseñar el mapa entero aunque no se haya explorado.)
+  - Se abre con **toda la zona explorada** a la vista si cabe con 20 px por casilla o más (hasta 64); si no, a 20 px por casilla y **centrado en el cubo**.
+  - **Arrastrando** un dedo (o el ratón) se desplaza; **pellizcando** con dos dedos (o con la rueda del ratón) se acerca o se aleja, desde ver toda la zona explorada hasta 64 px por casilla. No se puede llevar más allá de los bordes de la zona explorada.
+  - A la **derecha**, en columna, cuatro botones con iconos: **acercar**, **alejar**, **centrar en el cubo** (con una transición suave) y **leyenda**, que muestra u oculta un recuadro con lo que hay ahora en el nivel (a dos columnas si son más de siete elementos); se recuerda abierta o cerrada entre pausas.
+  - Al pie de la pantalla, centrado, se lee «Arrastra para mover el mapa y pellizca para acercarlo o alejarlo».
+- Al **continuar**, se reanuda la partida: la velocidad del juego sube de 0 a la normal en 1 s con una curva **ease-in cúbica** (empieza muy despacio y acelera). Al **reiniciar**, vuelve al momento.
 - En el móvil, el juego también se pausa al salir de la aplicación (por ejemplo, al recibir una llamada).
 
 ### 7.5. Controles

@@ -34,6 +34,10 @@ var _sky_mode := false
 var _matte_mode := false
 ## Modo «repeat»: la misma medida varias veces sin tocar nada.
 var _repeat_mode := false
+## Modo «map»: abre la pausa y guarda capturas del mapa 2D
+## (user://map_<nivel>_<n>.png): al abrir, con la leyenda, acercado y
+## centrado en el cubo.
+var _map_mode := false
 const FRAMES_TIME := 40.0
 const SLOW_FRAME_MS := 25.0
 var _lines: PackedStringArray = []
@@ -55,6 +59,8 @@ static func maybe_start(tree: SceneTree) -> bool:
 			bench._matte_mode = true
 		elif word.strip_edges() == "repeat":
 			bench._repeat_mode = true
+		elif word.strip_edges() == "map":
+			bench._map_mode = true
 		elif word.strip_edges().is_valid_int():
 			bench._levels.append(int(word.strip_edges()))
 	tree.root.add_child.call_deferred(bench)
@@ -89,6 +95,9 @@ func _bench_level(number: int) -> void:
 	var level: Level = game.get_node("Level")
 	if _frames_mode:
 		await _log_slow_frames(number, level)
+		return
+	if _map_mode:
+		await _map_shots(number, game)
 		return
 	var cube: RollingCube = game.get_node("Cube")
 	var sun: DirectionalLight3D = game.get_node("Sun")
@@ -233,6 +242,44 @@ func _materials(root: Node) -> Dictionary:
 					result[mat] = {"shading": mat.shading_mode, "specular": mat.specular_mode, "nodes": []}
 				result[mat]["nodes"].append(node)
 	return result
+
+
+func _map_shots(number: int, game: Node) -> void:
+	# El cubo rueda solo un rato para explorar algo más que la salida.
+	await _wait(8.0)
+	game._set_paused(true)
+	await _wait(1.0)
+	var map: PauseMap = game._map
+	_log("nivel %d: mapa %s, %.1f px por casilla" % [number, map._grid, map._zoom])
+	await _map_shot(number, 1)
+	map._legend_open = true
+	map._legend.visible = true
+	await _wait(0.5)
+	await _map_shot(number, 2)
+	map._legend_open = false
+	map._legend.visible = false
+	map._zoom_smoothly(PauseMap.ZOOM_STEP * PauseMap.ZOOM_STEP)
+	await _wait(0.6)
+	_log("  tras acercar: zoom %s, offset %s, canvas %s / %s, visible %s" % [map._zoom, map._offset,
+		map._canvas.position, map._canvas.scale, map._canvas.is_visible_in_tree()])
+	await _map_shot(number, 3)
+	map.center_on_cube()
+	await _wait(0.6)
+	await _map_shot(number, 4)
+	game._set_paused(false)
+	await _wait(1.5)
+	# Con el mapa entero a la vista (mecánica futura).
+	game.level.reveal_whole_map()
+	game._set_paused(true)
+	await _wait(1.0)
+	await _map_shot(number, 5)
+	game._set_paused(false)
+	await _wait(1.0)
+
+
+func _map_shot(number: int, index: int) -> void:
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png("user://map_%d_%d.png" % [number, index])
 
 
 func _log_slow_frames(number: int, level: Level) -> void:
