@@ -97,6 +97,9 @@ signal key_picked(color: String)
 signal door_opened(color: String)
 signal breakable_hit(cell: Vector2i, hits_left: int)
 signal button_pressed(cell: Vector2i)
+## Ha chocado de frente con la tienda de esa casilla (ver Level.is_shop): rebota
+## como contra un muro y se abre la tienda.
+signal shop_reached(cell: Vector2i)
 ## El cubo ha dado media vuelta a petición del jugador.
 signal reversed(cell: Vector2i)
 ## Se ha pedido un giro hacia una casilla bloqueada y se ha descartado.
@@ -546,7 +549,7 @@ func _try_advance() -> void:
 	if _pending_reverse:
 		_pending_reverse = false
 		heading = -heading
-		_end_power_ups_on_bounce(false)
+		_end_power_ups_on_reverse()
 		_spawn_reverse_smoke()
 		_update_held_key(Vector3.ZERO)
 		reversed.emit(cell)
@@ -587,6 +590,8 @@ func _try_advance() -> void:
 		elif level.is_button(ahead):
 			level.press_button(ahead)
 			button_pressed.emit(ahead)
+		elif level.is_shop(ahead):
+			shop_reached.emit(ahead)
 		_end_power_ups_on_bounce(door_like)
 		heading = -heading
 		bounced.emit(cell)
@@ -1103,6 +1108,12 @@ func _end_power_ups_on_bounce(is_door: bool) -> void:
 	for id in _power_ups.keys():
 		var power_up: PowerUp = _power_ups[id]["power_up"]
 		if (is_door and power_up.ends_on_door_bounce) or (not is_door and power_up.ends_on_wall_bounce):
+			_end_power_up(id)
+
+
+func _end_power_ups_on_reverse() -> void:
+	for id in _power_ups.keys():
+		if _power_ups[id]["power_up"].ends_on_reverse:
 			_end_power_up(id)
 
 

@@ -5,8 +5,9 @@ extends Control
 ## Game) se dibujan los límites del tablero, lo que se puede coger y los
 ## obstáculos fijos, tal como están ahora y solo en la zona ya explorada
 ## (ver Level.map_snapshot y Level.mark_seen_around). Nunca los enemigos ni
-## lo que se mueve. El cubo se marca con un anillo que late. El encuadre y el
-## arrastre se limitan a la zona explorada.
+## lo que se mueve. El borde de lo explorado (lo que solo se ha visto de
+## lejos) se difumina, ver Level.seen_alpha. El cubo se marca con un anillo
+## que late. El encuadre y el arrastre se limitan a la zona explorada.
 ##
 ## El mapa se dibuja una sola vez al abrir la pausa (open): desplazarlo y
 ## acercarlo solo cambia la posición y la escala del nodo que lo dibuja.
@@ -163,6 +164,7 @@ func open(level: Level, cube_cell: Vector2i) -> void:
 		else seen.merge(Rect2i(cube_cell, Vector2i.ONE))
 	_bounds = Rect2(seen)
 	_canvas.data = _data
+	_canvas.set_alpha_map(_data["alpha"])
 	# Con su tamaño real: Godot no dibuja un Control cuyo rectángulo queda
 	# fuera de la pantalla (con tamaño 0, al acercar se dejaba de ver).
 	_canvas.size = _grid
@@ -389,6 +391,8 @@ func _legend_entries() -> Array:
 		entries.append(["laser", "ENC_LASER_NAME", {"dir": Vector2i.DOWN}])
 	if not _data["mortars"].is_empty():
 		entries.append(["mortar", "ENC_MORTAR_NAME", {}])
+	if _data["shop"] != Level.NO_CELL:
+		entries.append(["shop", "MAP_LEGEND_SHOP", {"dir": Vector2i.DOWN}])
 	return entries
 
 
@@ -502,13 +506,60 @@ static func draw_item(ci: CanvasItem, kind: String, o: Vector2, info: Dictionary
 			ci.draw_circle(c, 0.38, OUTLINE_COLOR)
 			ci.draw_circle(c, 0.3, MORTAR_COLOR)
 			ci.draw_circle(c, 0.16, OUTLINE_COLOR)
+		"shop":
+			# Casita blanca con el toldo rojo del lado de la entrada (`dir`).
+			var dir: Vector2i = info.get("dir", Vector2i.DOWN)
+			var xform := Transform2D(Vector2(dir).angle() - PI * 0.5, c)
+			_draw_turned_rect(ci, xform, Rect2(-0.42, -0.42, 0.84, 0.84), OUTLINE_COLOR)
+			_draw_turned_rect(ci, xform, Rect2(-0.35, -0.35, 0.7, 0.7), ShopBuilding.WHITE)
+			for i in 4:
+				_draw_turned_rect(ci, xform, Rect2(-0.35 + i * 0.175, 0.12, 0.175, 0.26),
+					ShopBuilding.RED if i % 2 == 0 else ShopBuilding.WHITE)
+			_draw_turned_rect(ci, xform, Rect2(-0.08, -0.22, 0.16, 0.3), ShopBuilding.GLASS)
+
+
+## Rectángulo girado y desplazado con `xform` (sin tocar la transformación
+## de dibujo, que la muestra de la leyenda usa para escalar).
+static func _draw_turned_rect(ci: CanvasItem, xform: Transform2D, rect: Rect2, color: Color) -> void:
+	ci.draw_colored_polygon(PackedVector2Array([xform * rect.position,
+		xform * Vector2(rect.end.x, rect.position.y), xform * rect.end,
+		xform * Vector2(rect.position.x, rect.end.y)]), color)
 
 
 ## Nodo que dibuja el mapa entero (en unidades de casilla).
 class MapCanvas:
 	extends Control
 
+	## Opacidad por casilla (ver Level.seen_alpha): una imagen de una casilla
+	## por píxel con filtro lineal, así el borde de lo explorado se difumina
+	## suave en vez de a escalones.
+	const FADE_SHADER := """
+shader_type canvas_item;
+uniform sampler2D alpha_map : filter_linear, repeat_disable;
+uniform vec2 grid = vec2(1.0);
+varying vec2 cell_pos;
+void vertex() {
+	cell_pos = VERTEX;
+}
+void fragment() {
+	COLOR.a *= texture(alpha_map, cell_pos / grid).r;
+}
+"""
+	static var _shader: Shader
+
 	var data := {}
+
+	func set_alpha_map(image: Image) -> void:
+		if _shader == null:
+			_shader = Shader.new()
+			_shader.code = FADE_SHADER
+		var mat := material as ShaderMaterial
+		if mat == null:
+			mat = ShaderMaterial.new()
+			mat.shader = _shader
+			material = mat
+		mat.set_shader_parameter("alpha_map", ImageTexture.create_from_image(image))
+		mat.set_shader_parameter("grid", Vector2(image.get_size()))
 
 	func _draw() -> void:
 		if data.is_empty():
@@ -561,6 +612,8 @@ class MapCanvas:
 			PauseMap.draw_item(self, "power_up", Vector2(cell), {})
 		if data["collectible"] != Level.NO_CELL:
 			PauseMap.draw_item(self, "gold", Vector2(data["collectible"]), {})
+		if data["shop"] != Level.NO_CELL:
+			PauseMap.draw_item(self, "shop", Vector2(data["shop"]), {"dir": data["shop_facing"]})
 
 	func _draw_runs(z: int, width: int, cells: Dictionary, color: Color) -> void:
 		var x := 0

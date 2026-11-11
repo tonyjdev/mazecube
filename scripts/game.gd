@@ -47,6 +47,23 @@ extends Node3D
 ## hace falta alguna estrella, en esta partida o en una anterior del nivel
 ## (que el siguiente esté desbloqueado); si no, se avisa.
 ##
+## Puntos (ver Abilities.points_for_run): al llegar a la meta, la partida
+## suma los giros que sobran respecto al reto de giros, 50 por estrella y lo
+## que valen los enemigos destruidos (Level.enemy_destroyed). Si supera el
+## récord del nivel, se ganan los de diferencia (GameState.record_points); la
+## pantalla de nivel completado lo cuenta después de las estrellas.
+##
+## Tienda (ver Shop): al chocar con la tienda del nivel (ver ShopBuilding) el
+## juego se detiene y se abre la tienda encima; al salir, se reanuda como
+## tras la pausa. Habilidades (ver Abilities): solo girar está siempre
+## disponible. Pedir una bloqueada (media vuelta, dash, pisotón o inmunidad)
+## no hace nada salvo avisar (sonido de descarte y un letrero abajo); sin
+## media vuelta, tocar los dos lados a la vez son dos giros normales. Sin
+## dash, pisotón ni inmunidad no se ve la barra de fuerza. Las mejoras
+## compradas se aplican al cubo (radio del pisotón, duración de la
+## inmunidad, recarga de la fuerza) al empezar el nivel y al salir de la
+## tienda.
+##
 ## Controles:
 ##   Media vuelta: pulsar izquierda y derecha a la vez (con el otro lado aún
 ##   pulsado, o con menos de SIMULTANEOUS_WINDOW segundos de diferencia). La
@@ -123,6 +140,9 @@ const RESPAWN_CAMERA_WAIT := 3.0
 ## Distancia (en casillas) del cubo a una bomba que explota a partir de la cual
 ## no tiembla la cámara.
 const BOMB_SHAKE_DISTANCE := 4.0
+## Aviso de habilidad bloqueada: segundos que se ve entero y lo que tarda en irse.
+const LOCKED_TOAST_TIME := 1.6
+const LOCKED_TOAST_FADE := 0.4
 ## Zumbido de la inmunidad: volumen (dB) y lo que tarda en apagarse al acabar.
 const IMMUNITY_HUM_DB := -9.0
 const IMMUNITY_HUM_FADE := 0.25
@@ -160,6 +180,15 @@ var _restarting := false
 var _run_turns := 0
 var _run_deaths := 0
 var _run_collected := false
+## Puntos de los enemigos destruidos en la partida.
+var _run_enemy_points := 0
+## Tienda (ver Shop), en su propia capa, y aviso de habilidad bloqueada.
+var _shop: Shop
+var _locked_toast: Label
+var _toast_tween: Tween
+## Pantalla de nivel completado: puntos de la partida y lo ganado.
+var _points_label: Label
+var _points_gained_label: Label
 var _star_turns := 0
 var _stars_tween: Tween
 ## Zumbido en bucle de la inmunidad (se detiene con la pausa) y su desvanecido.
@@ -207,6 +236,8 @@ func _ready() -> void:
 	# La cámara se procesa siempre (ver FollowCamera) para explorar en la pausa.
 	for node: Node in [level, cube, $UI]:
 		node.process_mode = Node.PROCESS_MODE_PAUSABLE
+	_build_points_labels()
+	_build_locked_toast()
 
 	cube.reached_goal.connect(_on_reached_goal)
 	level.cube = cube
@@ -281,6 +312,9 @@ func _ready() -> void:
 		GameState.vibrate(GameState.VIBRATION_DASH)
 		_start_immunity_hum())
 	cube.immunity_ended.connect(_stop_immunity_hum)
+	cube.shop_reached.connect(func(_cell: Vector2i) -> void: _open_shop())
+	level.enemy_destroyed.connect(func(enemy: Enemy) -> void:
+		_run_enemy_points += Abilities.enemy_points(enemy))
 	cube.power_up_picked.connect(func(_power_up: PowerUp, _stacks: int) -> void:
 		Sfx.play("powerup"))
 	for button in find_children("*", "BaseButton", true, false):
@@ -291,6 +325,15 @@ func _ready() -> void:
 	pause_menu.add_child(_encyclopedia)
 	_encyclopedia.closed.connect(_on_encyclopedia_closed)
 	%EncyclopediaButton.pressed.connect(_toggle_encyclopedia)
+	# La tienda pone sus propios sonidos (después de lo de arriba), en una capa
+	# por encima de la partida.
+	var shop_layer := CanvasLayer.new()
+	shop_layer.layer = 9
+	shop_layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(shop_layer)
+	_shop = Shop.new()
+	shop_layer.add_child(_shop)
+	_shop.closed.connect(_on_shop_closed)
 	pause_button.pressed.connect(_set_paused.bind(true))
 	%ContinueButton.pressed.connect(_set_paused.bind(false))
 	%RestartButton.pressed.connect(func() -> void:
@@ -317,6 +360,8 @@ func _notification(what: int) -> void:
 	elif what == NOTIFICATION_WM_GO_BACK_REQUEST and not GameState.is_loading:
 		if _encyclopedia.is_open():
 			_encyclopedia.close()
+		elif _shop.is_open():
+			_shop.close()
 		else:
 			_toggle_pause()
 	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT and OS.has_feature("mobile") \
@@ -380,11 +425,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		_keys_held[RollingCube.TURN_RIGHT] = true
 		_press_side(RollingCube.TURN_RIGHT)
 	elif event.is_action_pressed("dash"):
-		cube.request_dash()
+		_request_ability(Abilities.DASH)
 	elif event.is_action_pressed("stomp"):
-		cube.request_stomp()
+		_request_ability(Abilities.STOMP)
 	elif event.is_action_pressed("immunity"):
-		cube.request_immunity()
+		_request_ability(Abilities.IMMUNITY)
 	elif event.is_action_pressed("restart"):
 		_restart_with_fade()
 	elif event.is_action_pressed("next_level") and complete_menu.visible:
@@ -404,7 +449,8 @@ func _press_side(side: int) -> void:
 	var simultaneous: bool = _is_side_held(other) \
 		or now - int(_side_pressed_at[other]) <= int(SIMULTANEOUS_WINDOW * 1000.0)
 	_side_pressed_at[side] = now
-	if simultaneous:
+	# Sin la media vuelta comprada, son dos giros normales.
+	if simultaneous and GameState.has_ability(Abilities.REVERSE):
 		# Evita que una tercera pulsación cuente otra vez con la misma.
 		_side_pressed_at[other] = -100000
 		cube.request_reverse()
@@ -435,12 +481,108 @@ func _try_swipe(index: int) -> bool:
 		cube.cancel_turn()
 		_touches.erase(index)
 	if sideways:
-		cube.request_immunity()
+		_request_ability(Abilities.IMMUNITY)
 	elif moved.y < 0.0:
-		cube.request_dash()
+		_request_ability(Abilities.DASH)
 	else:
-		cube.request_stomp()
+		_request_ability(Abilities.STOMP)
 	return true
+
+
+## Pide el dash, el pisotón o la inmunidad, si se tiene; si no, avisa.
+func _request_ability(id: String) -> void:
+	if not GameState.has_ability(id):
+		_show_locked_toast()
+		return
+	match id:
+		Abilities.DASH:
+			cube.request_dash()
+		Abilities.STOMP:
+			cube.request_stomp()
+		Abilities.IMMUNITY:
+			cube.request_immunity()
+
+
+func _show_locked_toast() -> void:
+	Sfx.play("reject")
+	GameState.vibrate(GameState.VIBRATION_TURN_REJECTED)
+	if _toast_tween and _toast_tween.is_valid():
+		_toast_tween.kill()
+	_locked_toast.modulate.a = 1.0
+	_toast_tween = create_tween()
+	_toast_tween.tween_interval(LOCKED_TOAST_TIME)
+	_toast_tween.tween_property(_locked_toast, "modulate:a", 0.0, LOCKED_TOAST_FADE)
+
+
+## Letrero de habilidad bloqueada, abajo en el centro (sobre la barra de fuerza).
+func _build_locked_toast() -> void:
+	_locked_toast = Label.new()
+	_locked_toast.text = "ABILITY_LOCKED"
+	_locked_toast.add_theme_font_size_override("font_size", 28)
+	_locked_toast.add_theme_constant_override("outline_size", 10)
+	_locked_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_locked_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_locked_toast.anchor_left = 0.0
+	_locked_toast.anchor_right = 1.0
+	_locked_toast.anchor_top = 1.0
+	_locked_toast.anchor_bottom = 1.0
+	_locked_toast.offset_top = -150.0
+	_locked_toast.offset_bottom = -110.0
+	_locked_toast.modulate.a = 0.0
+	$UI.add_child(_locked_toast)
+
+
+## Textos de los puntos en la pantalla de nivel completado, bajo las estrellas.
+func _build_points_labels() -> void:
+	var stars: Control = $CompleteMenu/Center/Panel/VBox/Stars
+	_points_label = Label.new()
+	_points_label.add_theme_font_size_override("font_size", 26)
+	_points_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_points_gained_label = Label.new()
+	_points_gained_label.add_theme_font_size_override("font_size", 24)
+	_points_gained_label.add_theme_color_override("font_color", Color(0.98, 0.85, 0.3))
+	_points_gained_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var box := stars.get_parent()
+	box.add_child(_points_label)
+	box.move_child(_points_label, stars.get_index() + 1)
+	box.add_child(_points_gained_label)
+	box.move_child(_points_gained_label, _points_label.get_index() + 1)
+
+
+## Aplica al cubo las mejoras compradas y enseña la barra de fuerza solo si
+## hay alguna habilidad que la gaste.
+func _apply_abilities() -> void:
+	if GameState.has_ability(Abilities.STOMP):
+		cube.stomp_radius = GameState.ability_value(Abilities.STOMP)
+	if GameState.has_ability(Abilities.IMMUNITY):
+		cube.immunity_time = GameState.ability_value(Abilities.IMMUNITY)
+	cube.strength_recharge_time = GameState.ability_value(Abilities.RECHARGE)
+	var uses_strength := false
+	for id: String in [Abilities.DASH, Abilities.STOMP, Abilities.IMMUNITY]:
+		uses_strength = uses_strength or GameState.has_ability(id)
+	strength_bar.modulate.a = 1.0 if uses_strength else 0.0
+
+
+## La tienda: el juego se detiene (como en la pausa, pero sin el menú).
+func _open_shop() -> void:
+	if _shop.is_open() or complete_menu.visible or pause_menu.visible or _restarting \
+			or _pausing or GameState.is_loading:
+		return
+	_stop_speed_ramp()
+	get_tree().paused = true
+	Music.set_muffled(true)
+	$UI.visible = false
+	_clear_held_sides()
+	_shop.open()
+
+
+func _on_shop_closed() -> void:
+	_apply_abilities()
+	$UI.visible = true
+	_clear_held_sides()
+	Music.set_muffled(false)
+	get_tree().paused = false
+	_start_speed_ramp()
 
 
 ## El dedo se ha movido más de SWIPE_SLOP: intenta deslizar, así que no debe
@@ -496,7 +638,7 @@ func _is_side_held(side: int) -> bool:
 
 
 func _toggle_pause() -> void:
-	if complete_menu.visible:
+	if complete_menu.visible or _shop.is_open():
 		return
 	_set_paused(not pause_menu.visible)
 
@@ -505,7 +647,8 @@ func _toggle_pause() -> void:
 ## reanudar, la partida sigue con la aceleración de _start_speed_ramp.
 func _set_paused(paused: bool) -> void:
 	if paused:
-		if complete_menu.visible or pause_menu.visible or _restarting or _pausing:
+		if complete_menu.visible or pause_menu.visible or _restarting or _pausing \
+				or _shop.is_open():
 			return
 		_stop_speed_ramp()
 		get_tree().paused = true
@@ -640,6 +783,8 @@ func _restart() -> void:
 	_run_turns = 0
 	_run_deaths = 0
 	_run_collected = false
+	_run_enemy_points = 0
+	_apply_abilities()
 	_update_stats()
 	_play_intro()
 
@@ -714,16 +859,18 @@ func _on_reached_goal() -> void:
 	var stars := [_run_deaths == 0, _run_turns <= _star_turns,
 		_run_collected or not level.has_collectible()]
 	var record := GameState.record_result(current_level, stars)
+	var points := Abilities.points_for_run(_run_turns, _star_turns, stars.count(true), _run_enemy_points)
+	var gained := GameState.record_points(current_level, points["total"])
 	pause_button.visible = false
 	await get_tree().create_timer(COMPLETE_MENU_DELAY).timeout
 	if cube.is_finished:
-		_show_complete_menu(stars, record)
+		_show_complete_menu(stars, record, points, gained)
 
 
 ## Pantalla de nivel completado: las estrellas aparecen una a una (con su
 ## campanada, o un golpe apagado si no se ha conseguido) y luego el aviso de
 ## récord.
-func _show_complete_menu(stars: Array, record: bool) -> void:
+func _show_complete_menu(stars: Array, record: bool, points: Dictionary, gained: int) -> void:
 	var last := current_level >= Levels.count() - 1
 	complete_title.text = "COMPLETE_ALL" if last else "COMPLETE_TITLE"
 	next_button.visible = not last
@@ -735,6 +882,12 @@ func _show_complete_menu(stars: Array, record: bool) -> void:
 		star_icons[i].reset()
 		star_labels[i].text = texts[i]
 		star_labels[i].modulate = Color(1, 1, 1, 0)
+	_points_label.text = tr("COMPLETE_POINTS") % [points["total"], points["turns"], points["stars"],
+		points["enemies"]]
+	_points_gained_label.text = tr("COMPLETE_POINTS_GAINED") % [gained, GameState.points()] if gained > 0 \
+		else tr("COMPLETE_POINTS_BEST") % [GameState.best_points(current_level), GameState.points()]
+	_points_label.modulate.a = 0.0
+	_points_gained_label.modulate.a = 0.0
 	complete_menu.visible = true
 	_focus_first(complete_menu)
 	if _stars_tween and _stars_tween.is_valid():
@@ -752,6 +905,12 @@ func _show_complete_menu(stars: Array, record: bool) -> void:
 		_stars_tween.tween_property(star_labels[i], "modulate",
 			Color(1, 1, 1, 1.0) if got else Color(1, 1, 1, 0.5), 0.2)
 		_stars_tween.tween_interval(STAR_INTERVAL - 0.2)
+	_stars_tween.tween_property(_points_label, "modulate:a", 1.0, 0.2)
+	_stars_tween.tween_property(_points_gained_label, "modulate:a", 1.0, 0.2)
+	if gained > 0:
+		_stars_tween.tween_callback(func() -> void:
+			Sfx.play("collect")
+			_pop_stat(_points_gained_label))
 	if record and stars.count(true) > 0:
 		_stars_tween.tween_callback(func() -> void:
 			%RecordLabel.visible = true

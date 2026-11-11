@@ -1,9 +1,9 @@
 class_name SpeedPowerUp
 extends PowerUp
 ## Velocidad: cada acumulación suma un 25% a la velocidad base del cubo, hasta
-## ×2 (4 acumulaciones). Sin límite de tiempo; el efecto se pierde al rebotar
-## contra una pared o el borde del tablero (rebotar contra una puerta no lo
-## quita). Mientras está activo, el cubo deja un rastro de polvo que se
+## ×2 (4 acumulaciones). Sin límite de tiempo; el efecto solo se pierde al dar
+## media vuelta (o al morir): rebotar contra una pared, el borde del tablero o
+## una puerta no lo quita. Mientras está activo, el cubo deja un rastro de polvo que se
 ## desvanece en unos 2,5 s.
 
 const BONUS_PER_STACK := 0.25
@@ -22,8 +22,9 @@ func _init() -> void:
 	stackable = true
 	max_stacks = 4
 	duration = 0.0
-	ends_on_wall_bounce = true
+	ends_on_wall_bounce = false
 	ends_on_door_bounce = false
+	ends_on_reverse = true
 	pickup_spin_axis = Vector3(1, 1, 0.3).normalized()
 	pickup_spin_speed = 6.0
 

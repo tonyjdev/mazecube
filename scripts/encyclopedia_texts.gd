@@ -60,7 +60,7 @@ const MESSAGES := {
 
 		"ENC_SPEED_NAME": "Velocidad",
 		"ENC_SPEED_DESC": "Un cubito azul translúcido. Cada uno que coges suma un 25 % a la velocidad del cubo, hasta el doble de rápido, y mientras dura deja un rastro de polvo.",
-		"ENC_SPEED_FACTS": "No tiene límite de tiempo: se pierde al chocar contra una pared o el borde del tablero.\nChocar contra una puerta no lo quita.\nLa media vuelta también lo hace perder, y morir, por supuesto.",
+		"ENC_SPEED_FACTS": "No tiene límite de tiempo: chocar contra una pared, el borde del tablero o una puerta no lo quita.\nSolo se pierde al dar media vuelta, y al morir, por supuesto.",
 
 		"ENC_DOOR_NAME": "Puerta",
 		"ENC_DOOR_DESC": "Un bloque de color que corta el paso como una pared. Para abrirla, choca de frente contra ella llevando la llave de su mismo color: la puerta y la llave desaparecen.",
@@ -151,7 +151,7 @@ const MESSAGES := {
 
 		"ENC_SPEED_NAME": "Speed",
 		"ENC_SPEED_DESC": "A translucent blue cube. Each one you pick up adds 25% to the cube's speed, up to twice as fast, and while it lasts the cube leaves a trail of dust.",
-		"ENC_SPEED_FACTS": "It has no time limit: it's lost when you hit a wall or the edge of the board.\nHitting a door doesn't remove it.\nTurning around also makes you lose it, and so does dying, of course.",
+		"ENC_SPEED_FACTS": "It has no time limit: hitting a wall, the edge of the board or a door doesn't remove it.\nIt's only lost when you turn around, and when you die, of course.",
 
 		"ENC_DOOR_NAME": "Door",
 		"ENC_DOOR_DESC": "A coloured block that blocks the way like a wall. To open it, hit it head-on while carrying the key of the same colour: the door and the key disappear.",

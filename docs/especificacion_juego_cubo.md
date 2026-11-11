@@ -91,7 +91,7 @@ El diseño busca combinar **lógica y planificación** con **controles y reglas 
 - Mientras está en pie se comporta como una **pared**: el cubo rebota al chocar con él (apartado 2.4) y los giros hacia él se descartan (apartado 2.5).
 - Cada **choque de frente** le quita un golpe y el cubo rebota. El golpe que lo destruye **también rebota**; para pasar hay que volver.
 - Al destruirse, el bloque se parte en **pedazos que caen** al suelo y después **desaparecen** (en torno a 1,5 s). Desde el instante de la destrucción la casilla **ya se puede atravesar**, aunque los pedazos sigan cayendo. Al destruirse, el móvil **vibra** (si la vibración está activada); al golpearlo sin romperlo, no.
-- Para los power ups cuenta como un rebote contra una **pared** (por ejemplo, se pierde la velocidad).
+- Para los power ups cuenta como un rebote contra una **pared**.
 - Los muros destruidos se restauran al reiniciar el nivel.
 
 ### 2.10. Power ups — Confirmada
@@ -100,7 +100,7 @@ Objetos que el cubo coge al llegar a su casilla y que modifican su comportamient
 
 - **Duración:** limitada (segundos) o ilimitada hasta que otra regla termine el efecto.
 - **Acumulación:** si coger otro igual mientras está activo suma su efecto (con un máximo) o solo lo renueva.
-- **Fin al rebotar:** si el efecto termina al rebotar contra una pared o el borde del tablero, contra una puerta, o en ningún caso.
+- **Fin al rebotar o al dar media vuelta:** si el efecto termina al rebotar contra una pared o el borde del tablero, contra una puerta, al dar media vuelta, o en ningún caso.
 
 Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (el número mínimo de giros es el mismo), pero sí el ritmo al que hay que tomarlas.
 
@@ -108,7 +108,7 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 
 - **Efecto:** aumenta la velocidad del cubo un **25%**.
 - **Acumulable sumando:** cada uno suma un 25% sobre la velocidad base (×1,25 → ×1,50 → ×1,75 → ×2,00), con un **máximo de ×2** (4 acumulaciones); a partir de ahí coger más no acelera.
-- **Duración ilimitada:** el efecto **se pierde al rebotar contra una pared o el borde del tablero**. Rebotar contra una puerta (cerrada, o al abrirla con su llave) **no** lo quita.
+- **Duración ilimitada:** el efecto **solo se pierde al dar media vuelta** (apartado 2.12) o al morir. Rebotar contra una pared, el borde del tablero, una puerta o unos barrotes **no** lo quita.
 - **Aspecto en el mapa:** un cubo pequeño semitransparente (≈30% de transparencia) que gira rápido sobre sí mismo.
 - **Efecto visual:** mientras está activo, el cubo deja tras de sí un rastro de polvo que se desvanece en unos 2,5 segundos; con más acumulaciones el rastro es más opaco.
 - **Cámara:** al ir más rápido, la cámara se aleja un poco (ver apartado 5).
@@ -119,7 +119,7 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 - Al **abrirse**, cada lanza se desliza hacia el **lado contrario a su punta** y queda escondida dentro del muro de ese lado; al **cerrarse** vuelve a salir. La animación dura unos 0,3 s y las lanzas se mueven ligeramente escalonadas.
 - Cada juego de barrotes tiene un **estado inicial** propio: **abierto o cerrado**.
 - Unos barrotes **cerrados** se comportan como una **pared**: el cubo rebota al chocar con ellos y los giros hacia ellos se descartan. Abiertos, la casilla se atraviesa con normalidad. El cambio de estado es **instantáneo** para la lógica, aunque la animación siga.
-- Para los power ups, rebotar contra unos barrotes cerrados cuenta como rebotar contra una **puerta** (no se pierde la velocidad).
+- Para los power ups, rebotar contra unos barrotes cerrados cuenta como rebotar contra una **puerta**.
 - **Botones:** están **pegados a la cara de un muro**: una placa metálica con un pulsador rojo. Solo se accionan cuando el cubo **choca de frente** con ellos; el cubo rebota y el pulsador se hunde y vuelve a salir. Al pulsarlo, el móvil vibra suavemente (si la vibración está activada).
 - Para los power ups, el botón cuenta como una **pared**.
 - Cada botón tiene asignados **uno o más juegos de barrotes**. Al pulsarlo, **todos** cambian de estado: los abiertos se cierran y los cerrados se abren. Un mismo juego de barrotes puede estar asignado a varios botones. Se puede pulsar tantas veces como se quiera.
@@ -130,11 +130,12 @@ Los power ups no cambian qué decisiones hay que tomar para resolver un nivel (e
 
 ### 2.12. Media vuelta — Implementada en el prototipo
 
+- Hay que **comprarla en una tienda** (apartado 2.24); hasta entonces, tocar los dos lados a la vez son dos giros normales.
 - Al pulsar **izquierda y derecha a la vez**, el cubo cambia al **sentido contrario** al que lleva, igual que si chocara contra una pared. Si va hacia arriba, pasa a ir hacia abajo.
 - Cuentan como «a la vez» si al pulsar un lado el otro **sigue pulsado** o se pulsó hace **menos de 0,15 s**. La primera pulsación pide un giro, pero la media vuelta lo sustituye.
 - Se aplica en el **siguiente límite entre casillas**, como los giros (apartado 2.7): el cubo termina el vuelco en curso y da la media vuelta al llegar a la casilla.
 - Es un movimiento **grande y costoso**: el cubo se queda **parado unos 200 ms**; por sus **cuatro lados sale humo gris** que se expande y se desvanece (≈0,8 s); la **cámara tiembla** levemente (≈0,25 s) y el móvil **vibra** (si la vibración está activada). En el futuro podría penalizar puntos.
-- Para los power ups cuenta como un rebote contra una **pared** (se pierde la velocidad).
+- Para los power ups tiene su propia regla de fin (por ejemplo, se pierde la velocidad).
 - El resolvedor de niveles **no la usa**: los niveles se diseñan y miden sin media vuelta, que queda como ayuda extra para el jugador. Para la estrella de giros cuenta como **2 giros** (apartado 2.21).
 
 ### 2.13. Enemigos — Implementada en el prototipo
@@ -208,6 +209,8 @@ Hay tres tipos de enemigos. Se mueven de casilla en casilla deslizándose (no vu
 ### 2.16. Dash y pisotón — En pruebas en el prototipo
 
 Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pantalla (apartado 7.5).
+
+- Hay que **comprarlos en una tienda** (apartado 2.24); el pisotón se puede mejorar para que llegue más lejos.
 
 - **Momento en que se aplican:** como los giros (apartado 2.7), en el **siguiente límite entre casillas**. Giro, media vuelta, dash y pisotón comparten una sola petición pendiente: **cuenta la última**.
 - **Fuerza:** las dos gastan la misma **fuerza**. Hacer cualquiera de ellas la **vacía del todo** y no se puede volver a pedir ninguna hasta que esté **llena**. Se recarga en **2 s** (sin contar lo que dura la acción); más adelante habrá habilidades que cambien ese tiempo.
@@ -297,7 +300,7 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 
 ### 2.22. Inmunidad — En pruebas en el prototipo
 
-- El jugador la activa **deslizando el dedo hacia un lado** (a la izquierda o a la derecha, da igual), en cualquier parte de la pantalla, con las mismas reglas que el deslizamiento del dash y el pisotón (apartado 7.5). En PC, **Espacio** o **E**. De momento está **siempre disponible** (más adelante se podrá desbloquear o limitar).
+- El jugador la activa **deslizando el dedo hacia un lado** (a la izquierda o a la derecha, da igual), en cualquier parte de la pantalla, con las mismas reglas que el deslizamiento del dash y el pisotón (apartado 7.5). En PC, **Espacio** o **E**. Hay que **comprarla en una tienda** (apartado 2.24).
 - Al principio se probó con un botón arriba en el centro, pero se descartó: era la única acción con un botón en pantalla y quedaba lejos del dedo.
 - **Gasta toda la fuerza**, como el dash y el pisotón (apartado 2.16). Sin la fuerza llena se descarta con el mismo aviso (sonido, vibración leve y la barra tiembla en rojo). La fuerza **no se recarga mientras dura** la inmunidad: empieza a recargarse (2 s) al acabar.
 - Se activa **al momento**, en cuanto se reconoce el deslizamiento, sin esperar al siguiente límite entre casillas, y **no toca** el giro, la media vuelta, el dash o el pisotón pendientes.
@@ -308,6 +311,38 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 - **Barra de fuerza:** mientras dura la inmunidad se vuelve **azul eléctrico**, parpadea y se **vacía con el tiempo que queda**; al acabar, vuelve a mostrar la fuerza (vacía) recargándose.
 - Se pierde al **morir** (caída al vacío), al **reiniciar** el nivel y al **llegar a la meta**.
 - No cuenta como giro para las estrellas y el resolvedor de niveles no la usa.
+
+### 2.23. Puntos — En pruebas en el prototipo
+
+- Al llegar a la meta, la partida da **puntos** (los valores son orientativos; hay que calibrarlos):
+  - **1 por cada giro que sobra** respecto al reto de giros de la estrella (`star_turns` menos los giros usados; si se pasa, 0);
+  - **50 por cada estrella** conseguida;
+  - por cada **enemigo destruido** (con el dash o el pisotón): **10** el patrullero (octaedro), **15** el obstáculo (dodecaedro) y **25** el perseguidor (esfera).
+- Cada nivel guarda los puntos de su **mejor partida**. Repetir un nivel solo da puntos si se **supera ese récord**, y entonces se gana la **diferencia** (así no se pueden acumular repitiendo el mismo nivel). Los puntos que se tienen son la suma de los récords menos lo gastado en las tiendas.
+- La pantalla de **nivel completado**, después de las estrellas, muestra los puntos de la partida con su desglose y lo ganado («+40 para la tienda · tienes 620»), o el récord del nivel si no se ha superado.
+- Al llegar esta versión, cada nivel ya completado cuenta como una partida con las estrellas que tenía (50 por estrella), para no empezar de cero.
+- En el futuro podrá haber otros coleccionables que den puntos.
+
+### 2.24. Tiendas y habilidades — En pruebas en el prototipo
+
+- Todas las habilidades empiezan **bloqueadas** salvo **girar** (el movimiento básico). Se consiguen y se mejoran en las **tiendas**, pagando con puntos.
+- **Catálogo** (`scripts/abilities.gd`; precios provisionales):
+
+| Habilidad | Niveles y precio | Efecto |
+|---|---|---|
+| Media vuelta | 150 | desbloquearla |
+| Dash | 300 | desbloquearlo |
+| Pisotón | 400 · 900 | zona de 5×5 · 7×7 |
+| Inmunidad | 500 · 800 · 1200 | 3 s · 4,5 s · 6 s |
+| Recarga | 400 · 800 | la fuerza se llena en 2 s (sin comprar) · 1,5 s · 1 s |
+
+  - La **recarga** no es una acción: mejora la fuerza que gastan el dash, el pisotón y la inmunidad, y solo se puede comprar teniendo alguna de las tres.
+- **Habilidad bloqueada:** pedirla (deslizar el dedo o su tecla) no hace nada salvo avisar con el sonido de descarte, una vibración leve y el letrero «Aún no tienes esta habilidad: consíguela en una tienda» abajo en el centro. Sin la media vuelta, tocar los dos lados a la vez son dos giros normales. Sin dash, pisotón ni inmunidad no se ve la barra de fuerza.
+- **Tiendas en el mapa:** hay una en los niveles **5, 10, 15…** (uno de cada 5; `Levels.SHOP_EVERY`, o el campo `"shop"` del nivel). Es una **casita blanca** con **toldo de rayas rojas y blancas**, escaparate y puerta, que ocupa una casilla de **muro**, y encima el letrero **«TIENDA»** flotando, siempre de cara a la cámara.
+  - Se coloca sola: en el muro del **fondo de un callejón** (o, si no hay, al final de un tramo recto), el más cercano a la salida por el recorrido y a 4 pasos o más de ella. La casilla de delante tiene que ser de suelo normal, sin nada.
+  - **Para entrar**, el cubo **choca con ella de frente** (también con el dash): rebota como contra un muro y se abre la tienda. Para todo lo demás es un muro.
+  - Sale en el **mapa de la pausa** (una casita con el toldo hacia la entrada) y en su leyenda, cuando se ha explorado.
+- **Pantalla de la tienda:** el juego se detiene y se ve encima, sobre un fondo oscuro: el título y los **puntos** que se tienen; una **ficha por habilidad** con su dibujo de la enciclopedia, el nombre, el nivel comprado, qué hace, el efecto del siguiente nivel y el botón **Comprar · precio** / **Mejorar · precio** (desactivado si no llegan los puntos, «Al máximo» o lo que le falta); debajo, de dónde salen los puntos, y el botón **Salir** (o Esc / Atrás). Al comprar, sonido, vibración y la ficha da un saltito y se vuelve verdosa. Al salir, el juego se reanuda con la aceleración de la pausa y las mejoras ya se aplican.
 
 ## 3. Escenario y objetivo — Confirmados
 
@@ -591,7 +626,7 @@ Dos acciones especiales que se piden **deslizando el dedo**, sin botones en pant
 - **Mapa 2D:** al pausar, la partida se queda **congelada en una imagen** (mientras dura la pausa no se dibuja el 3D) y encima se ve, sobre un **fondo negro medio transparente**, un mapa 2D del nivel al estilo de los metroidvania:
   - Muestra los **límites** (el suelo en gris azulado y solo el **contorno** de los muros en color crema; el relleno macizo entre salas no se dibuja), **lo que se puede coger** (llaves, cubito dorado, power ups) y los **obstáculos fijos** (puertas, muros agrietados, barrotes con el color de su grupo y los botones con el del grupo que cambian, puentes colgantes, teletransportes, pinchos y cañones), además de la **salida**, la **meta** y el **cubo**, marcado con un anillo que se agranda y se desvanece en bucle. **Nunca los enemigos** ni lo que se mueve (láseres, bombas).
   - Refleja el estado actual: no salen las llaves ni los power ups ya cogidos, ni las puertas abiertas, los muros rotos o los puentes caídos.
-  - **Solo lo explorado:** el mapa enseña únicamente las casillas que han estado a **8,5 casillas o menos del cubo** (de centro a centro, en línea recta; los muros no tapan), allí donde haya estado: rodando, tras un teletransporte o al reaparecer en la salida. Lo no explorado no se dibuja y la leyenda solo incluye lo descubierto. Lo explorado se mantiene al morir y se olvida al reiniciar el nivel. (Una mecánica futura podrá enseñar el mapa entero aunque no se haya explorado.)
+  - **Solo lo explorado:** el mapa enseña únicamente las casillas que han estado a **8,5 casillas o menos del cubo** (de centro a centro, en línea recta; los muros no tapan), allí donde haya estado: rodando, tras un teletransporte o al reaparecer en la salida. Lo que solo ha quedado a **más de 5 casillas** se dibuja **más transparente cuanto más lejos** (un degradado suave hasta casi desaparecer en el borde, a 8,5). Lo no explorado no se dibuja y la leyenda solo incluye lo descubierto. Lo explorado se mantiene al morir y se olvida al reiniciar el nivel. (Una mecánica futura podrá enseñar el mapa entero aunque no se haya explorado.)
   - Se abre con **toda la zona explorada** a la vista si cabe con 20 px por casilla o más (hasta 64); si no, a 20 px por casilla y **centrado en el cubo**.
   - **Arrastrando** un dedo (o el ratón) se desplaza; **pellizcando** con dos dedos (o con la rueda del ratón) se acerca o se aleja, desde ver toda la zona explorada hasta 64 px por casilla. No se puede llevar más allá de los bordes de la zona explorada.
   - A la **derecha**, en columna, cuatro botones con iconos: **acercar**, **alejar**, **centrar en el cubo** (con una transición suave) y **leyenda**, que muestra u oculta un recuadro con lo que hay ahora en el nivel (a dos columnas si son más de siete elementos); se recuerda abierta o cerrada entre pausas.

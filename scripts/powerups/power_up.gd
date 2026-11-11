@@ -27,6 +27,8 @@ var duration := 0.0
 var ends_on_wall_bounce := false
 ## El efecto termina al rebotar contra una puerta.
 var ends_on_door_bounce := false
+## El efecto termina al dar media vuelta.
+var ends_on_reverse := false
 ## Giro del objeto mientras está en el mapa (eje y velocidad en rad/s).
 var pickup_spin_axis := Vector3.UP
 var pickup_spin_speed := 1.0

@@ -38,6 +38,9 @@ var _repeat_mode := false
 ## (user://map_<nivel>_<n>.png): al abrir, con la leyenda, acercado y
 ## centrado en el cubo.
 var _map_mode := false
+## Modo «shop»: captura del nivel (con la tienda) y de la tienda abierta
+## (user://shop_<nivel>_<n>.png), sin comprar nada.
+var _shop_mode := false
 const FRAMES_TIME := 40.0
 const SLOW_FRAME_MS := 25.0
 var _lines: PackedStringArray = []
@@ -61,6 +64,8 @@ static func maybe_start(tree: SceneTree) -> bool:
 			bench._repeat_mode = true
 		elif word.strip_edges() == "map":
 			bench._map_mode = true
+		elif word.strip_edges() == "shop":
+			bench._shop_mode = true
 		elif word.strip_edges().is_valid_int():
 			bench._levels.append(int(word.strip_edges()))
 	tree.root.add_child.call_deferred(bench)
@@ -98,6 +103,9 @@ func _bench_level(number: int) -> void:
 		return
 	if _map_mode:
 		await _map_shots(number, game)
+		return
+	if _shop_mode:
+		await _shop_shots(number, game)
 		return
 	var cube: RollingCube = game.get_node("Cube")
 	var sun: DirectionalLight3D = game.get_node("Sun")
@@ -275,6 +283,20 @@ func _map_shots(number: int, game: Node) -> void:
 	await _map_shot(number, 5)
 	game._set_paused(false)
 	await _wait(1.0)
+
+
+func _shop_shots(number: int, game: Node) -> void:
+	await _shot("shop_%d_1" % number)
+	game._open_shop()
+	await _wait(0.8)
+	await _shot("shop_%d_2" % number)
+	game._shop.close()
+	await _wait(1.0)
+
+
+func _shot(file: String) -> void:
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png("user://%s.png" % file)
 
 
 func _map_shot(number: int, index: int) -> void:

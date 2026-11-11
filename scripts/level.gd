@@ -65,6 +65,11 @@ extends Node3D
 ##   dorado (GoldenCube; lo colocan tools/place_collectibles.py). El cubo lo
 ##   coge al llegar a su casilla (take_collectible) y no vuelve a salir hasta
 ##   reiniciar el nivel.
+## Tienda (ver ShopBuilding y Shop): los niveles con "shop" (cada
+##   Levels.SHOP_EVERY) tienen una en un muro al fondo de un callejón (o, si
+##   no hay, de un tramo recto), elegida sola en build() (ver _place_shop):
+##   al chocar el cubo con ella de frente se abre la tienda. Para todo lo demás
+##   es un muro.
 ## Materiales (ver BlockCatalog): el campo "theme" del nivel elige el bloque
 ## del suelo ("floor"), de los muros ("wall") y, opcionalmente, de la roca de
 ## debajo ("foundation"; si no se da, la que va bajo el suelo). Lo que falte
@@ -83,6 +88,8 @@ extends Node3D
 signal reveal_finished
 ## Ha explotado una bomba a `distance` casillas del cubo (INF si no está).
 signal bomb_exploded(distance: float)
+## Se ha destruido un enemigo (dash o pisotón del cubo; ver Abilities.enemy_points).
+signal enemy_destroyed(enemy: Enemy)
 
 const CELL_SIZE := 1.0
 ## Tipo de caja del terreno (ver _add_terrain_box).
@@ -186,9 +193,17 @@ const POWER_UP_FLOAT_HEIGHT := 0.5
 ## se considera cerca de un botón. Ver button_near().
 const BUTTON_APPROACH_CELLS := 4
 const NO_CELL := Vector2i(-9999, -9999)
+const DIRECTIONS: Array[Vector2i] = [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
+## Pasos mínimos por el recorrido desde la salida hasta la entrada de la
+## tienda (si hay sitio así).
+const SHOP_MIN_STEPS := 4
 ## Radio (en casillas) alrededor del cubo que queda explorado para el mapa de
-## la pausa (ver mark_seen_around).
+## la pausa (ver mark_seen_around). Lo que ha quedado a más de
+## SEEN_CLEAR_RADIUS se dibuja más transparente cuanto más lejos, hasta
+## SEEN_EDGE_ALPHA en el borde.
 const SEEN_RADIUS := 8.5
+const SEEN_CLEAR_RADIUS := 5.0
+const SEEN_EDGE_ALPHA := 0.15
 ## Aparición del tablero: duración total y lo que tarda cada casilla en
 ## pasar de transparente a opaca.
 const REVEAL_TIME := 1.3
@@ -226,6 +241,12 @@ const REVEAL_FADE_TIME := 0.45
 @export var mortar_settings := {}
 ## Casilla del cubito dorado (campo "collectible"); NO_CELL si no hay.
 var collectible_cell := NO_CELL
+## El nivel tiene tienda (ver _place_shop).
+var has_shop := false
+## Muro de la tienda y casilla libre de delante, desde la que se entra
+## (NO_CELL si no hay tienda).
+var shop_cell := NO_CELL
+var shop_front := NO_CELL
 ## Cubito dorado del mapa (null si no hay o ya se ha cogido).
 var _collectible: GoldenCube
 ## Cubo del jugador: los enemigos lo buscan y lo matan.
@@ -301,7 +322,8 @@ var _terrain_builder: TerrainBuilder
 var _wall_set := {}
 ## Casillas ya exploradas (las que han estado cerca del cubo, ver
 ## mark_seen_around): el mapa de la pausa solo enseña esas. Se mantienen al
-## morir y se borran al reiniciar.
+## morir y se borran al reiniciar. casilla -> distancia más corta a la que ha
+## estado el cubo.
 var _seen := {}
 ## El mapa de la pausa enseña el tablero entero aunque no se haya visto (ver
 ## reveal_whole_map).
@@ -323,6 +345,7 @@ func configure(data: Dictionary) -> void:
 	block_regions = data.get("theme_regions", [])
 	mortar_settings = data.get("mortars", {})
 	collectible_cell = data.get("collectible", NO_CELL)
+	has_shop = data.get("shop", false)
 
 
 func build() -> void:
@@ -354,6 +377,8 @@ func build() -> void:
 	_body_positions.clear()
 	_seen.clear()
 	_map_revealed = false
+	shop_cell = NO_CELL
+	shop_front = NO_CELL
 	var enemy_cells := {}
 	var mortar_cells: Array[Vector2i] = []
 	## símbolo -> casillas de teletransporte
@@ -457,6 +482,8 @@ func build() -> void:
 		_add_mortar(cell)
 	for button in _buttons.values():
 		button["near"] = _cells_within(button["front"], BUTTON_APPROACH_CELLS)
+	if has_shop:
+		_place_shop()
 	_warm_up_effects.call_deferred()
 
 
@@ -1333,6 +1360,70 @@ func _destroy_enemy(enemy: Enemy) -> void:
 	_enemies.erase(enemy)
 	_solid_dirty = true
 	enemy.destroy()
+	enemy_destroyed.emit(enemy)
+
+
+## Muro de la tienda (ver _place_shop).
+func is_shop(cell: Vector2i) -> bool:
+	return cell == shop_cell and shop_cell != NO_CELL
+
+
+## Pone la tienda en un muro '#' contra el que el cubo choca de frente: el de
+## detrás de una casilla '.' (sin nada) a la que se llega en línea recta desde
+## la casilla opuesta. Prefiere el fondo de un callejón (la casilla '.' solo
+## tiene una salida) y, entre ellos, el más cercano a la salida por el
+## recorrido, a SHOP_MIN_STEPS pasos o más (para no chocar con ella nada más
+## empezar).
+func _place_shop() -> void:
+	var steps := _path_steps(start_cell)
+	var best_score := INF
+	for cell: Vector2i in steps:
+		if layout[cell.y][cell.x] != "." or cell == collectible_cell:
+			continue
+		var exits := 0
+		for dir: Vector2i in DIRECTIONS:
+			if _walkable.has(cell + dir):
+				exits += 1
+		for dir: Vector2i in DIRECTIONS:
+			var wall := cell + dir
+			if not _walkable.has(cell - dir) or not _is_plain_wall(wall):
+				continue
+			var distance: int = steps[cell]
+			var score := float(distance) + (0.0 if exits == 1 else 1000.0) \
+				+ (500.0 if distance < SHOP_MIN_STEPS else 0.0)
+			if score < best_score:
+				best_score = score
+				shop_cell = wall
+				shop_front = cell
+	if shop_cell == NO_CELL:
+		push_warning("Nivel sin sitio para la tienda")
+		return
+	var facing := shop_front - shop_cell
+	var building := ShopBuilding.new()
+	building.name = "Shop"
+	building.position = Vector3(shop_cell.x, 0.0, shop_cell.y) * CELL_SIZE
+	building.rotation.y = atan2(facing.x, facing.y)
+	add_child(building)
+
+
+func _is_plain_wall(cell: Vector2i) -> bool:
+	return cell.y >= 0 and cell.y < layout.size() and cell.x >= 0 \
+		and cell.x < layout[cell.y].length() and layout[cell.y][cell.x] == "#"
+
+
+## Pasos por el recorrido (casillas con suelo, sin tener en cuenta puertas,
+## barrotes ni muros destructibles) desde `origin` hasta cada casilla.
+func _path_steps(origin: Vector2i) -> Dictionary:
+	var steps := {origin: 0}
+	var queue: Array[Vector2i] = [origin]
+	while not queue.is_empty():
+		var current: Vector2i = queue.pop_front()
+		for dir: Vector2i in DIRECTIONS:
+			var n := current + dir
+			if _walkable.has(n) and not steps.has(n):
+				steps[n] = steps[current] + 1
+				queue.append(n)
+	return steps
 
 
 ## Color de la puerta cerrada de la casilla, o "" si no hay.
@@ -1433,9 +1524,10 @@ func mark_seen_around(center: Vector2i) -> void:
 	for dz in range(-reach, reach + 1):
 		for dx in range(-reach, reach + 1):
 			var cell := center + Vector2i(dx, dz)
-			if dx * dx + dz * dz <= SEEN_RADIUS * SEEN_RADIUS and cell.x >= 0 and cell.y >= 0 \
+			var distance := sqrt(dx * dx + dz * dz)
+			if distance <= SEEN_RADIUS and cell.x >= 0 and cell.y >= 0 \
 					and cell.x < grid.x and cell.y < grid.y:
-				_seen[cell] = true
+				_seen[cell] = minf(_seen.get(cell, INF), distance)
 
 
 ## El mapa de la pausa pasa a enseñar el tablero entero, visto o no (para
@@ -1446,6 +1538,32 @@ func reveal_whole_map() -> void:
 
 func is_seen(cell: Vector2i) -> bool:
 	return _map_revealed or _seen.has(cell)
+
+
+## Opacidad de la casilla en el mapa de la pausa: 1 hasta SEEN_CLEAR_RADIUS
+## del cubo, bajando hasta SEEN_EDGE_ALPHA en SEEN_RADIUS, y 0 si no se ha
+## visto.
+func seen_alpha(cell: Vector2i) -> float:
+	if _map_revealed:
+		return 1.0
+	if not _seen.has(cell):
+		return 0.0
+	var k := inverse_lerp(SEEN_CLEAR_RADIUS, SEEN_RADIUS, _seen[cell])
+	return lerpf(1.0, SEEN_EDGE_ALPHA, clampf(k, 0.0, 1.0))
+
+
+## Imagen de grid × casillas con la opacidad de cada casilla en el mapa de la
+## pausa (ver seen_alpha).
+func _seen_alpha_image() -> Image:
+	var grid := get_grid_size().max(Vector2i.ONE)
+	var image := Image.create(grid.x, grid.y, false, Image.FORMAT_L8)
+	if _map_revealed:
+		image.fill(Color.WHITE)
+		return image
+	for cell: Vector2i in _seen:
+		var alpha := seen_alpha(cell)
+		image.set_pixelv(cell, Color(alpha, alpha, alpha))
+	return image
 
 
 ## Estado del tablero para el mapa 2D de la pausa (ver PauseMap): solo lo ya
@@ -1540,6 +1658,9 @@ func map_snapshot() -> Dictionary:
 		"spikes": _spikes.keys().filter(is_seen),
 		"lasers": lasers,
 		"mortars": mortars,
+		"alpha": _seen_alpha_image(),
+		"shop": shop_cell if shop_cell != NO_CELL and is_seen(shop_cell) else NO_CELL,
+		"shop_facing": shop_front - shop_cell,
 	}
 
 

@@ -8,6 +8,12 @@ extends Node
 ##   sin morir, en «star_turns» giros o menos y con el cubito dorado (ver
 ##   record_result). Solo cuenta la mejor partida (la de más estrellas); no
 ##   se suman estrellas de partidas distintas.
+## - Puntos y habilidades (también en user://progress.cfg): cada nivel guarda
+##   los puntos de su mejor partida (ver Abilities.points_for_run y
+##   record_points); los puntos que se tienen son la suma de esos récords
+##   menos lo gastado en las tiendas. Así repetir un nivel solo da puntos si
+##   se mejora su récord (y la diferencia). Las habilidades compradas se
+##   guardan con su nivel (ver Abilities y buy_ability).
 ## - Ajustes (user://settings.cfg): volumen de efectos y de música (buses
 ##   "SFX" y "Music", ver default_bus_layout.tres), antialiasing, calidad
 ##   gráfica, sombras, idioma y vibración.
@@ -84,6 +90,12 @@ var _completed: Array[int] = []
 var _stars := {}
 ## Truco para pruebas: todos los niveles desbloqueados (ver unlock_all_levels).
 var _all_unlocked := false
+## Índice del nivel -> puntos de su mejor partida.
+var _level_points := {}
+## Puntos gastados en las tiendas.
+var _spent_points := 0
+## Habilidad -> nivel comprado (las que no están, nivel 0: bloqueadas).
+var _abilities := {}
 ## Capa negra de los fundidos y su animación en curso.
 var _fade_rect: ColorRect
 var _fade_tween: Tween
@@ -179,6 +191,76 @@ func record_result(index: int, stars: Array) -> bool:
 	return record
 
 
+# --- Puntos y habilidades ---------------------------------------------------
+
+## Puntos disponibles para gastar en las tiendas.
+func points() -> int:
+	var total := 0
+	for value: int in _level_points.values():
+		total += value
+	return maxi(total - _spent_points, 0)
+
+
+## Puntos de la mejor partida del nivel.
+func best_points(index: int) -> int:
+	return _level_points.get(index, 0)
+
+
+## Puntos de una partida del nivel: si supera su récord, pasa a serlo y se
+## ganan los de diferencia. Devuelve los puntos ganados (0 si no lo supera).
+func record_points(index: int, earned: int) -> int:
+	var gained := earned - best_points(index)
+	if gained <= 0:
+		return 0
+	_level_points[index] = earned
+	_save_progress()
+	return gained
+
+
+## Nivel comprado de la habilidad (0 = bloqueada; ver Abilities).
+func ability_level(id: String) -> int:
+	return _abilities.get(id, 0)
+
+
+func has_ability(id: String) -> bool:
+	return ability_level(id) > 0
+
+
+## Valor del efecto de la habilidad con el nivel comprado (ver Abilities.value).
+func ability_value(id: String) -> Variant:
+	return Abilities.value(id, ability_level(id))
+
+
+## Se puede comprar el siguiente nivel de la habilidad: no está al máximo,
+## se tiene alguna de las que necesita y hay puntos suficientes.
+func can_buy_ability(id: String) -> bool:
+	var current := ability_level(id)
+	if current >= Abilities.max_level(id) or not meets_ability_needs(id):
+		return false
+	return points() >= Abilities.price(id, current)
+
+
+func meets_ability_needs(id: String) -> bool:
+	var needed := Abilities.needs(id)
+	if needed.is_empty():
+		return true
+	for other: String in needed:
+		if has_ability(other):
+			return true
+	return false
+
+
+## Compra el siguiente nivel de la habilidad. Devuelve true si se ha podido.
+func buy_ability(id: String) -> bool:
+	if not can_buy_ability(id):
+		return false
+	var current := ability_level(id)
+	_spent_points += Abilities.price(id, current)
+	_abilities[id] = current + 1
+	_save_progress()
+	return true
+
+
 func _load_progress() -> void:
 	var cfg := ConfigFile.new()
 	if cfg.load(PROGRESS_PATH) != OK:
@@ -190,6 +272,23 @@ func _load_progress() -> void:
 			var value: Variant = saved_stars[key]
 			if value is Array and value.size() == 3:
 				_stars[int(key)] = [bool(value[0]), bool(value[1]), bool(value[2])]
+	var saved_points: Variant = cfg.get_value("points", "levels", {}) \
+		if cfg.has_section_key("points", "levels") else null
+	if saved_points is Dictionary:
+		for key: Variant in saved_points:
+			_level_points[int(key)] = int(saved_points[key])
+	else:
+		# Progreso de antes de los puntos: cada nivel con estrellas cuenta como
+		# una partida con esas estrellas (sin giros sobrantes ni enemigos).
+		for index: int in _stars:
+			_level_points[index] = star_count(index) * Abilities.POINTS_PER_STAR
+	_spent_points = int(cfg.get_value("points", "spent", 0))
+	var saved_abilities: Variant = cfg.get_value("points", "abilities", {})
+	if saved_abilities is Dictionary:
+		for key: Variant in saved_abilities:
+			var id := str(key)
+			if Abilities.max_level(id) > 0:
+				_abilities[id] = clampi(int(saved_abilities[key]), 0, Abilities.max_level(id))
 	if cfg.has_section_key("progress", "completed"):
 		for value in cfg.get_value("progress", "completed", []):
 			_completed.append(int(value))
@@ -205,6 +304,9 @@ func _save_progress() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("progress", "completed", _completed)
 	cfg.set_value("progress", "stars", _stars)
+	cfg.set_value("points", "levels", _level_points)
+	cfg.set_value("points", "spent", _spent_points)
+	cfg.set_value("points", "abilities", _abilities)
 	if _all_unlocked:
 		cfg.set_value("progress", "all_unlocked", true)
 	cfg.save(PROGRESS_PATH)

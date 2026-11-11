@@ -104,6 +104,9 @@ extends RefCounted
 ## Estos niveles sirven para probar las mecánicas; los definitivos se
 ## diseñarán aparte.
 
+## Cada cuántos niveles hay una tienda (ver has_shop).
+const SHOP_EVERY := 5
+
 const LIST: Array[Dictionary] = [
 	{
 		"name": "Primer giro",
@@ -7196,14 +7199,22 @@ static func star_turns(index: int) -> int:
 	return data.get("star_turns", turns + maxi(3, (turns * 3 + 9) / 10))
 
 
-## Datos del nivel. Si no trae "theme", lleva el de su tramo en THEMES.
+## Datos del nivel. Si no trae "theme", lleva el de su tramo en THEMES; si
+## no dice si tiene tienda ("shop"), la tiene uno de cada SHOP_EVERY (ver
+## has_shop).
 static func get_level(index: int) -> Dictionary:
 	index = clampi(index, 0, LIST.size() - 1)
-	var data: Dictionary = LIST[index]
+	var data: Dictionary = LIST[index].duplicate()
+	if not data.has("shop"):
+		data["shop"] = has_shop(index)
 	if data.has("theme"):
 		return data
-	data = data.duplicate()
 	for entry: Array in THEMES:
 		if index >= entry[0]:
 			data["theme"] = entry[1]
 	return data
+
+
+## Hay tienda en los niveles 5, 10, 15... (ver Level._place_shop y Shop).
+static func has_shop(index: int) -> bool:
+	return (index + 1) % SHOP_EVERY == 0
