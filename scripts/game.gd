@@ -113,6 +113,9 @@ const SWIPE_MAX_TIME := 0.5
 ## Un deslizamiento debe ser al menos así de más vertical que horizontal (o
 ## al revés).
 const SWIPE_DIRECTION_RATIO := 1.5
+## Margen (en píxeles) alrededor del botón del mapa que también lo pulsa (el
+## botón mide 80; con el margen se puede tocar hasta el borde de la pantalla).
+const PAUSE_HIT_MARGIN := 36.0
 ## Tiempo que tarda el juego en recuperar su velocidad al salir de la pausa.
 const RESUME_RAMP_TIME := 1.0
 ## Tiempo máximo que el cubo espera a la cámara para reaparecer tras morir.
@@ -345,6 +348,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				if not info["committed"] and not info["done"] and not _is_swipe_attempt(info):
 					_press_side(info["side"])
 				_gestures.erase(touch.index)
+		elif _is_near_pause_button(touch.position):
+			# Margen alrededor del botón del mapa: abre la pausa como el botón.
+			pause_button.pressed.emit()
+			get_viewport().set_input_as_handled()
 		elif not _is_over_buttons(touch.position):
 			var half := get_viewport().get_visible_rect().size.x * 0.5
 			var side := RollingCube.TURN_LEFT if touch.position.x < half else RollingCube.TURN_RIGHT
@@ -791,6 +798,14 @@ func _on_play_area_resized() -> void:
 ## Los toques sobre los botones no cuentan como giro.
 func _is_over_buttons(pos: Vector2) -> bool:
 	return pause_button.visible and pause_button.get_global_rect().has_point(pos)
+
+
+## Toque en el margen de PAUSE_HIT_MARGIN alrededor del botón del mapa (fuera
+## del botón: dentro, lo recoge el propio botón). El botón se ve igual de
+## grande, pero así es más fácil acertar y no se gira el cubo sin querer.
+func _is_near_pause_button(pos: Vector2) -> bool:
+	return pause_button.visible and not pause_button.get_global_rect().has_point(pos) \
+		and pause_button.get_global_rect().grow(PAUSE_HIT_MARGIN).has_point(pos)
 
 
 ## Reproductor del zumbido de la inmunidad, con el sonido en bucle.

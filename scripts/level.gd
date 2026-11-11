@@ -188,7 +188,7 @@ const BUTTON_APPROACH_CELLS := 4
 const NO_CELL := Vector2i(-9999, -9999)
 ## Radio (en casillas) alrededor del cubo que queda explorado para el mapa de
 ## la pausa (ver mark_seen_around).
-const SEEN_RADIUS := 5.0
+const SEEN_RADIUS := 8.5
 ## Aparición del tablero: duración total y lo que tarda cada casilla en
 ## pasar de transparente a opaca.
 const REVEAL_TIME := 1.3
@@ -591,24 +591,30 @@ func bridge_stability(cell: Vector2i) -> int:
 
 
 ## El cubo acaba de salir de `cell` (ya está en otra casilla): si era un
-## puente, pierde estabilidad y, si llega a 0, el puente entero cae, con el
-## cubo si sigue encima.
+## puente, pierde estabilidad y, si llega a 0, el puente empieza a romperse
+## (se cae unos segundos después, ver _on_bridge_break_due).
 func cube_left_cell(cell: Vector2i) -> void:
 	if not _bridges.has(cell):
 		return
 	var bridge: HangingBridge = _bridges[cell]
-	if not bridge.wear(cell):
-		Sfx.play("creak", 0.1, -4.0 * bridge.stability(cell))
+	var broke := bridge.wear(cell)
+	Sfx.play("creak", 0.1, -4.0 * bridge.stability(cell) + (4.0 if broke else 0.0))
+
+
+## Al puente se le ha acabado el aguante: cae entero, con el cubo si está
+## encima o volcando hacia él.
+func _on_bridge_break_due(origin: Vector2i, bridge: HangingBridge) -> void:
+	if not is_instance_valid(bridge) or not _bridges.has(origin):
 		return
 	var cube_cell := NO_CELL
-	if cube and cube.is_alive() and (bridge.has_cell(cube.cell) or bridge.has_cell(cube.roll_target())):
-		cube_cell = cube.cell if bridge.has_cell(cube.cell) else cube.roll_target()
+	if cube and cube.is_alive() and bridge.has_cell(cube.roll_target()):
+		cube_cell = cube.roll_target()
 	for c in bridge.cells:
 		_bridges.erase(c)
 		_walkable.erase(c)
 		_void[c] = true
 	_topology_version += 1
-	bridge.collapse(cell, cube_cell)
+	bridge.collapse(origin, cube_cell)
 	Sfx.play("collapse")
 	if cube_cell != NO_CELL:
 		cube.drop()
@@ -1855,6 +1861,7 @@ func _add_bridges(bridge_cells: Dictionary) -> void:
 			var bridge := HangingBridge.new()
 			bridge.name = "Bridge%d" % get_child_count()
 			bridge.setup(run, along, CELL_SIZE)
+			bridge.break_due.connect(_on_bridge_break_due.bind(bridge))
 			add_child(bridge)
 			for cell in run:
 				_bridges[cell] = bridge

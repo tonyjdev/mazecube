@@ -7,13 +7,21 @@ extends Node3D
 ## (100 %) y baja un punto (25 %) cada vez que el cubo sale de ella (ver
 ## Level.cube_left_cell). Cuanto menos estable, más a menudo suelta polvo
 ## que cae al vacío (ver DUST_*); al 25 % además se balancea un poco cada
-## pocos segundos (ver SWAY_*). Cuando una casilla llega a 0 se cae el
-## puente entero: las casillas se desprenden una tras otra empezando por la
-## que se ha roto, y el cubo que siga encima cae con ellas.
+## pocos segundos (ver SWAY_*). Cuando una casilla llega a 0 el puente
+## aguanta todavía BREAK_DELAY segundos (polvo sin parar y la casilla rota
+## temblando) para que al cubo le dé tiempo a cruzar por última vez; luego
+## avisa con `break_due` y Level lo tira: las casillas se desprenden una tras
+## otra empezando por la que se ha roto, y el cubo que siga encima cae con
+## ellas.
 ##
 ## Las coordenadas son las del tablero (Level), en casillas.
 
+signal break_due(origin: Vector2i)
+
 const MAX_STABILITY := 4
+## Segundos que aguanta el puente desde que una casilla llega a 0 hasta que
+## se cae.
+const BREAK_DELAY := 3.0
 ## Retraso entre la caída de una casilla y la de su vecina.
 const CELL_FALL_DELAY := 0.09
 const FALL_GRAVITY := 9.0
@@ -23,8 +31,8 @@ const FALL_SPIN_MAX := 2.5
 
 ## Segundos entre dos sueltas de polvo y partículas por suelta, según la
 ## estabilidad que le queda a la casilla (a MAX_STABILITY no suelta nada).
-const DUST_INTERVAL := {3: Vector2(8.0, 10.0), 2: Vector2(4.0, 7.0), 1: Vector2(1.0, 2.0)}
-const DUST_AMOUNT := {3: Vector2i(1, 2), 2: Vector2i(2, 4), 1: Vector2i(4, 7)}
+const DUST_INTERVAL := {3: Vector2(8.0, 10.0), 2: Vector2(4.0, 7.0), 1: Vector2(1.0, 2.0), 0: Vector2(0.25, 0.5)}
+const DUST_AMOUNT := {3: Vector2i(1, 2), 2: Vector2i(2, 4), 1: Vector2i(4, 7), 0: Vector2i(5, 8)}
 const DUST_LIFETIME := 2.4
 const DUST_COLOR := Color(0.86, 0.78, 0.64)
 
@@ -35,6 +43,8 @@ const DUST_COLOR := Color(0.86, 0.78, 0.64)
 ## empieza cada giro. Es solo visual: el cubo no se entera.
 const SWAY_STABILITY := 1
 const SWAY_INTERVAL := Vector2(3.0, 5.0)
+## Pausa entre vaivenes de la casilla rota mientras el puente aguanta.
+const BREAK_SWAY_INTERVAL := Vector2(0.05, 0.2)
 const SWAY_TIME := 1.8
 ## Oscilaciones por vaivén.
 const SWAY_WAVES := 1.5
@@ -63,6 +73,11 @@ static var _dust_material: StandardMaterial3D
 ## Casillas del puente, de un extremo al otro.
 var cells: Array[Vector2i] = []
 var is_collapsed := false
+## Una casilla ha llegado a 0 y el puente se caerá en `_break_left` segundos.
+var is_breaking := false
+
+var _break_origin := Vector2i.ZERO
+var _break_left := 0.0
 
 var _cell_size := 1.0
 var _along := Vector2i.RIGHT
@@ -114,18 +129,23 @@ func stability(cell: Vector2i) -> int:
 
 
 ## El cubo ha salido de la casilla: pierde un punto de estabilidad. Devuelve
-## true si ha llegado a 0 (el puente tiene que caerse).
+## true si acaba de llegar a 0: el puente empieza a romperse y se caerá
+## BREAK_DELAY segundos después (ver `break_due`).
 func wear(cell: Vector2i) -> bool:
-	if is_collapsed or not _stability.has(cell):
+	if is_collapsed or is_breaking or not _stability.has(cell):
 		return false
 	var left: int = maxi(_stability[cell] - 1, 0)
 	_stability[cell] = left
-	if left == 0:
-		return true
 	# Una suelta de polvo nada más perder estabilidad y luego al ritmo que le
 	# toca.
 	_emit_dust(cell)
 	_dust_wait[cell] = _random_interval(left)
+	if left == 0:
+		is_breaking = true
+		_break_origin = cell
+		_break_left = BREAK_DELAY
+		_sway_wait[cell] = 0.0
+		return true
 	if left == SWAY_STABILITY and not _sway_wait.has(cell):
 		_sway_wait[cell] = _rng.randf_range(SWAY_INTERVAL.x, SWAY_INTERVAL.y) * 0.5
 	return false
@@ -138,6 +158,7 @@ func collapse(origin: Vector2i, first := Vector2i(-9999, -9999)) -> void:
 	if is_collapsed:
 		return
 	is_collapsed = true
+	is_breaking = false
 	var origin_index := cells.find(origin)
 	for i in cells.size():
 		var cell := cells[i]
@@ -160,6 +181,11 @@ func collapse(origin: Vector2i, first := Vector2i(-9999, -9999)) -> void:
 
 
 func _process(delta: float) -> void:
+	if is_breaking:
+		_break_left -= delta
+		if _break_left <= 0.0:
+			is_breaking = false
+			break_due.emit(_break_origin)
 	for cell: Vector2i in _dust_wait.keys():
 		_dust_wait[cell] -= delta
 		if _dust_wait[cell] <= 0.0:
@@ -201,7 +227,8 @@ func _process_sway(delta: float) -> void:
 		var base := Vector3(cell.x, 0, cell.y) * _cell_size
 		if t >= SWAY_TIME:
 			_swaying.erase(cell)
-			_sway_wait[cell] = _rng.randf_range(SWAY_INTERVAL.x, SWAY_INTERVAL.y)
+			var pause := BREAK_SWAY_INTERVAL if _stability[cell] == 0 else SWAY_INTERVAL
+			_sway_wait[cell] = _rng.randf_range(pause.x, pause.y)
 			node.basis = Basis.IDENTITY
 			node.position = base
 			continue
