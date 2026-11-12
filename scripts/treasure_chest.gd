@@ -6,9 +6,9 @@ extends Node3D
 ## lo alcance (ver Level.open_chest y Level.stomp).
 ##
 ## Al abrirse (open) la tapa se levanta de golpe, sale un destello dorado y
-## Level suelta las monedas; OPEN_LINGER segundos después el cofre encoge y
-## se hunde hasta desaparecer (emite vanished, y entonces la casilla queda
-## libre). Un cofre abierto no vuelve a salir en ese nivel (ver
+## Level suelta las monedas; desde ese momento ya no es obstáculo (el cubo lo
+## atraviesa) y OPEN_LINGER segundos después encoge y se hunde hasta
+## desaparecer (emite vanished). Un cofre abierto no vuelve a salir en ese nivel (ver
 ## GameState.open_chest).
 ##
 ## El nodo va en el centro de la casilla, a ras de suelo, girado para que el

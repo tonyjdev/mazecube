@@ -143,7 +143,6 @@ func _ready() -> void:
 		_beam_shader.code = BEAM_SHADER
 		_pool_shader = Shader.new()
 		_pool_shader.code = POOL_SHADER
-		_dot_texture = _make_dot_texture()
 	var extra := maxf(power - 1.0, 0.0)
 	var height_scale := 1.0 + POWER_HEIGHT * extra
 	var intensity_scale := 1.0 + POWER_INTENSITY * extra
@@ -238,7 +237,7 @@ func _make_particles() -> void:
 	_particle_material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	_particle_material.billboard_keep_scale = true
 	_particle_material.vertex_color_use_as_albedo = true
-	_particle_material.albedo_texture = _dot_texture
+	_particle_material.albedo_texture = dot_texture()
 	_particle_material.albedo_color = color.lightened(0.6)
 	quad.material = _particle_material
 	_multimesh = MultiMesh.new()
@@ -297,6 +296,14 @@ func _update_particles(delta: float) -> void:
 		_multimesh.set_instance_transform(i, Transform3D(Basis.from_scale(Vector3.ONE * size), pos))
 		var alpha := smoothstep(0.0, 0.12, u) * (1.0 - smoothstep(0.55, 1.0, u)) * _reveal
 		_multimesh.set_instance_color(i, Color(1, 1, 1, alpha))
+
+
+## Punto de luz redondo y difuminado (compartido; lo usan también otros
+## efectos, como el piloto de WallButton y CheckpointTile).
+static func dot_texture() -> Texture2D:
+	if _dot_texture == null:
+		_dot_texture = _make_dot_texture()
+	return _dot_texture
 
 
 ## Punto de luz redondo y difuminado para las partículas.

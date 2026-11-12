@@ -77,7 +77,8 @@ extends Node3D
 ##   (tools/place_extras.py). Son obstáculos como un muro que solo se abren
 ##   con un dash contra ellos (open_chest) o un pisotón que los alcance
 ##   (stomp); al abrirse sueltan entre Abilities.CHEST_COINS_MIN y
-##   CHEST_COINS_MAX monedas y a los dos segundos desaparecen. Los ya abiertos
+##   CHEST_COINS_MAX monedas, dejan de ser obstáculo (se atraviesan) y a
+##   los dos segundos desaparecen. Los ya abiertos
 ##   (opened_chests, ver GameState.open_chest) no salen.
 ## Monedas (ver Coin): salen de los cofres y de los enemigos destruidos
 ##   (Abilities.enemy_coins), se dispersan con físicas y el cubo las coge al
@@ -669,7 +670,7 @@ func is_walkable(cell: Vector2i) -> bool:
 ## pie (sin tener en cuenta a los enemigos).
 func is_terrain_walkable(cell: Vector2i) -> bool:
 	return _walkable.has(cell) and not _doors.has(cell) and not _breakables.has(cell) \
-		and not bars_closed(cell) and not _chests.has(cell)
+		and not bars_closed(cell) and not chest_closed(cell)
 
 
 ## Casilla de vacío ('~' o fuera del mapa): el cubo que entra en ella se cae.
@@ -1298,7 +1299,7 @@ func bomb_boxes(cell: Vector2i) -> Array[AABB]:
 		var across_x: bool = is_zero_approx(_bars[cell]["node"].rotation.y)
 		var size := Vector3(CELL_SIZE, 0.55, 0.16) if across_x else Vector3(0.16, 0.55, CELL_SIZE)
 		boxes.append(AABB(center - Vector3(size.x * 0.5, 0.0, size.z * 0.5), size))
-	elif _chests.has(cell):
+	elif chest_closed(cell):
 		var size := TreasureChest.BASE_SIZE + Vector3(0.0, TreasureChest.LID_HEIGHT, 0.0)
 		var side := maxf(size.x, size.z)
 		boxes.append(AABB(center - Vector3(side * 0.5, 0.0, side * 0.5), Vector3(side, size.y, side)))
@@ -1456,6 +1457,11 @@ func is_chest(cell: Vector2i) -> bool:
 	return _chests.has(cell)
 
 
+## Hay un cofre sin abrir en la casilla (los abiertos se pueden atravesar).
+func chest_closed(cell: Vector2i) -> bool:
+	return _chests.has(cell) and not _chests[cell].is_open
+
+
 ## El cofre se orienta con el cierre hacia su casilla libre de al lado.
 func _add_chest(cell: Vector2i) -> void:
 	var facing := Vector2i.DOWN
@@ -1468,18 +1474,18 @@ func _add_chest(cell: Vector2i) -> void:
 	chest.rotation.y = atan2(facing.x, facing.y)
 	add_child(chest)
 	_chests[cell] = chest
-	chest.vanished.connect(func() -> void:
-		_chests.erase(cell)
-		_topology_version += 1)
+	chest.vanished.connect(func() -> void: _chests.erase(cell))
 
 
 ## Abre el cofre de la casilla (dash o pisotón): suelta sus monedas y, al
-## rato, desaparece y la casilla queda libre. Devuelve true si se ha abierto.
+## rato, desaparece. Desde que se abre la casilla queda libre (el cubo lo
+## atraviesa). Devuelve true si se ha abierto.
 func open_chest(cell: Vector2i) -> bool:
 	var chest: TreasureChest = _chests.get(cell)
 	if chest == null or chest.is_open:
 		return false
 	chest.open()
+	_topology_version += 1
 	spawn_coins(chest.position + Vector3(0.0, TreasureChest.BASE_SIZE.y + 0.1, 0.0),
 		randi_range(Abilities.CHEST_COINS_MIN, Abilities.CHEST_COINS_MAX))
 	chest_opened.emit(cell)

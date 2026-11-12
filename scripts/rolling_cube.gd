@@ -37,7 +37,7 @@ extends Node3D
 ## - Dash: el cubo se arrastra sin volcar hasta la casilla de delante en
 ##   DASH_TIME segundos. Antes destruye a cualquier enemigo que la ocupe y, si
 ##   es un muro destructible, lo rompe de una vez y pasa sin rebotar. Si es
-##   un cofre, lo abre (ver Level.open_chest) y rebota. Si delante hay una
+##   un cofre, lo abre (ver Level.open_chest) y pasa a través de él. Si delante hay una
 ##   pared, puerta, barrotes o un botón, el dash se queda en un choque normal
 ##   (rebote). Si es vacío, se cae.
 ## - Pisotón: salta y cae con fuerza en su casilla (STOMP_TIME en total). Al
