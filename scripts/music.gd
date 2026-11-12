@@ -5,10 +5,11 @@ extends RefCounted
 ## desde el tema anterior. Si ya suena ese tema, sigue sin cortarse (p. ej. al
 ## pasar a otro nivel del mismo tramo).
 ##
-## Temas (los compone tools/make_music.py): menu y, para los niveles, tres en
-## la zona I (la que más niveles tiene) y dos en cada una de las demás; cada
-## uno suena en un tramo de niveles (TRACKS). Cada uno tiene una intro que suena solo al empezar: el
-## bucle vuelve al punto que indica audio/music/loops.json.
+## Temas (los compone tools/make_music.py, de unos 2 minutos cada uno): menu
+## y, para los niveles, cuatro en la zona I (la que más niveles tiene) y tres
+## en cada una de las demás; cada uno suena en un tramo de niveles (TRACKS).
+## Cada uno tiene una intro que suena solo al empezar: el bucle vuelve al
+## punto que indica audio/music/loops.json.
 ##
 ## Music.set_muffled(true) amortigua la música (más baja y sin agudos, con el
 ## filtro paso bajo y el amplificador del bus "Music"); se usa en la pausa y al
@@ -27,17 +28,19 @@ const FADE_TIME := 1.5
 ## Tema de cada tramo de niveles: [primer nivel (índice), tema]. Los tramos
 ## siguen las zonas del mapa (ui/level_select/map.json) y, dentro de cada
 ## una, los cambios de paisaje o de mecánicas:
-## I: 1-13 aprendizaje, 14-24 enemigos y mapas grandes, 25-34 grandes
-## travesías y vacío; II: 35-48 praderas, 49-60 montaña y nieve; III: 61-68
-## portales, pinchos, láseres y bombas, 69-75 desierto y cristal; IV: 76-87
-## tierra corrompida, 88-100 volcán y obsidiana; V: 101-108 la fortaleza,
+## I: 1-13 aprendizaje, 14-24 enemigos y mapas grandes, 25-30 grandes
+## travesías, 31-34 vacío y puentes colgantes; II: 35-42 islas flotantes,
+## 43-48 el valle y el bosque, 49-60 montaña y nieve; III: 61-68 portales,
+## pinchos, láseres y bombas, 69-71 desierto, 72-75 cuevas de cristal; IV:
+## 76-83 tierra corrompida, 84-91 volcán y obsidiana, 92-100 la plaga y el
+## abismo; V: 101-104 la fortaleza, 105-108 la fundición y el arsenal,
 ## 109-115 el final.
 const TRACKS := [
-	[0, "zone1a"], [13, "zone1b"], [24, "zone1c"],
-	[34, "zone2a"], [48, "zone2b"],
-	[60, "zone3a"], [68, "zone3b"],
-	[75, "zone4a"], [87, "zone4b"],
-	[100, "zone5a"], [108, "zone5b"],
+	[0, "zone1a"], [13, "zone1b"], [24, "zone1c"], [30, "zone1d"],
+	[34, "zone2a"], [42, "zone2c"], [48, "zone2b"],
+	[60, "zone3a"], [68, "zone3b"], [71, "zone3c"],
+	[75, "zone4a"], [83, "zone4b"], [91, "zone4c"],
+	[100, "zone5a"], [104, "zone5c"], [108, "zone5b"],
 ]
 ## Amortiguado: frecuencia de corte (Hz), volumen (dB) y duración de la transición.
 const MUFFLED_CUTOFF := 700.0

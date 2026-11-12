@@ -2,7 +2,7 @@ class_name CheckpointTile
 extends Node3D
 ## Casilla de inicio (ver Level: la salida 'A' y las del campo "checkpoints"
 ## del nivel). Tiene dos estados: activada (baldosa azul de la salida con su
-## luz, TileGlow) y desactivada (baldosa gris con ondas suaves, como gotas
+## luz, TileGlow) y desactivada (baldosa que parpadea entre dos grises, con ondas suaves, como gotas
 ## cayendo en un charco, y unas pocas partículas blancas que suben poco, para
 ## que se vea que es una casilla especial y apetezca ir a ella). Solo una
 ## está activada a la vez: el cubo reaparece en ella al morir. Al pasar el
@@ -11,7 +11,11 @@ extends Node3D
 ##
 ## El nodo va en el centro de la casilla, a ras de suelo.
 
-const OFF_COLOR := Color(0.5, 0.5, 0.52)
+## Desactivada: la baldosa va y viene entre estos dos grises cada
+## BLINK_PERIOD segundos.
+const OFF_COLOR := Color(0.44, 0.44, 0.46)
+const OFF_COLOR_BRIGHT := Color(0.66, 0.66, 0.68)
+const BLINK_PERIOD := 1.4
 ## Ondas de la casilla desactivada: intensidad y segundos entre gotas.
 const RIPPLE_INTENSITY := 0.55
 const RIPPLE_PERIOD := 2.2
@@ -69,6 +73,9 @@ var _idle_multimesh: MultiMesh
 ## Por partícula: { "age", "life", "pos", "rise", "size" }
 var _idle_particles: Array[Dictionary] = []
 var _reveal := 1.0
+## Material propio de la baldosa desactivada (cambia de color al parpadear).
+var _off_mat: StandardMaterial3D
+var _blink_time := 0.0
 
 
 func _ready() -> void:
@@ -102,7 +109,7 @@ func set_reveal_alpha(alpha: float) -> void:
 
 
 func _apply() -> void:
-	(_tile.mesh as BoxMesh).material = _material(Level.START_COLOR if active else OFF_COLOR)
+	(_tile.mesh as BoxMesh).material = _material(Level.START_COLOR) if active else _off_mat
 	_glow.visible = active
 	_idle.visible = not active
 	set_process(not active)
@@ -114,6 +121,10 @@ func _make_idle() -> void:
 	if _ripple_shader == null:
 		_ripple_shader = Shader.new()
 		_ripple_shader.code = RIPPLE_SHADER
+	_off_mat = StandardMaterial3D.new()
+	_off_mat.albedo_color = OFF_COLOR
+	_off_mat.roughness = 0.9
+	_blink_time = randf() * BLINK_PERIOD
 	_idle = Node3D.new()
 	add_child(_idle)
 	var plane := PlaneMesh.new()
@@ -169,6 +180,9 @@ func _spawn_idle(p: Dictionary) -> void:
 
 func _process(delta: float) -> void:
 	_update_idle(delta)
+	_blink_time = fmod(_blink_time + delta, BLINK_PERIOD)
+	var k := 0.5 - 0.5 * cos(_blink_time / BLINK_PERIOD * TAU)
+	_off_mat.albedo_color = OFF_COLOR.lerp(OFF_COLOR_BRIGHT, k)
 
 
 func _update_idle(delta: float) -> void:
