@@ -1771,8 +1771,9 @@ func mark_seen_around(center: Vector2i) -> void:
 				_seen[cell] = minf(_seen.get(cell, INF), distance)
 
 
-## El mapa de la pausa pasa a enseñar el tablero entero, visto o no (para
-## mecánicas futuras; se olvida al reiniciar el nivel).
+## El mapa de la pausa pasa a enseñar el tablero entero, visto o no (con el
+## mapa del nivel comprado, ver GameState.buy_map; se olvida al reconstruir
+## el nivel).
 func reveal_whole_map() -> void:
 	_map_revealed = true
 

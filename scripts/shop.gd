@@ -8,7 +8,15 @@ extends Control
 ## nivel comprado, qué hace, el efecto del siguiente nivel y el botón de
 ## comprar o mejorar con su precio (desactivado si no llegan las monedas, si
 ## ya está al máximo o si le falta una habilidad que necesita); abajo, de
-## dónde salen las monedas y el botón Salir. Esc o Atrás también la cierran.
+## dónde salen las monedas y el botón Salir. La última ficha es el objeto
+## «mapa» (Abilities.MAP): desbloquea los mapas de los niveles siguientes al
+## de esta tienda según Cartografía (ver GameState.buy_map). Esc o Atrás
+## también la cierran.
+##
+## Las fichas van en una tira con desplazamiento horizontal (ver _scroll) tan
+## ancha como la pantalla: se arrastran con el dedo (o el ratón) también
+## empezando encima de un botón, y un arrastre no cuenta como pulsarlo (ver
+## _input y _buy). La rueda del ratón también las mueve.
 ## Funciona con el juego en pausa (process_mode = ALWAYS).
 
 signal closed
@@ -21,15 +29,32 @@ const CARD_OWNED_COLOR := Color(0.24, 0.3, 0.2, 1.0)
 const CARD_BORDER := Color(0.45, 0.36, 0.27, 1.0)
 const GOLD := Color(0.98, 0.85, 0.3)
 const SOFT := Color(0.85, 0.8, 0.72)
-const CARD_WIDTH := 180.0
-const IMAGE_SIZE := Vector2(156, 110)
+## Ancho de cada ficha (todas iguales) y tamaño de su dibujo.
+const CARD_WIDTH := 360.0
+const IMAGE_SIZE := Vector2(190, 108)
+## Tamaños de letra de la ficha: nombre, nivel, descripción, efecto y botón
+## (el botón, más pequeño cuando avisa de lo que falta, en dos líneas).
+const NAME_FONT := 32
+const LEVEL_FONT := 23
+const DESC_FONT := 22
+const VALUE_FONT := 23
+const BUTTON_FONT := 26
+const BUTTON_NOTE_FONT := 20
 const OPEN_TIME := 0.18
-## Margen mínimo (px) entre el panel y el borde de la pantalla.
+## Margen mínimo (px) entre el panel y el borde de la pantalla, a los lados y
+## arriba y abajo (más justo: la tira de fichas ya se desplaza a lo ancho).
 const FIT_MARGIN := 16.0
+const FIT_MARGIN_V := 4.0
+const CARD_SEPARATION := 12.0
+## Píxeles que hay que mover el dedo para que un toque pase a ser arrastre.
+const DRAG_THRESHOLD := 12.0
+const SCROLLBAR_HEIGHT := 10.0
 const ART_DIR := "res://ui/encyclopedia/"
 const ART_OVERRIDES := {
 	Abilities.RECHARGE: "res://ui/shop/recharge.svg",
 	Abilities.MAGNET: "res://ui/shop/magnet.svg",
+	Abilities.CARTOGRAPHY: "res://ui/shop/cartography.svg",
+	Abilities.MAP: "res://ui/shop/map.svg",
 }
 ## Clave del nombre de cada habilidad (las de la enciclopedia cuando existen).
 const NAME_KEYS := {
@@ -39,12 +64,25 @@ const NAME_KEYS := {
 	Abilities.IMMUNITY: "ENC_IMMUNITY_NAME",
 	Abilities.RECHARGE: "SHOP_RECHARGE_NAME",
 	Abilities.MAGNET: "SHOP_MAGNET_NAME",
+	Abilities.CARTOGRAPHY: "SHOP_CARTOGRAPHY_NAME",
+	Abilities.MAP: "SHOP_MAP_NAME",
 }
 
 var _coins_label: Label
 var _panel: PanelContainer
 ## id -> { "card", "level", "value", "button" }
 var _cards := {}
+## Tira de fichas con desplazamiento horizontal, su contenido y el texto de
+## abajo (que ocupa lo mismo de ancho).
+var _scroll: ScrollContainer
+var _cards_row: HBoxContainer
+var _hint: Label
+## Arrastre de la tira: dedo que la arrastra (-1 si ninguno), dónde empezó,
+## desplazamiento que tenía entonces y si ya ha pasado a ser arrastre.
+var _drag_index := -1
+var _drag_start := Vector2.ZERO
+var _drag_scroll := 0
+var _dragged := false
 var _close_button: Button
 var _tween: Tween
 var _open := false
@@ -71,7 +109,15 @@ func open() -> void:
 	if _tween and _tween.is_valid():
 		_tween.kill()
 	modulate.a = 0.0
-	var fit := _fit_scale()
+	# Se mide con la tienda ya visible (mientras está oculta los contenedores
+	# no colocan nada y los textos que se parten en líneas miden de más):
+	# primero la tira al ancho de la pantalla y, un fotograma después, ya
+	# repartida, el alto.
+	_fit_layout()
+	await get_tree().process_frame
+	if not _open:
+		return
+	var fit := _fit_layout()
 	_panel.pivot_offset = _panel.get_combined_minimum_size() * 0.5
 	_panel.scale = Vector2.ONE * fit * 0.94
 	_tween = create_tween().set_parallel()
@@ -98,19 +144,62 @@ func is_open() -> bool:
 	return _open
 
 
-## Escala del panel para que quepa en la pantalla con un margen (1 si ya
-## cabe; con seis fichas no cabe en 16:9).
-func _fit_scale() -> float:
-	var need := _panel.get_combined_minimum_size() + Vector2(FIT_MARGIN, FIT_MARGIN) * 2.0
+## Ajusta la tira de fichas al ancho de la pantalla (todas si caben; si no,
+## lo que quepa y el resto con desplazamiento) y devuelve la escala del panel:
+## 1 salvo que no quepa de alto, y entonces la tira aprovecha el ancho extra
+## que deja la escala.
+func _fit_layout() -> float:
 	var room := get_viewport_rect().size
-	return minf(1.0, minf(room.x / need.x, room.y / need.y))
+	var content := (_scroll.get_child(0) as Control).get_combined_minimum_size().x
+	var padding := _panel.get_theme_stylebox("panel").get_minimum_size().x
+	_set_strip_width(minf(content, room.x - FIT_MARGIN * 2.0 - padding))
+	var fit := minf(1.0, room.y / (_panel.get_combined_minimum_size().y + FIT_MARGIN_V * 2.0))
+	if fit < 1.0:
+		_set_strip_width(minf(content, room.x / fit - FIT_MARGIN * 2.0 - padding))
+	_panel.reset_size()
+	_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
+	return fit
+
+
+func _set_strip_width(width: float) -> void:
+	_scroll.custom_minimum_size.x = width
+	_hint.custom_minimum_size.x = width
+	# El alto del texto de abajo depende de su ancho actual (no del mínimo):
+	# se ajusta ya para que el alto del panel salga bien antes del reparto.
+	_hint.size.x = width
 
 
 func _input(event: InputEvent) -> void:
-	if _open and event.is_action_pressed("ui_cancel"):
+	if not _open:
+		return
+	if event.is_action_pressed("ui_cancel"):
 		Sfx.play("click")
 		close()
 		get_viewport().set_input_as_handled()
+		return
+	# Arrastre de la tira a mano (y no con el de ScrollContainer, que no
+	# arranca si el dedo empieza encima de un botón). Con el ratón llegan
+	# toques emulados (pointing/emulate_touch_from_mouse).
+	if event is InputEventScreenTouch:
+		var touch := event as InputEventScreenTouch
+		if touch.pressed and _drag_index < 0 and _scroll.get_global_rect().has_point(touch.position):
+			_drag_index = touch.index
+			_drag_start = touch.position
+			_drag_scroll = _scroll.scroll_horizontal
+			_dragged = false
+		elif not touch.pressed and touch.index == _drag_index:
+			_drag_index = -1
+			# Después de que el botón que hubiera debajo atienda el soltar.
+			set_deferred("_dragged", false)
+	elif event is InputEventScreenDrag:
+		var drag := event as InputEventScreenDrag
+		if drag.index != _drag_index:
+			return
+		var dx := drag.position.x - _drag_start.x
+		if not _dragged and absf(dx) > DRAG_THRESHOLD:
+			_dragged = true
+		if _dragged:
+			_scroll.scroll_horizontal = _drag_scroll - int(dx / _panel.scale.x)
 
 
 func _build() -> void:
@@ -120,14 +209,14 @@ func _build() -> void:
 	add_child(dim)
 	# Anclado al centro (y no en un CenterContainer, que crecería con el panel
 	# y lo dejaría pegado a la izquierda): así se escala desde el centro (ver
-	# _fit_scale).
+	# _fit_layout).
 	_panel = PanelContainer.new()
 	_panel.set_anchors_preset(Control.PRESET_CENTER)
 	_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_panel.grow_vertical = Control.GROW_DIRECTION_BOTH
 	add_child(_panel)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 12)
+	box.add_theme_constant_override("separation", 8)
 	_panel.add_child(box)
 
 	var header := HBoxContainer.new()
@@ -158,33 +247,53 @@ func _build() -> void:
 	_coins_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	header.add_child(_coins_label)
 
-	var cards := HBoxContainer.new()
-	cards.add_theme_constant_override("separation", 12)
-	cards.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_child(cards)
-	for id in Abilities.ids():
-		cards.add_child(_build_card(id))
+	_scroll = ScrollContainer.new()
+	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	# Sin el arrastre propio de ScrollContainer: lo lleva _input.
+	_scroll.scroll_deadzone = 1000000
+	_scroll.follow_focus = true
+	box.add_child(_scroll)
+	# Hueco debajo de las fichas para la barra de desplazamiento, que se
+	# dibuja encima del contenido.
+	var strip := MarginContainer.new()
+	strip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	strip.add_theme_constant_override("margin_bottom", int(SCROLLBAR_HEIGHT + 8.0))
+	_scroll.add_child(strip)
+	_cards_row = HBoxContainer.new()
+	_cards_row.add_theme_constant_override("separation", int(CARD_SEPARATION))
+	_cards_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	strip.add_child(_cards_row)
+	for id in _card_ids():
+		_cards_row.add_child(_build_card(id))
+	_style_scrollbar(_scroll.get_h_scroll_bar())
 
-	var hint := Label.new()
-	hint.text = "SHOP_HINT"
-	hint.add_theme_font_size_override("font_size", 20)
-	hint.add_theme_color_override("font_color", SOFT)
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.custom_minimum_size = Vector2(Abilities.CATALOG.size() * (CARD_WIDTH + 12.0) - 12.0, 0)
-	box.add_child(hint)
+	_hint = Label.new()
+	_hint.text = "SHOP_HINT"
+	_hint.add_theme_font_size_override("font_size", 20)
+	_hint.add_theme_color_override("font_color", SOFT)
+	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(_hint)
 
 	var buttons := HBoxContainer.new()
 	buttons.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.add_child(buttons)
 	_close_button = Button.new()
 	_close_button.text = "SHOP_CLOSE"
-	_close_button.custom_minimum_size = Vector2(240, 68)
+	_close_button.custom_minimum_size = Vector2(240, 60)
 	_close_button.focus_mode = Control.FOCUS_ALL
 	_close_button.pressed.connect(func() -> void:
 		Sfx.play("click")
 		close())
 	buttons.add_child(_close_button)
+
+
+## Fichas de la tienda: las habilidades y, al final, el mapa.
+static func _card_ids() -> Array[String]:
+	var list := Abilities.ids()
+	list.append(Abilities.MAP)
+	return list
 
 
 func _build_card(id: String) -> Control:
@@ -202,37 +311,52 @@ func _build_card(id: String) -> Control:
 	box.add_child(art)
 	var name_label := Label.new()
 	name_label.text = NAME_KEYS[id]
-	name_label.add_theme_font_size_override("font_size", 24)
+	name_label.add_theme_font_size_override("font_size", NAME_FONT)
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(name_label)
 	var level := Label.new()
-	level.add_theme_font_size_override("font_size", 18)
+	level.add_theme_font_size_override("font_size", LEVEL_FONT)
 	level.add_theme_color_override("font_color", GOLD)
 	level.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(level)
 	var desc := Label.new()
 	desc.text = "SHOP_%s_DESC" % id.to_upper()
-	desc.add_theme_font_size_override("font_size", 16)
+	desc.add_theme_font_size_override("font_size", DESC_FONT)
 	desc.add_theme_color_override("font_color", SOFT)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	desc.custom_minimum_size = Vector2(CARD_WIDTH - 20.0, 72)
+	desc.custom_minimum_size = Vector2(CARD_WIDTH - 20.0, 0)
 	desc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	box.add_child(desc)
 	var value := Label.new()
-	value.add_theme_font_size_override("font_size", 17)
+	value.add_theme_font_size_override("font_size", VALUE_FONT)
 	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	value.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	value.custom_minimum_size = Vector2(CARD_WIDTH - 20.0, 0)
 	box.add_child(value)
 	var button := Button.new()
-	button.custom_minimum_size = Vector2(0, 58)
-	button.add_theme_font_size_override("font_size", 20)
+	button.custom_minimum_size = Vector2(0, 62)
+	button.add_theme_font_size_override("font_size", BUTTON_FONT)
 	button.focus_mode = Control.FOCUS_ALL
 	button.pressed.connect(_buy.bind(id))
 	box.add_child(button)
 	_cards[id] = {"card": card, "level": level, "value": value, "button": button}
 	return card
+
+
+## Barra de desplazamiento fina en los colores de las fichas, separada de
+## ellas.
+func _style_scrollbar(bar: ScrollBar) -> void:
+	var track := StyleBoxFlat.new()
+	track.bg_color = Color(CARD_BORDER, 0.35)
+	track.set_corner_radius_all(4)
+	bar.add_theme_stylebox_override("scroll", track)
+	var grab := StyleBoxFlat.new()
+	grab.bg_color = Color(GOLD, 0.75)
+	grab.set_corner_radius_all(4)
+	for state in ["grabber", "grabber_highlight", "grabber_pressed"]:
+		bar.add_theme_stylebox_override(state, grab)
+	bar.custom_minimum_size.y = SCROLLBAR_HEIGHT
 
 
 func _card_style(color: Color) -> StyleBoxFlat:
@@ -246,7 +370,12 @@ func _card_style(color: Color) -> StyleBoxFlat:
 
 
 func _buy(id: String) -> void:
-	if not GameState.buy_ability(id):
+	# Soltar el dedo tras arrastrar la tira no compra.
+	if _dragged:
+		return
+	var done := GameState.buy_map(GameState.current_level) if id == Abilities.MAP \
+		else GameState.buy_ability(id)
+	if not done:
 		Sfx.play("reject")
 		return
 	Sfx.play("powerup")
@@ -265,6 +394,9 @@ func _refresh() -> void:
 	_coins_label.text = tr("SHOP_COINS") % GameState.coins()
 	for id: String in _cards:
 		var parts: Dictionary = _cards[id]
+		if id == Abilities.MAP:
+			_refresh_map(parts)
+			continue
 		var current := GameState.ability_level(id)
 		var top := Abilities.max_level(id)
 		var maxed := current >= top
@@ -285,7 +417,7 @@ func _refresh() -> void:
 			button.theme_type_variation = &""
 		elif not GameState.meets_ability_needs(id):
 			button.text = tr("SHOP_NEEDS")
-			button.add_theme_font_size_override("font_size", 15)
+			button.add_theme_font_size_override("font_size", BUTTON_NOTE_FONT)
 			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			button.disabled = true
 			button.theme_type_variation = &""
@@ -295,8 +427,48 @@ func _refresh() -> void:
 			button.text = (tr("SHOP_UPGRADE") if owned else tr("SHOP_BUY")) % price
 			button.disabled = not GameState.can_buy_ability(id)
 			button.theme_type_variation = &"" if button.disabled else &"PrimaryButton"
-		button.add_theme_font_size_override("font_size", 20)
+		button.add_theme_font_size_override("font_size", BUTTON_FONT)
 		button.autowrap_mode = TextServer.AUTOWRAP_OFF
+
+
+## Ficha del mapa: cuántos mapas da cada compra, qué niveles desbloquea y el
+## botón (desactivado sin Cartografía, si ya están todos desbloqueados o si no
+## llegan las monedas).
+func _refresh_map(parts: Dictionary) -> void:
+	var cartography := GameState.ability_level(Abilities.CARTOGRAPHY)
+	var shop_level := GameState.current_level
+	var levels := GameState.map_levels(shop_level)
+	var count := levels.size()
+	var level_label: Label = parts["level"]
+	level_label.text = tr("SHOP_LOCKED") if cartography == 0 \
+		else (tr("SHOP_MAP_COUNT_ONE") if count == 1 else tr("SHOP_MAP_COUNT") % count)
+	var value_label: Label = parts["value"]
+	value_label.text = ""
+	if count == 1:
+		value_label.text = tr("SHOP_MAP_LEVEL") % (levels[0] + 1)
+	elif count > 1:
+		value_label.text = tr("SHOP_MAP_LEVELS") % [levels[0] + 1, levels[-1] + 1]
+	var button: Button = parts["button"]
+	var owned := cartography > 0 and count > 0 and GameState.new_maps(shop_level) == 0
+	(parts["card"] as PanelContainer).add_theme_stylebox_override("panel",
+		_card_style(CARD_OWNED_COLOR if owned else CARD_COLOR))
+	button.add_theme_font_size_override("font_size", BUTTON_FONT)
+	button.autowrap_mode = TextServer.AUTOWRAP_OFF
+	button.theme_type_variation = &""
+	button.disabled = true
+	if cartography == 0:
+		button.text = tr("SHOP_MAP_NEEDS")
+		button.add_theme_font_size_override("font_size", BUTTON_NOTE_FONT)
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	elif count == 0:
+		button.text = tr("SHOP_MAP_NONE")
+	elif owned:
+		button.text = tr("SHOP_MAP_OWNED")
+	else:
+		button.text = tr("SHOP_BUY") % Abilities.map_price(cartography)
+		button.disabled = not GameState.can_buy_map(shop_level)
+		if not button.disabled:
+			button.theme_type_variation = &"PrimaryButton"
 
 
 ## Texto del efecto de la habilidad en ese nivel (vacío si no tiene valores).
@@ -313,6 +485,8 @@ func _effect_text(id: String, at_level: int) -> String:
 			var reach: float = Abilities.value(id, at_level)
 			return tr("SHOP_MAGNET_VALUE_ONE") if is_equal_approx(reach, 1.0) \
 				else tr("SHOP_MAGNET_VALUE") % _number(reach)
+		Abilities.CARTOGRAPHY:
+			return tr("SHOP_CARTOGRAPHY_VALUE") % Abilities.maps_per_purchase(at_level)
 	return ""
 
 

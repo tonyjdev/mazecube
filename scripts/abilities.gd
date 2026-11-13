@@ -28,6 +28,10 @@ const STOMP := "stomp"
 const IMMUNITY := "immunity"
 const RECHARGE := "recharge"
 const MAGNET := "magnet"
+const CARTOGRAPHY := "cartography"
+## El mapa no es una habilidad sino un objeto de la tienda (ver map_price y
+## GameState.buy_map); comparte con ellas los textos (SHOP_MAP_*) y la ficha.
+const MAP := "map"
 
 const CATALOG: Array[Dictionary] = [
 	{"id": REVERSE, "prices": [60]},
@@ -41,7 +45,14 @@ const CATALOG: Array[Dictionary] = [
 		"needs": [DASH, STOMP, IMMUNITY]},
 	# Casillas alrededor del cubo desde las que atrae las monedas.
 	{"id": MAGNET, "prices": [80, 160, 260], "values": [0.0, 1.0, 2.0, 3.0]},
+	# Mapas que desbloquea cada compra del objeto «mapa» (ver MAP): los de
+	# los niveles siguientes al de la tienda; con 10 se llega a la próxima.
+	{"id": CARTOGRAPHY, "prices": [70, 110, 160, 220, 290], "values": [0, 2, 4, 6, 8, 10]},
 ]
+
+## Precio del objeto «mapa» según el nivel de Cartografía (desde el 1): cuantos
+## más mapas desbloquea, más caro, con algo de descuento por cantidad.
+const MAP_PRICES: Array[int] = [15, 28, 40, 50, 60]
 
 ## Monedas (ver GameState.coins): las que se recogen del suelo (cada una vale
 ## COINS_PER_PICKUP; salen de los enemigos destruidos y de los cofres) y la
@@ -90,6 +101,18 @@ static func value(id: String, at_level: int) -> Variant:
 	if values.is_empty():
 		return null
 	return values[clampi(at_level, 0, values.size() - 1)]
+
+
+## Mapas que desbloquea el objeto «mapa» con ese nivel de Cartografía.
+static func maps_per_purchase(cartography_level: int) -> int:
+	return value(CARTOGRAPHY, cartography_level)
+
+
+## Precio del objeto «mapa» con ese nivel de Cartografía (0 si no se tiene).
+static func map_price(cartography_level: int) -> int:
+	if cartography_level <= 0:
+		return 0
+	return MAP_PRICES[mini(cartography_level, MAP_PRICES.size()) - 1]
 
 
 ## Habilidades de las que hace falta tener alguna para comprar `id` (vacío

@@ -826,6 +826,9 @@ func _restart() -> void:
 	# cofres ya abiertos no vuelven).
 	level.opened_chests = GameState.opened_chests(current_level)
 	level.build()
+	# Con el mapa comprado (ver GameState.buy_map), el de la pausa se ve entero.
+	if GameState.has_map(current_level):
+		level.reveal_whole_map()
 	cube.reset(level)
 	camera.snap()
 	# El nivel ha olvidado lo explorado: se vuelve a apuntar aunque el cubo

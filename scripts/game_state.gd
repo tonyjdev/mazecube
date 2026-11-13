@@ -15,7 +15,9 @@ extends Node
 ##   su mejor recompensa y repetirlo solo da la diferencia si se mejora), y
 ##   bajan al comprar en las tiendas. Las habilidades compradas se guardan
 ##   con su nivel (ver Abilities y buy_ability). Los cofres abiertos de cada
-##   nivel no vuelven a salir (ver open_chest y opened_chests).
+##   nivel no vuelven a salir (ver open_chest y opened_chests). Los mapas
+##   comprados (ver buy_map) son los niveles cuyo mapa de la pausa se ve
+##   entero desde el principio.
 ##   Las partidas de antes de las monedas (sección "points") conservan las
 ##   habilidades compradas, pero empiezan sin monedas.
 ## - Ajustes (user://settings.cfg): volumen de efectos y de música (buses
@@ -104,6 +106,8 @@ var _opened_chests := {}
 var _save_queued := false
 ## Habilidad -> nivel comprado (las que no están, nivel 0: bloqueadas).
 var _abilities := {}
+## Índices de los niveles con el mapa desbloqueado (ver buy_map).
+var _maps: Array[int] = []
 ## Capa negra de los fundidos y su animación en curso.
 var _fade_rect: ColorRect
 var _fade_tween: Tween
@@ -291,6 +295,53 @@ func buy_ability(id: String) -> bool:
 	return true
 
 
+## El mapa de la pausa de este nivel se ve entero (ver buy_map).
+func has_map(index: int) -> bool:
+	return _maps.has(index)
+
+
+## Niveles cuyos mapas desbloquea el objeto «mapa» comprado en la tienda del
+## nivel `shop_level`: los siguientes, tantos como dé Cartografía (ver
+## Abilities.maps_per_purchase), sin pasar del último nivel. Vacío si no se
+## tiene Cartografía.
+func map_levels(shop_level: int) -> Array[int]:
+	var list: Array[int] = []
+	var count := Abilities.maps_per_purchase(ability_level(Abilities.CARTOGRAPHY))
+	for i in range(shop_level + 1, mini(shop_level + count, Levels.count() - 1) + 1):
+		list.append(i)
+	return list
+
+
+## Mapas de map_levels que aún no están desbloqueados.
+func new_maps(shop_level: int) -> int:
+	var count := 0
+	for i in map_levels(shop_level):
+		if not has_map(i):
+			count += 1
+	return count
+
+
+## Se puede comprar el mapa en la tienda de `shop_level`: se tiene
+## Cartografía, desbloquearía algún mapa nuevo y llegan las monedas.
+func can_buy_map(shop_level: int) -> bool:
+	var level := ability_level(Abilities.CARTOGRAPHY)
+	return level > 0 and new_maps(shop_level) > 0 and _coins >= Abilities.map_price(level)
+
+
+## Compra el mapa en la tienda de `shop_level` (ver map_levels). Devuelve true
+## si se ha podido.
+func buy_map(shop_level: int) -> bool:
+	if not can_buy_map(shop_level):
+		return false
+	_coins -= Abilities.map_price(ability_level(Abilities.CARTOGRAPHY))
+	for i in map_levels(shop_level):
+		if not _maps.has(i):
+			_maps.append(i)
+	_maps.sort()
+	_save_progress()
+	return true
+
+
 func _load_progress() -> void:
 	var cfg := ConfigFile.new()
 	if cfg.load(PROGRESS_PATH) != OK:
@@ -315,6 +366,10 @@ func _load_progress() -> void:
 				if cell is Vector2i:
 					cells.append(cell)
 			_opened_chests[int(key)] = cells
+	for value: Variant in cfg.get_value("coins", "maps", []):
+		if not _maps.has(int(value)):
+			_maps.append(int(value))
+	_maps.sort()
 	# Las habilidades se guardan en "coins"; las partidas de antes de las
 	# monedas las tenían en "points".
 	var section := "coins" if cfg.has_section_key("coins", "abilities") else "points"
@@ -335,8 +390,8 @@ func _load_progress() -> void:
 		_save_progress()
 
 
-## Borra todo el progreso (niveles, estrellas, monedas, cofres abiertos y
-## habilidades) para empezar desde cero. Los ajustes no se tocan.
+## Borra todo el progreso (niveles, estrellas, monedas, cofres abiertos,
+## habilidades y mapas) para empezar desde cero. Los ajustes no se tocan.
 func reset_progress() -> void:
 	_completed.clear()
 	_stars.clear()
@@ -345,6 +400,7 @@ func reset_progress() -> void:
 	_level_rewards.clear()
 	_opened_chests.clear()
 	_abilities.clear()
+	_maps.clear()
 	current_level = 0
 	_save_progress()
 
@@ -367,6 +423,7 @@ func _save_progress() -> void:
 	cfg.set_value("coins", "levels", _level_rewards)
 	cfg.set_value("coins", "chests", _opened_chests)
 	cfg.set_value("coins", "abilities", _abilities)
+	cfg.set_value("coins", "maps", _maps)
 	if _all_unlocked:
 		cfg.set_value("progress", "all_unlocked", true)
 	cfg.save(PROGRESS_PATH)
